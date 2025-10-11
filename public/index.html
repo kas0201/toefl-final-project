@@ -147,9 +147,21 @@
                 background-color: #218838;
             }
 
+        #submit-btn {
+            background-color: #007bff;
+        }
+
+            #submit-btn:hover {
+                background-color: #0069d9;
+            }
+
+            #submit-btn:disabled {
+                background-color: #a0a0a0;
+                cursor: not-allowed;
+            }
+
         #reset-btn {
             background-color: #dc3545;
-            margin-left: 10px;
         }
 
             #reset-btn:hover {
@@ -174,6 +186,13 @@
             #word-count.sufficient {
                 color: #28a745;
             }
+
+        #status-message {
+            text-align: center;
+            margin-top: 15px;
+            font-weight: bold;
+            height: 20px;
+        }
     </style>
 </head>
 <body>
@@ -217,37 +236,85 @@
                 </div>
                 <div class="buttons">
                     <button id="start-btn">Start</button>
+                    <button id="submit-btn" disabled>Submit</button>
                     <button id="reset-btn">Reset</button>
                 </div>
             </div>
+            <p id="status-message"></p>
         </div>
     </div>
 
     <script>
         const startBtn = document.getElementById('start-btn');
+        const submitBtn = document.getElementById('submit-btn');
         const resetBtn = document.getElementById('reset-btn');
         const timerEl = document.getElementById('timer');
         const wordCountEl = document.getElementById('word-count');
         const textarea = document.getElementById('user-textarea');
+        const statusMessageEl = document.getElementById('status-message');
 
         let timer;
-        let timeRemaining = 600; // 10 minutes in seconds
+        let timeRemaining = 600;
+
+        async function submitResponse() {
+            const content = textarea.value;
+            const wordCount = content ? content.match(/\S+/g).length : 0;
+
+            if (wordCount === 0) {
+                alert("Cannot submit an empty response.");
+                return;
+            }
+
+            statusMessageEl.textContent = "Submitting...";
+            statusMessageEl.style.color = '#007bff';
+            submitBtn.disabled = true;
+
+            try {
+                // ============ 关键！将这里的 URL 替换成你在第一步中复制的网址 ============
+                const apiUrl = 'https://toefl-final-project.onrender.com';
+                // =====================================================================
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ content: content, wordCount: wordCount }),
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    statusMessageEl.textContent = result.message;
+                    statusMessageEl.style.color = '#28a745';
+                    textarea.disabled = true;
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                statusMessageEl.textContent = `Error: ${error.message}`;
+                statusMessageEl.style.color = '#dc3545';
+                submitBtn.disabled = false;
+            }
+        }
 
         function updateTimerDisplay() {
             const minutes = Math.floor(timeRemaining / 60);
             const seconds = timeRemaining % 60;
             timerEl.textContent = `Time: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
             if (timeRemaining < 60) {
-                 timerEl.style.color = '#dc3545';
+                timerEl.style.color = '#dc3545';
             } else {
-                 timerEl.style.color = '#005a9c';
+                timerEl.style.color = '#005a9c';
             }
         }
 
         function startTimer() {
             startBtn.disabled = true;
+            // submitBtn.disabled = false; // <<< 如果你想不到10分钟不能提交，就保持这行是注释掉的状态
             textarea.disabled = false;
             textarea.focus();
+            statusMessageEl.textContent = '';
 
             timer = setInterval(() => {
                 timeRemaining--;
@@ -256,7 +323,9 @@
                     clearInterval(timer);
                     timerEl.textContent = "Time's Up!";
                     textarea.disabled = true;
-                    alert("Time's Up! Your writing session has ended.");
+                    submitBtn.disabled = true;
+                    alert("Time's Up! Automatically submitting your response.");
+                    submitResponse();
                 }
             }, 1000);
         }
@@ -266,10 +335,12 @@
             timeRemaining = 600;
             updateTimerDisplay();
             startBtn.disabled = false;
+            submitBtn.disabled = true;
             textarea.disabled = true;
             textarea.value = '';
             updateWordCount();
             timerEl.style.color = '#005a9c';
+            statusMessageEl.textContent = '';
         }
 
         function updateWordCount() {
@@ -284,10 +355,10 @@
         }
 
         startBtn.addEventListener('click', startTimer);
+        submitBtn.addEventListener('click', submitResponse);
         resetBtn.addEventListener('click', resetTimer);
         textarea.addEventListener('input', updateWordCount);
 
-        // Initial setup
         resetTimer();
     </script>
 
