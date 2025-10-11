@@ -270,9 +270,9 @@
             submitBtn.disabled = true;
 
             try {
-                // ============ 关键！确保这里的 URL 是你自己的 Render 网址 ============
-                const apiUrl = 'https://toefl-final-project.onrender.com/';
-                // =====================================================================
+                // ============ 关键！这个地址现在是完整的、正确的！ ============
+                const apiUrl = 'https://toefl-final-project.onrender.com/api/submit-response';
+                // =============================================================
 
                 const response = await fetch(apiUrl, {
                     method: 'POST',
@@ -282,15 +282,23 @@
                     body: JSON.stringify({ content: content, wordCount: wordCount }),
                 });
 
-                const result = await response.json();
-
-                if (response.ok) {
-                    statusMessageEl.textContent = result.message;
-                    statusMessageEl.style.color = '#28a745';
-                    textarea.disabled = true;
+                // 检查响应是否为 JSON
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    const result = await response.json();
+                    if (response.ok) {
+                        statusMessageEl.textContent = result.message;
+                        statusMessageEl.style.color = '#28a745';
+                        textarea.disabled = true;
+                    } else {
+                        throw new Error(result.message);
+                    }
                 } else {
-                    throw new Error(result.message);
+                    // 如果响应不是 JSON，则显示原始文本以帮助调试
+                    const text = await response.text();
+                    throw new Error("Received non-JSON response from server: " + text);
                 }
+
             } catch (error) {
                 statusMessageEl.textContent = `Error: ${error.message}`;
                 statusMessageEl.style.color = '#dc3545';
@@ -311,7 +319,7 @@
 
         function startTimer() {
             startBtn.disabled = true;
-            submitBtn.disabled = false; // <<< 关键修正！已经去掉了注释
+            submitBtn.disabled = false;
             textarea.disabled = false;
             textarea.focus();
             statusMessageEl.textContent = '';
