@@ -18,7 +18,7 @@ app.post('/api/submit-response', async (req, res) => {
     }
 
     const sql = `INSERT INTO responses (content, word_count) VALUES ($1, $2) RETURNING id`;
-
+    
     try {
         const result = await pool.query(sql, [content, wordCount]);
         const newId = result.rows[0].id;
@@ -37,17 +37,17 @@ app.use(express.static('public'));
 
 // --- PostgreSQL 数据库连接 ---
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: {
-        rejectUnauthorized: false
-    }
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 pool.connect((err) => {
-    if (err) {
-        return console.error('❌ 数据库连接失败:', err);
-    }
-    console.log('✅ 成功连接到 PostgreSQL 数据库！');
+  if (err) {
+    return console.error('❌ 数据库连接失败:', err);
+  }
+  console.log('✅ 成功连接到 PostgreSQL 数据库！');
 });
 
 // --- 启动服务器 ---
