@@ -9,10 +9,6 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// ======================= 关键修正 =======================
-//  我们把 API 路由的定义，移动到了静态文件服务的前面！
-// ======================================================
-
 // --- API 路由：处理提交作文的请求 ---
 app.post('/api/submit-response', async (req, res) => {
     const { content, wordCount } = req.body;
@@ -27,7 +23,9 @@ app.post('/api/submit-response', async (req, res) => {
         const result = await pool.query(sql, [content, wordCount]);
         const newId = result.rows[0].id;
         console.log(`📝 一篇新作文已成功保存到数据库，ID为 ${newId}`);
-        res.status(201).json({ message: "作文已成功保存！", id: newId });
+        // ============ 关键修复！恢复了正确的返回格式 ============
+        res.status(201).json({ message: "Submission successful!", id: newId });
+        // =======================================================
     } catch (err) {
         console.error("数据库插入失败:", err);
         res.status(500).json({ message: "服务器内部错误，保存失败。" });
@@ -35,9 +33,7 @@ app.post('/api/submit-response', async (req, res) => {
 });
 
 // --- 静态文件服务 ---
-// 这个规则现在在最后，只有当请求不匹配任何 API 路由时，才会到这里来。
 app.use(express.static('public'));
-
 
 // --- PostgreSQL 数据库连接 ---
 const pool = new Pool({
