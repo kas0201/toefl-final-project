@@ -270,8 +270,8 @@
             submitBtn.disabled = true;
 
             try {
-                // ============ 关键！将这里的 URL 替换成你在第一步中复制的网址 ============
-                const apiUrl = 'https://toefl-final-project.onrender.com';
+                // ============ 关键！确保这里的 URL 是你自己的 Render 网址 ============
+                const apiUrl = 'https://toefl-final-project.onrender.com/';
                 // =====================================================================
 
                 const response = await fetch(apiUrl, {
@@ -311,7 +311,7 @@
 
         function startTimer() {
             startBtn.disabled = true;
-            // submitBtn.disabled = false; // <<< 如果你想不到10分钟不能提交，就保持这行是注释掉的状态
+            submitBtn.disabled = false; // <<< 关键修正！已经去掉了注释
             textarea.disabled = false;
             textarea.focus();
             statusMessageEl.textContent = '';
