@@ -3,235 +3,285 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TOEFL Academic Discussion Practice</title>
+    <title>Academic Discussion - TOEFL® Practice</title>
+    <!-- 引入 Google Fonts: Inter & Roboto Mono -->
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500&display=swap');
+
+        /* --- 动画效果 --- */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* --- 苹果风格 Pro 基础样式 --- */
+        :root {
+            --bg-color: #f0f0f5;
+            --container-bg: #ffffff;
+            --text-primary: #1d1d1f;
+            --text-secondary: #6e6e73;
+            --text-tertiary: #86868b;
+            --accent-blue: #007aff;
+            --accent-blue-hover: #0060c5;
+            --accent-green: #30d158;
+            --accent-red: #ff453a;
+            --border-color: #d6d6d6;
+            --control-bg: #f5f5f7;
+        }
 
         body {
-            font-family: 'Lato', sans-serif;
-            background-color: #f0f2f5;
-            color: #333;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
             margin: 0;
-            padding: 20px;
+            padding: 24px;
             box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
+        /* --- 主容器 --- */
         .main-container {
             width: 100%;
-            max-width: 800px;
-            background-color: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            padding: 30px 40px;
-            border: 1px solid #e0e0e0;
+            max-width: 760px;
+            background-color: var(--container-bg);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            border: 1px solid rgba(0,0,0,0.08);
+            animation: fadeIn 0.6s ease-out forwards;
         }
 
+        /* --- 标题 --- */
         h1 {
+            font-size: 32px;
+            font-weight: 700;
             text-align: center;
-            color: #005a9c;
-            font-size: 24px;
-            margin-bottom: 10px;
+            margin: 0 0 8px 0;
+            letter-spacing: -0.5px;
         }
 
         .subtitle {
             text-align: center;
-            color: #666;
-            margin-bottom: 25px;
-            font-size: 16px;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            font-size: 17px;
         }
 
-        .directions {
-            background-color: #e6f7ff;
-            border-left: 5px solid #1890ff;
-            padding: 15px 20px;
-            margin-bottom: 25px;
-            border-radius: 5px;
-            font-size: 15px;
-            line-height: 1.6;
-        }
-
+        /* --- 帖子卡片 --- */
         .post {
-            margin-bottom: 25px;
+            border-radius: 12px;
             padding: 20px;
-            border-radius: 8px;
-            border: 1px solid #d9d9d9;
-            background-color: #fafafa;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
         }
 
         .post-author {
-            font-weight: 700;
-            font-size: 18px;
-            color: #003366;
-            margin-bottom: 10px;
-        }
-
-        .professor .post-author {
-            color: #d9534f;
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 12px;
         }
 
         .post-content {
             font-size: 16px;
-            line-height: 1.7;
+            line-height: 1.65;
+            color: var(--text-secondary);
         }
 
             .post-content strong {
-                color: #005a9c;
+                color: var(--text-primary);
+                font-weight: 600;
             }
 
-        .user-response-area {
-            margin-top: 20px;
-        }
-
         .response-header {
-            font-size: 20px;
+            font-size: 21px;
             font-weight: 700;
-            color: #005a9c;
-            margin-bottom: 15px;
+            margin-top: 32px;
+            margin-bottom: 16px;
         }
 
+        /* --- 文本输入框 --- */
         #user-textarea {
             width: 100%;
-            min-height: 180px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            padding: 15px;
+            min-height: 160px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 14px;
             font-size: 16px;
-            font-family: 'Lato', sans-serif;
+            font-family: 'Inter', sans-serif;
             resize: vertical;
             box-sizing: border-box;
-            transition: border-color 0.3s, box-shadow 0.3s;
+            background-color: #fff;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
             #user-textarea:focus {
                 outline: none;
-                border-color: #1890ff;
-                box-shadow: 0 0 5px rgba(24, 144, 255, 0.2);
+                border-color: var(--accent-blue);
+                box-shadow: inset 0 0 0 1px var(--accent-blue);
             }
 
             #user-textarea:disabled {
-                background-color: #f5f5f5;
-                cursor: not-allowed;
+                background-color: var(--control-bg);
             }
 
-        .controls {
+        /* --- 控制面板 --- */
+        .controls-container {
+            background-color: var(--control-bg);
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin-top: 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-top: 15px;
+            border: 1px solid rgba(0,0,0,0.05);
+            box-shadow: inset 0 1px 1px rgba(0,0,0,0.02);
         }
-
-        .buttons button {
-            padding: 10px 20px;
-            font-size: 16px;
-            font-weight: 700;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            color: white;
-            transition: background-color 0.3s, transform 0.1s;
-        }
-
-            .buttons button:active {
-                transform: scale(0.98);
-            }
-
-        #start-btn {
-            background-color: #28a745;
-        }
-
-            #start-btn:hover {
-                background-color: #218838;
-            }
-
-        #submit-btn {
-            background-color: #007bff;
-        }
-
-            #submit-btn:hover {
-                background-color: #0069d9;
-            }
-
-            #submit-btn:disabled {
-                background-color: #a0a0a0;
-                cursor: not-allowed;
-            }
-
-        #reset-btn {
-            background-color: #dc3545;
-        }
-
-            #reset-btn:hover {
-                background-color: #c82333;
-            }
 
         .stats {
             display: flex;
-            gap: 20px;
-            font-size: 18px;
-            font-weight: 700;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .timer-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .icon {
+            width: 20px;
+            height: 20px;
+            stroke-width: 1.5;
+            color: var(--text-tertiary);
         }
 
         #timer {
-            color: #005a9c;
+            font-family: 'Roboto Mono', 'SF Mono', Menlo, Monaco, Consolas, "Courier New", monospace;
+            font-size: 18px;
+            font-weight: 500;
+            color: var(--text-primary);
         }
 
         #word-count {
-            color: #666;
+            color: var(--text-tertiary);
+            font-size: 14px;
+            font-weight: 500;
         }
 
             #word-count.sufficient {
-                color: #28a745;
+                color: var(--accent-green);
+            }
+
+        /* --- 按钮 --- */
+        .buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+            .buttons button {
+                padding: 8px 20px;
+                font-size: 14px;
+                font-weight: 600;
+                border-radius: 8px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                border: none;
+            }
+
+                .buttons button:active:not(:disabled) {
+                    transform: scale(0.97);
+                }
+
+        #start-btn, #submit-btn {
+            background-color: var(--accent-blue);
+            color: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+            #start-btn:hover, #submit-btn:hover:not(:disabled) {
+                background-color: var(--accent-blue-hover);
+            }
+
+            #start-btn:disabled, #submit-btn:disabled {
+                background-color: #dcdce1;
+                color: var(--text-tertiary);
+                cursor: not-allowed;
+                box-shadow: none;
+            }
+
+        #reset-btn {
+            background-color: #e5e5ea;
+            color: var(--text-primary);
+        }
+
+            #reset-btn:hover {
+                background-color: #dcdce1;
             }
 
         #status-message {
             text-align: center;
-            margin-top: 15px;
-            font-weight: bold;
+            margin-top: 20px;
+            font-weight: 500;
+            font-size: 15px;
             height: 20px;
+            transition: color 0.3s ease;
         }
     </style>
 </head>
 <body>
 
     <div class="main-container">
-        <h1>TOEFL Academic Discussion Practice</h1>
-        <p class="subtitle">Simulated Testing Environment</p>
+        <h1>Academic Discussion</h1>
+        <p class="subtitle">TOEFL® Writing Practice</p>
 
-        <div class="directions">
-            <strong>Directions:</strong> Read the professor's question and the two student responses. Then write your own response that addresses the professor's question and contributes to the discussion. You must write <strong>at least 100 words</strong>.
-        </div>
-
-        <div class="post professor">
-            <p class="post-author">Professor Anya Sharma:</p>
+        <!-- === 关键修正：恢复原始的、完整的题目内容 === -->
+        <div class="post">
+            <p class="post-author">Professor Anya Sharma</p>
             <p class="post-content">
                 Hello class. This week, we're discussing the impact of technology on social connections. Some argue that social media and instant messaging have made us more connected than ever, allowing us to maintain relationships across vast distances. Others claim that these technologies lead to more superficial, low-quality interactions and actually increase feelings of loneliness. So, for our discussion this week, I want to ask you: <strong>Does modern technology, especially social media, ultimately bring people closer together or drive them further apart?</strong>
             </p>
         </div>
 
         <div class="post">
-            <p class="post-author">Paul:</p>
+            <p class="post-author">Paul</p>
             <p class="post-content">
                 I definitely believe that modern technology brings people closer. Before, if your best friend moved to another country, you might lose touch completely. Now, you can video chat with them every day and feel like you're in the same room. It also helps people find communities they wouldn't have access to otherwise, like online groups for rare hobbies or support groups for people with specific health conditions. It has opened up a whole new world of social connection that was impossible before.
             </p>
         </div>
 
         <div class="post">
-            <p class="post-author">Sarah:</p>
+            <p class="post-author">Sarah</p>
             <p class="post-content">
                 I have to disagree with Paul. While it's true we can "connect" with more people, I think these connections are weak and superficial. People spend hours scrolling through photos and leaving one-word comments instead of having a deep, meaningful conversation. I've seen groups of friends at a restaurant all staring at their phones instead of talking to each other. This isn't real connection; it's a distraction that actually pulls us away from the people who are right in front of us. It creates an illusion of closeness while making us feel more isolated.
             </p>
         </div>
+        <!-- ======================================================= -->
 
         <div class="user-response-area">
-            <p class="response-header">Your Response:</p>
-            <textarea id="user-textarea" placeholder="Start writing your response here after clicking 'Start'..." disabled></textarea>
-            <div class="controls">
+            <p class="response-header">Your Response</p>
+            <textarea id="user-textarea" placeholder="Click 'Start' to begin your response..." disabled></textarea>
+
+            <div class="controls-container">
                 <div class="stats">
-                    <div id="timer">Time: 10:00</div>
+                    <div class="timer-group">
+                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div id="timer">10:00</div>
+                    </div>
                     <div id="word-count">Words: 0</div>
                 </div>
                 <div class="buttons">
@@ -240,6 +290,7 @@
                     <button id="reset-btn">Reset</button>
                 </div>
             </div>
+
             <p id="status-message"></p>
         </div>
     </div>
@@ -266,54 +317,47 @@
             }
 
             statusMessageEl.textContent = "Submitting...";
-            statusMessageEl.style.color = '#007bff';
+            statusMessageEl.style.color = 'var(--accent-blue)';
             submitBtn.disabled = true;
 
             try {
-                // ============ 关键！这个地址现在是完整的、正确的！ ============
+                // ============ 关键！请务必将这里的 URL 换成你自己的 Render 网址 ============
                 const apiUrl = 'https://toefl-final-project.onrender.com/api/submit-response';
-                // =============================================================
+                // ======================================================================
 
                 const response = await fetch(apiUrl, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ content: content, wordCount: wordCount }),
                 });
 
-                // 检查响应是否为 JSON
                 const contentType = response.headers.get("content-type");
                 if (contentType && contentType.indexOf("application/json") !== -1) {
                     const result = await response.json();
                     if (response.ok) {
-                        statusMessageEl.textContent = result.message;
-                        statusMessageEl.style.color = '#28a745';
+                        statusMessageEl.textContent = "✓ Submission successful!";
+                        statusMessageEl.style.color = 'var(--accent-green)';
                         textarea.disabled = true;
                     } else {
                         throw new Error(result.message);
                     }
                 } else {
-                    // 如果响应不是 JSON，则显示原始文本以帮助调试
-                    const text = await response.text();
-                    throw new Error("Received non-JSON response from server: " + text);
+                    throw new Error("Server returned an unexpected response.");
                 }
 
             } catch (error) {
-                statusMessageEl.textContent = `Error: ${error.message}`;
-                statusMessageEl.style.color = '#dc3545';
+                statusMessageEl.textContent = "✗ " + error.message;
+                statusMessageEl.style.color = 'var(--accent-red)';
                 submitBtn.disabled = false;
             }
         }
 
         function updateTimerDisplay() {
-            const minutes = Math.floor(timeRemaining / 60);
-            const seconds = timeRemaining % 60;
-            timerEl.textContent = `Time: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-            if (timeRemaining < 60) {
-                timerEl.style.color = '#dc3545';
-            } else {
-                timerEl.style.color = '#005a9c';
+            const minutes = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
+            const seconds = (timeRemaining % 60).toString().padStart(2, '0');
+            timerEl.textContent = `${minutes}:${seconds}`;
+            if (timeRemaining < 60 && !timerEl.style.color.includes('ff453a')) {
+                timerEl.style.color = 'var(--accent-red)';
             }
         }
 
@@ -329,7 +373,7 @@
                 updateTimerDisplay();
                 if (timeRemaining <= 0) {
                     clearInterval(timer);
-                    timerEl.textContent = "Time's Up!";
+                    timerEl.textContent = "00:00";
                     textarea.disabled = true;
                     submitBtn.disabled = true;
                     alert("Time's Up! Automatically submitting your response.");
@@ -347,7 +391,7 @@
             textarea.disabled = true;
             textarea.value = '';
             updateWordCount();
-            timerEl.style.color = '#005a9c';
+            timerEl.style.color = 'var(--text-primary)';
             statusMessageEl.textContent = '';
         }
 
@@ -367,7 +411,9 @@
         resetBtn.addEventListener('click', resetTimer);
         textarea.addEventListener('input', updateWordCount);
 
+        // 页面加载时，调用 resetTimer 来设置初始状态
         resetTimer();
+
     </script>
 
 </body>
