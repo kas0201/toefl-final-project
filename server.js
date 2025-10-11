@@ -8,31 +8,15 @@ const PORT = process.env.PORT || 3000;
 // --- 中间件设置 ---
 app.use(cors());
 app.use(express.json());
-// 直接从根目录托管 'public' 文件夹
-app.use(express.static('public'));
 
-// --- PostgreSQL 数据库连接 ---
-// Render 会通过环境变量自动注入 DATABASE_URL
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: {
-        rejectUnauthorized: false
-    }
-});
-
-// 检查数据库连接 (可选，但有助于调试)
-pool.connect((err) => {
-    if (err) {
-        return console.error('❌ 数据库连接失败:', err);
-    }
-    console.log('✅ 成功连接到 PostgreSQL 数据库！');
-});
+// ======================= 关键修正 =======================
+//  我们把 API 路由的定义，移动到了静态文件服务的前面！
+// ======================================================
 
 // --- API 路由：处理提交作文的请求 ---
 app.post('/api/submit-response', async (req, res) => {
     const { content, wordCount } = req.body;
 
-    // 基本验证
     if (!content || wordCount === undefined) {
         return res.status(400).json({ message: "内容和字数不能为空。" });
     }
@@ -43,13 +27,31 @@ app.post('/api/submit-response', async (req, res) => {
         const result = await pool.query(sql, [content, wordCount]);
         const newId = result.rows[0].id;
         console.log(`📝 一篇新作文已成功保存到数据库，ID为 ${newId}`);
-        // 成功时，返回一个 JSON 对象
         res.status(201).json({ message: "作文已成功保存！", id: newId });
     } catch (err) {
         console.error("数据库插入失败:", err);
-        // 失败时，也返回一个 JSON 对象
         res.status(500).json({ message: "服务器内部错误，保存失败。" });
     }
+});
+
+// --- 静态文件服务 ---
+// 这个规则现在在最后，只有当请求不匹配任何 API 路由时，才会到这里来。
+app.use(express.static('public'));
+
+
+// --- PostgreSQL 数据库连接 ---
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false
+    }
+});
+
+pool.connect((err) => {
+    if (err) {
+        return console.error('❌ 数据库连接失败:', err);
+    }
+    console.log('✅ 成功连接到 PostgreSQL 数据库！');
 });
 
 // --- 启动服务器 ---
