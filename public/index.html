@@ -1,1 +1,420 @@
-I definitely believe that modern technology brings people closer. Before, if your best friend moved to another country, you might lose touch completely. Now, you can video chat with them every day and feel like you're in the same room. It also helps people find communities they wouldn't have access to otherwise, like online groups for rare hobbies or support groups for people with specific health conditions. It has opened up a whole new world of social connection that was impossible before.
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Academic Discussion - TOEFL® Practice</title>
+    <!-- 引入 Google Fonts: Inter & Roboto Mono -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500&display=swap');
+
+        /* --- 动画效果 --- */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* --- 苹果风格 Pro 基础样式 --- */
+        :root {
+            --bg-color: #f0f0f5;
+            --container-bg: #ffffff;
+            --text-primary: #1d1d1f;
+            --text-secondary: #6e6e73;
+            --text-tertiary: #86868b;
+            --accent-blue: #007aff;
+            --accent-blue-hover: #0060c5;
+            --accent-green: #30d158;
+            --accent-red: #ff453a;
+            --border-color: #d6d6d6;
+            --control-bg: #f5f5f7;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 24px;
+            box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* --- 主容器 --- */
+        .main-container {
+            width: 100%;
+            max-width: 760px;
+            background-color: var(--container-bg);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            border: 1px solid rgba(0,0,0,0.08);
+            animation: fadeIn 0.6s ease-out forwards;
+        }
+
+        /* --- 标题 --- */
+        h1 {
+            font-size: 32px;
+            font-weight: 700;
+            text-align: center;
+            margin: 0 0 8px 0;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            font-size: 17px;
+        }
+
+        /* --- 帖子卡片 --- */
+        .post {
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .post-author {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .post-content {
+            font-size: 16px;
+            line-height: 1.65;
+            color: var(--text-secondary);
+        }
+
+            .post-content strong {
+                color: var(--text-primary);
+                font-weight: 600;
+            }
+
+        .response-header {
+            font-size: 21px;
+            font-weight: 700;
+            margin-top: 32px;
+            margin-bottom: 16px;
+        }
+
+        /* --- 文本输入框 --- */
+        #user-textarea {
+            width: 100%;
+            min-height: 160px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 14px;
+            font-size: 16px;
+            font-family: 'Inter', sans-serif;
+            resize: vertical;
+            box-sizing: border-box;
+            background-color: #fff;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+            #user-textarea:focus {
+                outline: none;
+                border-color: var(--accent-blue);
+                box-shadow: inset 0 0 0 1px var(--accent-blue);
+            }
+
+            #user-textarea:disabled {
+                background-color: var(--control-bg);
+            }
+
+        /* --- 控制面板 --- */
+        .controls-container {
+            background-color: var(--control-bg);
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid rgba(0,0,0,0.05);
+            box-shadow: inset 0 1px 1px rgba(0,0,0,0.02);
+        }
+
+        .stats {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .timer-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .icon {
+            width: 20px;
+            height: 20px;
+            stroke-width: 1.5;
+            color: var(--text-tertiary);
+        }
+
+        #timer {
+            font-family: 'Roboto Mono', 'SF Mono', Menlo, Monaco, Consolas, "Courier New", monospace;
+            font-size: 18px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        #word-count {
+            color: var(--text-tertiary);
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+            #word-count.sufficient {
+                color: var(--accent-green);
+            }
+
+        /* --- 按钮 --- */
+        .buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+            .buttons button {
+                padding: 8px 20px;
+                font-size: 14px;
+                font-weight: 600;
+                border-radius: 8px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                border: none;
+            }
+
+                .buttons button:active:not(:disabled) {
+                    transform: scale(0.97);
+                }
+
+        #start-btn, #submit-btn {
+            background-color: var(--accent-blue);
+            color: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+            #start-btn:hover, #submit-btn:hover:not(:disabled) {
+                background-color: var(--accent-blue-hover);
+            }
+
+            #start-btn:disabled, #submit-btn:disabled {
+                background-color: #dcdce1;
+                color: var(--text-tertiary);
+                cursor: not-allowed;
+                box-shadow: none;
+            }
+
+        #reset-btn {
+            background-color: #e5e5ea;
+            color: var(--text-primary);
+        }
+
+            #reset-btn:hover {
+                background-color: #dcdce1;
+            }
+
+        #status-message {
+            text-align: center;
+            margin-top: 20px;
+            font-weight: 500;
+            font-size: 15px;
+            height: 20px;
+            transition: color 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <h1>Academic Discussion</h1>
+        <p class="subtitle">TOEFL® Writing Practice</p>
+
+        <div class="post">
+            <p class="post-author">Professor Anya Sharma</p>
+            <p class="post-content">
+                Hello class. This week, we're discussing the impact of technology on social connections. Some argue that social media and instant messaging have made us more connected than ever, allowing us to maintain relationships across vast distances. Others claim that these technologies lead to more superficial, low-quality interactions and actually increase feelings of loneliness. So, for our discussion this week, I want to ask you: <strong>Does modern technology, especially social media, ultimately bring people closer together or drive them further apart?</strong>
+            </p>
+        </div>
+
+        <div class="post">
+            <p class="post-author">Paul</p>
+            <p class="post-content">
+                I definitely believe that modern technology brings people closer. Before, if your best friend moved to another country, you might lose touch completely. Now, you can video chat with them every day and feel like you're in the same room. It also helps people find communities they wouldn't have access to otherwise, like online groups for rare hobbies or support groups for people with specific health conditions. It has opened up a whole new world of social connection that was impossible before.
+            </p>
+        </div>
+
+        <div class="post">
+            <p class="post-author">Sarah</p>
+            <p class="post-content">
+                I have to disagree with Paul. While it's true we can "connect" with more people, I think these connections are weak and superficial. People spend hours scrolling through photos and leaving one-word comments instead of having a deep, meaningful conversation. I've seen groups of friends at a restaurant all staring at their phones instead of talking to each other. This isn't real connection; it's a distraction that actually pulls us away from the people who are right in front of us. It creates an illusion of closeness while making us feel more isolated.
+            </p>
+        </div>
+
+        <div class="user-response-area">
+            <p class="response-header">Your Response</p>
+            <textarea id="user-textarea" placeholder="Click 'Start' to begin your response..." disabled></textarea>
+
+            <div class="controls-container">
+                <div class="stats">
+                    <div class="timer-group">
+                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div id="timer">10:00</div>
+                    </div>
+                    <div id="word-count">Words: 0</div>
+                </div>
+                <div class="buttons">
+                    <button id="start-btn">Start</button>
+                    <button id="submit-btn" disabled>Submit</button>
+                    <button id="reset-btn">Reset</button>
+                </div>
+            </div>
+
+            <p id="status-message"></p>
+        </div>
+    </div>
+
+    <script>
+        const startBtn = document.getElementById('start-btn');
+        const submitBtn = document.getElementById('submit-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const timerEl = document.getElementById('timer');
+        const wordCountEl = document.getElementById('word-count');
+        const textarea = document.getElementById('user-textarea');
+        const statusMessageEl = document.getElementById('status-message');
+
+        let timer;
+        let timeRemaining = 600;
+
+        async function submitResponse() {
+            const content = textarea.value;
+            const wordCount = content ? content.match(/\S+/g).length : 0;
+
+            if (wordCount === 0) {
+                alert("Cannot submit an empty response.");
+                return;
+            }
+
+            statusMessageEl.textContent = "Submitting...";
+            statusMessageEl.style.color = 'var(--accent-blue)';
+            submitBtn.disabled = true;
+
+            try {
+                // ============ 关键！请务必将这里的 URL 换成你自己的 Render 网址 ============
+                const apiUrl = 'https://toefl-final-project.onrender.com/api/submit-response';
+                // ======================================================================
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: content, wordCount: wordCount }),
+                });
+
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    const result = await response.json();
+                    if (response.ok) {
+                        statusMessageEl.textContent = "✓ Submission successful!";
+                        statusMessageEl.style.color = 'var(--accent-green)';
+                        textarea.disabled = true;
+                        // ============ 关键修复！提交成功后，停止计时器 ============
+                        clearInterval(timer);
+                        // =======================================================
+                    } else {
+                        throw new Error(result.message);
+                    }
+                } else {
+                    throw new Error("Server returned an unexpected response.");
+                }
+
+            } catch (error) {
+                statusMessageEl.textContent = "✗ " + error.message;
+                statusMessageEl.style.color = 'var(--accent-red)';
+                submitBtn.disabled = false;
+            }
+        }
+
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
+            const seconds = (timeRemaining % 60).toString().padStart(2, '0');
+            timerEl.textContent = `${minutes}:${seconds}`;
+            if (timeRemaining < 60 && !timerEl.style.color.includes('ff453a')) {
+                timerEl.style.color = 'var(--accent-red)';
+            }
+        }
+
+        function startTimer() {
+            startBtn.disabled = true;
+            submitBtn.disabled = false;
+            textarea.disabled = false;
+            textarea.focus();
+            statusMessageEl.textContent = '';
+
+            timer = setInterval(() => {
+                timeRemaining--;
+                updateTimerDisplay();
+                if (timeRemaining <= 0) {
+                    clearInterval(timer);
+                    timerEl.textContent = "00:00";
+                    textarea.disabled = true;
+                    submitBtn.disabled = true;
+                    alert("Time's Up! Automatically submitting your response.");
+                    submitResponse();
+                }
+            }, 1000);
+        }
+
+        function resetTimer() {
+            clearInterval(timer);
+            timeRemaining = 600;
+            updateTimerDisplay();
+            startBtn.disabled = false;
+            submitBtn.disabled = true;
+            textarea.disabled = true;
+            textarea.value = '';
+            updateWordCount();
+            timerEl.style.color = 'var(--text-primary)';
+            statusMessageEl.textContent = '';
+        }
+
+        function updateWordCount() {
+            const text = textarea.value.trim();
+            const words = text ? text.match(/\S+/g).length : 0;
+            wordCountEl.textContent = `Words: ${words}`;
+            if (words >= 100) {
+                wordCountEl.classList.add('sufficient');
+            } else {
+                wordCountEl.classList.remove('sufficient');
+            }
+        }
+
+        startBtn.addEventListener('click', startTimer);
+        submitBtn.addEventListener('click', submitResponse);
+        resetBtn.addEventListener('click', resetTimer);
+        textarea.addEventListener('input', updateWordCount);
+
+        resetTimer();
+
+    </script>
+
+</body>
+</html>
