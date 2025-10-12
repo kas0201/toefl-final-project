@@ -67,7 +67,7 @@
             padding: 32px;
             height: calc(100vh - 160px);
             overflow-y: auto;
-            box-sizing: border-box; /* Important for consistency */
+            box-sizing: border-box;
         }
 
             .content-panel h2, .writing-panel h2 {
@@ -194,7 +194,6 @@
     </div>
 
     <script>
-        // JavaScript logic remains the same
         const token = localStorage.getItem('token');
         if (!token) window.location.href = '/login.html';
 
@@ -211,8 +210,18 @@
             try {
                 const response = await fetch('/api/writing-test');
                 if (!response.ok) throw new Error('Could not load the writing test.');
-                writingTasks = await response.json();
+                let tasks = await response.json();
+
+                // --- 【关键修正】: 排序以确保 integrated_writing 任务总是在第一位 ---
+                tasks.sort((a, b) => {
+                    if (a.task_type === 'integrated_writing') return -1;
+                    if (b.task_type === 'integrated_writing') return 1;
+                    return 0;
+                });
+
+                writingTasks = tasks;
                 renderCurrentScreen();
+
             } catch (error) {
                 renderInstructionScreen("Error", error.message, null);
             }
@@ -295,4 +304,57 @@
         function startTimer(duration, onComplete) {
             clearInterval(timer);
             let timeRemaining = duration;
-            const updateDisplay =
+            const updateDisplay = () => {
+                const minutes = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
+                const seconds = (timeRemaining % 60).toString().padStart(2, '0');
+                phaseTimerEl.textContent = `${minutes}:${seconds}`;
+            };
+            updateDisplay();
+            timer = setInterval(() => {
+                timeRemaining--;
+                updateDisplay();
+                if (timeRemaining <= 0) {
+                    clearInterval(timer);
+                    onComplete();
+                }
+            }, 1000);
+        }
+
+        async function submitAndContinue(force = false) {
+            const submitBtn = document.getElementById('submit-btn');
+            const textarea = document.getElementById('user-textarea');
+            const statusMessageEl = document.getElementById('status-message');
+            if (!submitBtn || !textarea) return;
+            const content = textarea.value;
+            const wordCount = content ? content.trim().match(/\S+/g).length : 0;
+            if (wordCount === 0 && !force) {
+                alert("Cannot submit an empty response.");
+                return;
+            }
+            submitBtn.disabled = true;
+            statusMessageEl.textContent = "Submitting...";
+            try {
+                const task = writingTasks[currentTaskIndex];
+                const response = await fetch('/api/submit-response', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ content, wordCount, questionId: task.id, task_type: task.task_type }),
+                });
+                if (!response.ok) {
+                    const result = await response.json();
+                    throw new Error(result.message);
+                }
+                if (currentTaskIndex === 0) {
+                    renderInstructionScreen("Task 2: Academic Discussion", "You will have 10 minutes to complete this task.", nextTask);
+                } else {
+                    nextTask();
+                }
+            } catch (error) {
+                statusMessageEl.innerHTML = `<span style="color: var(--accent-red);">✗ ${error.message}</span>`;
+                submitBtn.disabled = false;
+            }
+        }
+        document.addEventListener('DOMContentLoaded', startTest);
+    </script>
+</body>
+</html>
