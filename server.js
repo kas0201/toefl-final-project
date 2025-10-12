@@ -40,7 +40,7 @@ app.post('/api/submit-response', async (req, res) => {
     const qId = parseInt(questionId, 10);
     // =============================================================
 
-    if (!content || !wordCount || !qId) {
+    if (!content || !wordCount || isNaN(qId)) { // 增加 isNaN 检查
         return res.status(400).json({ message: "请求缺少必要信息或格式不正确。" });
     }
 
