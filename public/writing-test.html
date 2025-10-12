@@ -10,221 +10,297 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500&display=swap');
 
         :root {
-            --bg-color: #f0f0f5;
-            --container-bg: #fff;
+            --bg-color: #f5f5f7;
+            --card-bg: #ffffff;
             --text-primary: #1d1d1f;
             --text-secondary: #6e6e73;
             --accent-blue: #007aff;
-            --accent-blue-hover: #0060c5;
-            --border-color: #e5e5ea;
             --accent-red: #ff453a;
+            --border-color: #d2d2d7;
         }
 
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg-color);
             margin: 0;
         }
 
         .exam-header {
-            background-color: var(--container-bg);
+            background-color: var(--card-bg);
             border-bottom: 1px solid var(--border-color);
-            padding: 12px 24px;
+            padding: 16px 32px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
 
             .exam-header h1 {
                 font-size: 20px;
+                font-weight: 600;
                 margin: 0;
+                color: var(--text-primary);
             }
 
             .exam-header .timer {
                 font-family: 'Roboto Mono', monospace;
                 font-size: 20px;
                 font-weight: 500;
+                color: var(--text-primary);
             }
 
-        .exam-container {
-            max-width: 1000px;
-            margin: 24px auto;
-            padding: 24px;
-            background-color: var(--container-bg);
-            border-radius: 12px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.07);
-        }
-
-        .instruction-screen, .placeholder-screen, .break-screen, .end-screen {
-            text-align: center;
-            padding: 80px 40px;
-        }
-
-        h2 {
-            font-size: 32px;
-        }
-
-        p {
-            color: var(--text-secondary);
-            line-height: 1.6;
-            font-size: 18px;
-        }
-
-        button {
-            background-color: var(--accent-blue);
-            color: #fff;
-            padding: 12px 32px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 16px;
-            transition: all .2s ease;
-            border: none;
-            cursor: pointer;
-        }
-
-            button:hover:not(:disabled) {
-                background-color: var(--accent-blue-hover);
-            }
-
-            button:disabled {
-                background-color: #dcdce1;
-                cursor: not-allowed;
-            }
-
-        .writing-task-container {
+        .main-container {
+            max-width: 1200px;
+            margin: 32px auto;
+            padding: 0 32px;
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
+            gap: 32px;
         }
 
-        .writing-content {
-            font-size: 15px;
-            line-height: 1.65;
-            color: var(--text-secondary);
+        .content-panel, .writing-panel, .instruction-screen {
+            background-color: var(--card-bg);
+            border-radius: 20px;
             border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 16px;
-            height: 400px;
+            padding: 32px;
+            height: calc(100vh - 160px);
             overflow-y: auto;
-            white-space: pre-wrap;
         }
 
-        textarea {
+            .content-panel h2, .writing-panel h2 {
+                font-size: 22px;
+                margin-top: 0;
+            }
+
+            .content-panel p {
+                font-size: 17px;
+                line-height: 1.7;
+                color: var(--text-secondary);
+                white-space: pre-wrap;
+            }
+
+            .writing-panel.inactive {
+                background-color: #f5f5f7;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                text-align: center;
+            }
+
+        .instruction-screen {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+            .instruction-screen h2 {
+                font-size: 32px;
+            }
+
+            .instruction-screen p {
+                color: var(--text-secondary);
+                line-height: 1.6;
+                font-size: 18px;
+                max-width: 600px;
+            }
+
+            .instruction-screen button {
+                margin-top: 24px;
+            }
+
+        .inactive-message {
+            font-size: 18px;
+            color: var(--text-secondary);
+        }
+
+        #user-textarea {
             width: 100%;
-            min-height: 350px;
+            height: calc(100% - 80px);
             border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 12px;
+            border-radius: 12px;
+            padding: 16px;
             font-size: 16px;
-            resize: vertical;
+            font-family: inherit;
+            resize: none;
             box-sizing: border-box;
         }
 
-        .word-count {
-            font-size: 14px;
-            text-align: right;
-            margin-top: 8px;
+        .controls-container {
+            margin-top: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #word-count {
+            font-size: 15px;
             color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        #submit-btn {
+            padding: 10px 24px;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 999px;
+            cursor: pointer;
+            border: none;
+            background-color: var(--accent-blue);
+            color: #fff;
+        }
+
+            #submit-btn:disabled {
+                background-color: #e5e5ea;
+                color: var(--text-secondary);
+                cursor: not-allowed;
+            }
+
+        #status-message {
+            text-align: center;
+            margin-top: 24px;
+            font-weight: 500;
+            height: 20px;
         }
     </style>
 </head>
 <body>
     <div class="exam-header">
-        <h1 id="task-title">Loading Writing Test...</h1>
-        <div class="timer" id="task-timer">--:--</div>
+        <h1 id="phase-title">Writing Test</h1>
+        <div class="timer" id="phase-timer">--:--</div>
     </div>
-    <div class="exam-container" id="exam-content"></div>
+    <div class="main-container" id="main-container">
+        <!-- Content will be dynamically injected here -->
+    </div>
 
     <script>
         const token = localStorage.getItem('token');
         if (!token) window.location.href = '/login.html';
 
-        const taskTitleEl = document.getElementById('task-title');
-        const taskTimerEl = document.getElementById('task-timer');
-        const examContentEl = document.getElementById('exam-content');
+        const phaseTitleEl = document.getElementById('phase-title');
+        const phaseTimerEl = document.getElementById('phase-timer');
+        const mainContainer = document.getElementById('main-container');
 
+        let timer;
         let writingTasks = [];
         let currentTaskIndex = -1;
-        let timer;
+        let currentIntegratedPhase = 0;
 
         async function startTest() {
             try {
                 const response = await fetch('/api/writing-test');
                 if (!response.ok) throw new Error('Could not load the writing test.');
                 writingTasks = await response.json();
-                renderCurrentTask();
+                renderCurrentScreen();
             } catch (error) {
-                examContentEl.innerHTML = `<div class="instruction-screen"><h2>Error</h2><p>${error.message}</p></div>`;
+                renderInstructionScreen("Error", error.message, null);
             }
         }
 
-        function renderCurrentTask() {
+        function renderCurrentScreen() {
             if (currentTaskIndex === -1) {
-                renderInstructionScreen();
-                return;
-            }
-            if (currentTaskIndex >= writingTasks.length) {
-                renderEndScreen();
-                return;
-            }
-
-            const task = writingTasks[currentTaskIndex];
-            const isIntegrated = task.task_type === 'integrated_writing';
-            const timeLimit = isIntegrated ? 1200 : 600; // 20 mins or 10 mins
-            taskTitleEl.textContent = isIntegrated ? "Task 1: Integrated Writing" : "Task 2: Academic Discussion";
-
-            let contentHTML = '';
-            if (isIntegrated) {
-                contentHTML = `<h3>Reading Passage</h3><p>${task.reading_passage}</p><hr><h3>Lecture Script</h3><p>${task.lecture_script}</p>`;
+                renderInstructionScreen("Writing Section", "This section consists of two writing tasks. Click 'Start' when ready.", nextTask);
+            } else if (currentTaskIndex === 0) { // Task 1: Integrated Writing
+                const task = writingTasks[0];
+                if (currentIntegratedPhase === 0) renderIntegratedReading(task);
+                else if (currentIntegratedPhase === 1) renderIntegratedLecture(task);
+                else renderIntegratedWriting(task);
+            } else if (currentTaskIndex === 1) { // Task 2: Academic Discussion
+                renderAcademicDiscussion(writingTasks[1]);
             } else {
-                contentHTML = `<h3>Professor's Prompt</h3><p>${task.professor_prompt}</p><hr><p><b>${task.student1_author}:</b> ${task.student1_post}</p><p><b>${task.student2_author}:</b> ${task.student2_post}</p>`;
+                renderEndScreen();
             }
-
-            examContentEl.innerHTML = `
-                <div class="writing-task-container">
-                    <div class="writing-content">${contentHTML}</div>
-                    <div class="writing-response">
-                        <textarea id="writing-textarea" placeholder="Start writing your response here..."></textarea>
-                        <div class="word-count" id="word-counter">Words: 0</div>
-                    </div>
-                </div>
-                <div style="text-align: center; margin-top: 24px;">
-                    <button id="submit-writing-btn" onclick="submitWriting()">Submit & Continue</button>
-                </div>`;
-
-            document.getElementById('writing-textarea').addEventListener('input', (e) => {
-                const words = e.target.value.trim().match(/\S+/g)?.length || 0;
-                document.getElementById('word-counter').textContent = `Words: ${words}`;
-            });
-            startTimer(timeLimit);
         }
 
         function nextTask() {
             clearInterval(timer);
             currentTaskIndex++;
-            renderCurrentTask();
+            renderCurrentScreen();
         }
 
-        function renderInstructionScreen() {
-            taskTitleEl.textContent = "Writing Section";
-            taskTimerEl.textContent = "--:--";
-            examContentEl.innerHTML = `<div class="instruction-screen"><h2>Writing Section</h2><p>This section consists of two writing tasks. Click "Start" when you are ready to begin the first task.</p><button onclick="nextTask()">Start</button></div>`;
+        // --- Task 1: Integrated Writing Phases ---
+        function renderIntegratedReading(task) {
+            phaseTitleEl.textContent = "Task 1: Integrated Writing (Reading)";
+            mainContainer.style.gridTemplateColumns = '1fr 1fr';
+            mainContainer.innerHTML = `
+                    <div class="content-panel"><h2>Reading Passage</h2><p>${task.reading_passage}</p></div>
+                    <div class="writing-panel inactive"><p class="inactive-message">You will be able to write after the lecture.</p></div>`;
+            startTimer(180, () => { currentIntegratedPhase++; renderCurrentScreen(); });
+        }
+        function renderIntegratedLecture(task) {
+            phaseTitleEl.textContent = "Task 1: Integrated Writing (Lecture)";
+            mainContainer.style.gridTemplateColumns = '1fr'; // Switch to single column
+            mainContainer.innerHTML = `<div class="content-panel"><h2>Lecture Script</h2><p>${task.lecture_script}</p></div>`;
+            startTimer(120, () => { currentIntegratedPhase++; renderCurrentScreen(); });
+        }
+        function renderIntegratedWriting(task) {
+            phaseTitleEl.textContent = "Task 1: Integrated Writing (Writing)";
+            mainContainer.style.gridTemplateColumns = '1fr 1fr'; // Switch back to two columns
+            mainContainer.innerHTML = `
+                    <div class="content-panel"><h2>Reading Passage Reference</h2><p>${task.reading_passage}</p></div>
+                    <div class="writing-panel" id="writing-panel"></div>`;
+            renderWritingArea();
+            startTimer(1200, () => { alert("Time's Up!"); submitAndContinue(true); });
+        }
+
+        // --- Task 2: Academic Discussion ---
+        function renderAcademicDiscussion(task) {
+            phaseTitleEl.textContent = "Task 2: Academic Discussion";
+            mainContainer.style.gridTemplateColumns = '1fr 1fr';
+            mainContainer.innerHTML = `
+                    <div class="content-panel">
+                        <h2>Professor's Prompt & Discussion</h2>
+                        <p>${task.professor_prompt}</p><hr>
+                        <p><b>${task.student1_author}:</b> ${task.student1_post}</p><hr>
+                        <p><b>${task.student2_author}:</b> ${task.student2_post}</p>
+                    </div>
+                    <div class="writing-panel" id="writing-panel"></div>`;
+            renderWritingArea();
+            startTimer(600, () => { alert("Time's Up!"); submitAndContinue(true); });
+        }
+
+        // --- Reusable & Utility Functions ---
+        function renderWritingArea() {
+            const panel = document.getElementById('writing-panel');
+            panel.innerHTML = `
+                    <h2>Your Response</h2>
+                    <textarea id="user-textarea"></textarea>
+                    <div class="controls-container">
+                        <div id="word-count">Words: 0</div>
+                        <button id="submit-btn" onclick="submitAndContinue()">Submit & Continue</button>
+                    </div>
+                    <p id="status-message"></p>`;
+            document.getElementById('user-textarea').addEventListener('input', (e) => {
+                const words = e.target.value.trim().match(/\S+/g)?.length || 0;
+                document.getElementById('word-count').textContent = `Words: ${words}`;
+            });
+        }
+
+        function renderInstructionScreen(title, text, onClick) {
+            phaseTitleEl.textContent = "Instructions";
+            phaseTimerEl.textContent = "--:--";
+            mainContainer.style.gridTemplateColumns = '1fr';
+            mainContainer.innerHTML = `<div class="instruction-screen"><h2>${title}</h2><p>${text}</p>${onClick ? '<button id="continue-btn">Continue</button>' : ''}</div>`;
+            if (onClick) {
+                document.getElementById('continue-btn').onclick = onClick;
+            }
         }
 
         function renderEndScreen() {
-            taskTitleEl.textContent = "Test Finished";
-            taskTimerEl.style.display = 'none';
-            examContentEl.innerHTML = `<div class="end-screen"><h2>Congratulations!</h2><p>You have completed the Writing Test. You can view your submissions in the History section.</p><a href="/history.html"><button>View My History</button></a></div>`;
+            renderInstructionScreen("Congratulations!", "You have completed the Writing Test. You can view your submissions in the History section.", () => { window.location.href = '/history.html'; });
+            phaseTitleEl.textContent = "Test Finished";
+            phaseTimerEl.style.display = 'none';
         }
 
-        function startTimer(duration) {
+        function startTimer(duration, onComplete) {
             clearInterval(timer);
             let timeRemaining = duration;
             const updateDisplay = () => {
                 const minutes = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
                 const seconds = (timeRemaining % 60).toString().padStart(2, '0');
-                taskTimerEl.textContent = `${minutes}:${seconds}`;
+                phaseTimerEl.textContent = `${minutes}:${seconds}`;
             };
             updateDisplay();
             timer = setInterval(() => {
@@ -232,51 +308,51 @@
                 updateDisplay();
                 if (timeRemaining <= 0) {
                     clearInterval(timer);
-                    alert("Time's Up!");
-                    submitWriting(true);
+                    onComplete();
                 }
             }, 1000);
         }
 
-        async function submitWriting(force = false) {
-            const submitBtn = document.getElementById('submit-writing-btn');
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Submitting...';
+        async function submitAndContinue(force = false) {
+            const submitBtn = document.getElementById('submit-btn');
+            const textarea = document.getElementById('user-textarea');
+            const statusMessageEl = document.getElementById('status-message');
+            if (!submitBtn || !textarea) return;
 
-            const textarea = document.getElementById('writing-textarea');
             const content = textarea.value;
-            const wordCount = content.trim().match(/\S+/g)?.length || 0;
+            const wordCount = content ? content.trim().match(/\S+/g).length : 0;
 
             if (wordCount === 0 && !force) {
-                alert("Response cannot be empty.");
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Submit & Continue';
+                alert("Cannot submit an empty response.");
                 return;
             }
+
+            submitBtn.disabled = true;
+            statusMessageEl.textContent = "Submitting...";
 
             try {
                 const task = writingTasks[currentTaskIndex];
                 const response = await fetch('/api/submit-response', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({
-                        content: content,
-                        wordCount: wordCount,
-                        questionId: task.id,
-                        task_type: task.task_type
-                    }),
+                    body: JSON.stringify({ content, wordCount, questionId: task.id, task_type: task.task_type }),
                 });
                 if (!response.ok) {
-                    const errorResult = await response.json();
-                    throw new Error(errorResult.message || 'Submission failed.');
+                    const result = await response.json();
+                    throw new Error(result.message);
                 }
-                nextTask();
+
+                if (currentTaskIndex === 0) { // After integrated task, show instruction for next one
+                    renderInstructionScreen("Task 2: Academic Discussion", "You will have 10 minutes to complete this task.", nextTask);
+                } else {
+                    nextTask(); // After academic task, this will lead to the end screen
+                }
             } catch (error) {
-                alert(`Error: ${error.message}`);
+                statusMessageEl.innerHTML = `<span style="color: var(--accent-red);">✗ ${error.message}</span>`;
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Submit & Continue';
             }
         }
+
         document.addEventListener('DOMContentLoaded', startTest);
     </script>
 </body>
