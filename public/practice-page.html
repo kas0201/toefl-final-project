@@ -37,17 +37,13 @@
             font-family: 'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
             background-color: var(--bg-color);
             color: var(--text-primary);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
             margin: 0;
             padding: 24px;
             box-sizing: border-box;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale
         }
-
+        /* ============ 关键修复！添加了导航栏样式 ============ */
         .navbar {
             max-width: 800px;
             margin: 20px auto 0;
@@ -79,7 +75,7 @@
             color: var(--text-secondary);
             font-weight: 500
         }
-
+        /* ==================================================== */
         .main-container {
             width: 100%;
             max-width: 760px;
@@ -88,7 +84,8 @@
             box-shadow: 0 20px 40px -10px rgba(0,0,0,.1);
             padding: 40px;
             border: 1px solid rgba(0,0,0,.08);
-            animation: fadeIn .6s ease-out forwards
+            animation: fadeIn .6s ease-out forwards;
+            margin: 20px auto 40px;
         }
 
         h1 {
@@ -278,9 +275,7 @@
             <div class="controls-container">
                 <div class="stats">
                     <div class="timer-group">
-                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
+                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         <div id="timer">10:00</div>
                     </div>
                     <div id="word-count">Words: 0</div>
@@ -330,7 +325,6 @@
             }
 
             try {
-                // 这个 API 是公开的，不需要 token
                 const response = await fetch(`/api/questions/${questionId}`);
                 if (!response.ok) {
                     throw new Error('Failed to fetch question details.');
@@ -376,7 +370,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}` // 在请求头中附上通行证
+                        'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify({
                         content: content,
@@ -460,6 +454,5 @@
         textarea.addEventListener('input', updateWordCount);
         resetTimer();
     </script>
-
 </body>
 </html>
