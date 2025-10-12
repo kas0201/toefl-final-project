@@ -5,11 +5,13 @@ const { Pool } = require("pg");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const axios = require("axios"); // 引入 axios
+const axios = require("axios");
 
-// ----------------- 【真实 AI 评分函数 - DeepSeek 版本】 -----------------
+// ----------------- 【最终版 AI 评分函数 - 使用思维链 (Chain-of-Thought)】 -----------------
 async function callAIScoringAPI(responseText, promptText) {
-  console.log("🤖 AI a commencé à noter avec DeepSeek API...");
+  console.log(
+    "🤖 AI a commencé à noter avec le modèle de pensée (Chain-of-Thought)..."
+  );
 
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
@@ -17,16 +19,32 @@ async function callAIScoringAPI(responseText, promptText) {
     throw new Error("AI service is not configured.");
   }
 
-  // DeepSeek API 的端点
   const endpoint = "https://api.deepseek.com/chat/completions";
 
-  // 提示词工程 (指导 AI 如何评分和回应)
-  const systemPrompt = `You are an expert TOEFL writing evaluator. Your task is to score a user's essay out of 30 points and provide constructive feedback. Analyze the user's response based on the provided prompt.
+  // 【思维链提示词】
+  // 1. 定义角色和最终目标。
+  // 2. 指示 AI 先在 <thinking> 标签内进行分步思考。
+  // 3. 给出清晰的思考步骤/评分标准。
+  // 4. 严格要求在思考之后，才输出最终的 JSON。
+  const systemPrompt = `You are an expert TOEFL writing evaluator. Your primary goal is to score a user's essay out of 30 points and provide high-quality, constructive feedback.
 
-Respond ONLY with a JSON object in the following format, with no other text or explanations before or after the JSON:
+To achieve this, you must follow a strict process:
+1.  First, think step-by-step inside a <thinking> block. Do not output the final JSON yet.
+2.  In your thinking process, analyze the user's response based on the following criteria:
+    - **Task Response**: How well does the response address the prompt? Is the main idea clear and well-supported?
+    - **Organization & Development**: Is the essay well-structured? Are ideas logically connected with good transitions? Are examples and details sufficient?
+    - **Language Use**: How is the vocabulary and sentence structure? Is the grammar accurate?
+3.  Based on your analysis, determine a final overall score between 0 and 30.
+4.  Synthesize your key analysis points into concise, helpful feedback for the user.
+5.  After the <thinking> block, and only after, provide your final answer as a single JSON object in the specified format. Do not include any other text or markdown formatting around the JSON object.
+
+Example of your entire output process:
+<thinking>
+The user's response correctly identifies the main conflict. The structure is clear with an introduction and two body paragraphs. However, the examples are a bit generic. Language use is mostly correct but lacks advanced vocabulary. I will assign a score of 24. The feedback should focus on developing more specific examples and improving vocabulary.
+</thinking>
 {
-  "score": <an integer between 0 and 30>,
-  "feedback": "<A concise, helpful, and well-formatted feedback string. Use markdown for lists if necessary.>"
+  "score": 24,
+  "feedback": "This is a solid response that addresses the prompt well. Your structure is clear and easy to follow. To improve, try to provide more specific and detailed examples to support your points. Additionally, incorporating more varied academic vocabulary would elevate your writing."
 }`;
 
   const userPrompt = `## PROMPT ##\n${promptText}\n\n## USER RESPONSE ##\n${responseText}`;
@@ -35,14 +53,13 @@ Respond ONLY with a JSON object in the following format, with no other text or e
     const response = await axios.post(
       endpoint,
       {
-        // 使用 DeepSeek 的模型
-        model: "deepseek-chat",
+        // 【模型升级】: 使用 coder 模型，它更擅长遵循复杂指令和结构化输出
+        model: "deepseek-coder",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
         temperature: 0.5,
-        response_format: { type: "json_object" }, // 强制要求返回 JSON
       },
       {
         headers: {
@@ -52,10 +69,18 @@ Respond ONLY with a JSON object in the following format, with no other text or e
       }
     );
 
-    const aiResultContent = response.data.choices[0].message.content;
-    const result = JSON.parse(aiResultContent);
+    let aiResultContent = response.data.choices[0].message.content;
 
-    console.log("✅ Notation DeepSeek AI terminée !");
+    // 从 AI 的完整输出中，只提取 JSON 部分
+    const jsonMatch = aiResultContent.match(/{[\s\S]*}/);
+    if (!jsonMatch) {
+      throw new Error("AI did not return a valid JSON object.");
+    }
+
+    const jsonString = jsonMatch[0];
+    const result = JSON.parse(jsonString);
+
+    console.log("✅ Notation DeepSeek AI (Coder) terminée !");
     return { score: result.score, feedback: result.feedback };
   } catch (error) {
     console.error(
