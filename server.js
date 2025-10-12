@@ -5,25 +5,67 @@ const { Pool } = require("pg");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const axios = require("axios"); // 引入 axios
 
-// ----------------- 【重要】模拟 AI 评分函数 -----------------
-// 在真实项目中，这里会使用 axios 或 fetch 调用外部 AI API
+// ----------------- 【真实 AI 评分函数 - DeepSeek 版本】 -----------------
 async function callAIScoringAPI(responseText, promptText) {
-  console.log("🤖 AI a commencé à noter...");
-  await new Promise((resolve) => setTimeout(resolve, 15000)); // 模拟15秒
-  const mockScore = Math.floor(Math.random() * (28 - 22 + 1)) + 22; // 模拟 22-28 分
-  const mockFeedback = `This is a well-structured response. The introduction clearly states the main point. The body paragraphs effectively use examples to support the argument.
+  console.log("🤖 AI a commencé à noter avec DeepSeek API...");
 
-Areas for improvement:
-1.  **Vocabulary**: While the language is clear, try to incorporate more varied and academic vocabulary. For example, instead of "good," you could use "beneficial" or "advantageous."
-2.  **Sentence Structure**: Some sentences are a bit simple. Experiment with more complex sentence structures, using clauses and conjunctions to connect ideas more fluently.
-3.  **Conclusion**: The conclusion could be strengthened by summarizing the main points more robustly and offering a final thought.
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) {
+    console.error("❌ Erreur: DEEPSEEK_API_KEY non configuré.");
+    throw new Error("AI service is not configured.");
+  }
 
-Overall, a strong effort. Keep practicing!`;
-  console.log("✅ Notation AI terminée !");
-  return { score: mockScore, feedback: mockFeedback };
+  // DeepSeek API 的端点
+  const endpoint = "https://api.deepseek.com/chat/completions";
+
+  // 提示词工程 (指导 AI 如何评分和回应)
+  const systemPrompt = `You are an expert TOEFL writing evaluator. Your task is to score a user's essay out of 30 points and provide constructive feedback. Analyze the user's response based on the provided prompt.
+
+Respond ONLY with a JSON object in the following format, with no other text or explanations before or after the JSON:
+{
+  "score": <an integer between 0 and 30>,
+  "feedback": "<A concise, helpful, and well-formatted feedback string. Use markdown for lists if necessary.>"
+}`;
+
+  const userPrompt = `## PROMPT ##\n${promptText}\n\n## USER RESPONSE ##\n${responseText}`;
+
+  try {
+    const response = await axios.post(
+      endpoint,
+      {
+        // 使用 DeepSeek 的模型
+        model: "deepseek-chat",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.5,
+        response_format: { type: "json_object" }, // 强制要求返回 JSON
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const aiResultContent = response.data.choices[0].message.content;
+    const result = JSON.parse(aiResultContent);
+
+    console.log("✅ Notation DeepSeek AI terminée !");
+    return { score: result.score, feedback: result.feedback };
+  } catch (error) {
+    console.error(
+      "❌ Erreur lors de l'appel à l'API DeepSeek:",
+      error.response ? error.response.data : error.message
+    );
+    throw new Error("Failed to get a response from the AI service.");
+  }
 }
-// -------------------------------------------------------------
+// -------------------------------------------------------------------------
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -33,10 +75,12 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
+
 pool.connect((err) => {
   if (err) return console.error("❌ 数据库连接失败:", err);
   console.log("✅ 成功连接到 PostgreSQL 数据库！");
 });
+
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
@@ -52,7 +96,7 @@ const authenticateToken = (req, res, next) => {
   );
 };
 
-// ======================= API =======================
+// ======================= 所有 API 接口 =======================
 
 app.get("/api/writing-test", async (req, res) => {
   try {
