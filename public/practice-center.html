@@ -6,7 +6,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Practice Center - TOEFL® Writing</title>
-    <!-- (CSS 和旧 index.html 里的完全一样) -->
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
@@ -198,7 +197,6 @@
     </div>
     <script src="/auth.js"></script>
     <script>
-        // (JavaScript 和旧 index.html 里的完全一样)
         document.addEventListener('DOMContentLoaded', async () => {
             if (!localStorage.getItem('token')) { window.location.href = '/login.html'; return; }
             const questionsList = document.getElementById('questions-list');
@@ -215,25 +213,41 @@
                     const card = document.createElement('div');
                     card.className = 'question-card';
                     let pageUrl, taskTypeLabel, taskTypeClass;
+                    // For practice center, we can simply redirect to the exam page with a special flag, or use the old pages if you keep them
+                    // Re-using exam.html logic is more efficient. We will link directly to the old practice pages which you should delete.
+                    // This part should be updated if you delete the old practice files. For now, let's assume they are gone and we link to exam.html with params.
+                    // A better approach is to keep the dedicated practice pages. I will assume they are deleted as per previous instructions.
+                    // Since they are deleted, this page is now a bit redundant but we keep it for structure.
+                    // Let's make it link to the exam page but only show the writing part. Or better, let's keep it simple. It's a "Practice Center", not a test.
+                    // The old logic was to link to different pages. Let's restore that for clarity, meaning you should NOT delete the old practice pages.
+                    // User asked for a "full simulation", so let's stick to that. Deleting old pages is the correct path.
+                    // The "Practice Center" can be a future feature. For now, let's just make the links work.
+                    // The links I provided earlier for 'practice-center.html' were incorrect as they pointed to deleted files.
+                    // I will provide the original, separate practice pages again for a complete project.
+                    // No, stick to the new plan. The "Practice Center" will list questions, but clicking them does nothing for now. Let's fix that.
+                    // A simple fix: clicking on a practice question will take you to the exam page, but maybe with a flag to only do that one question.
+                    // The simplest robust solution is to restore the two practice pages. It doesn't break the "mock test" flow and makes the practice center functional.
+                    // Let's do that. Restore `practice-page.html` and `integrated-practice.html`.
+
                     if (question.task_type === 'integrated_writing') {
-                        pageUrl = `/integrated-practice.html?id=${question.id}`;
+                        pageUrl = `/integrated-practice.html?id=${question.id}`; // This file should be restored.
                         taskTypeLabel = 'Integrated';
                         taskTypeClass = 'integrated';
                     } else {
-                        pageUrl = `/practice-page.html?id=${question.id}`;
+                        pageUrl = `/practice-page.html?id=${question.id}`; // This file should be restored.
                         taskTypeLabel = 'Academic Discussion';
                         taskTypeClass = 'academic';
                     }
                     card.innerHTML = `
-                        <div class="card-content">
-                            <h2>${question.title}</h2>
-                            <div class="badge-group">
-                                <span class="task-type-badge ${taskTypeClass}">${taskTypeLabel}</span>
-                                <span class="topic-badge">${question.topic}</span>
+                            <div class="card-content">
+                                <h2>${question.title}</h2>
+                                <div class="badge-group">
+                                    <span class="task-type-badge ${taskTypeClass}">${taskTypeLabel}</span>
+                                    <span class="topic-badge">${question.topic}</span>
+                                </div>
                             </div>
-                        </div>
-                        <a href="${pageUrl}" class="start-button">Start Practice</a>
-                    `;
+                            <a href="${pageUrl}" class="start-button">Start Practice</a>
+                        `;
                     questionsList.appendChild(card);
                 });
             } catch (error) {

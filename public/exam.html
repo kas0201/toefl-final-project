@@ -91,7 +91,7 @@
                 background-color: #dcdce1;
                 cursor: not-allowed;
             }
-        /* Writing Task Specific Styles */
+
         .writing-task-container {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -137,9 +137,7 @@
         <h1 id="section-title">Loading Test...</h1>
         <div class="timer" id="main-timer">--:--</div>
     </div>
-    <div class="exam-container" id="exam-content">
-        <!-- Content will be dynamically inserted here -->
-    </div>
+    <div class="exam-container" id="exam-content"></div>
 
     <script>
         const token = localStorage.getItem('token');
@@ -151,9 +149,9 @@
 
         let testData = null;
         let currentSectionIndex = 0;
-        let currentQuestionIndex = 0; // This is the index within the current section's questions array
+        let currentQuestionIndex = 0;
         const sectionsOrder = ['reading', 'listening', 'speaking', 'writing'];
-        let currentWritingQuestion = null; // To hold the question object for submission
+        let currentWritingQuestion = null;
 
         async function startExam() {
             try {
@@ -171,62 +169,51 @@
                 renderEndScreen();
                 return;
             }
+            const sectionName = sectionsOrder[currentSectionIndex];
+            const sectionData = testData.sections[sectionName];
+            sectionTitleEl.textContent = `${sectionName.charAt(0).toUpperCase() + sectionName.slice(1)} Section`;
 
-            const currentSectionName = sectionsOrder[currentSectionIndex];
-            const currentSectionData = testData.sections[currentSectionName];
-
-            sectionTitleEl.textContent = `${currentSectionName.charAt(0).toUpperCase() + currentSectionName.slice(1)} Section`;
-
-            // Use currentQuestionIndex to check if we are at the start of a section's tasks
-            if (currentQuestionIndex === 0 && currentSectionData.length > 0) {
-                renderInstructionScreen(currentSectionName);
-            } else if (currentQuestionIndex < currentSectionData.length) {
-                const question = currentSectionData[currentQuestionIndex];
-                if (currentSectionName === 'writing' && question) {
-                    currentWritingQuestion = question; // Store current question for submission
+            if (currentQuestionIndex === 0) {
+                renderInstructionScreen(sectionName);
+            } else {
+                const question = sectionData[currentQuestionIndex - 1];
+                if (sectionName === 'writing' && question) {
+                    currentWritingQuestion = question;
                     renderWritingTask(question);
                 } else {
-                    renderPlaceholderScreen(currentSectionName, currentQuestionIndex + 1);
+                    renderPlaceholderScreen(sectionName, currentQuestionIndex);
                 }
-            } else { // No tasks for this section or section finished
-                nextSection();
             }
         }
 
         function next() {
-            currentQuestionIndex++;
-            renderCurrentScreen();
+            const sectionName = sectionsOrder[currentSectionIndex];
+            const sectionLength = testData.sections[sectionName].length;
+
+            if (currentQuestionIndex < sectionLength) {
+                currentQuestionIndex++;
+                renderCurrentScreen();
+            } else {
+                nextSection();
+            }
         }
 
         function nextSection() {
-            currentQuestionIndex = 0;
             currentSectionIndex++;
+            currentQuestionIndex = 0;
             if (currentSectionIndex < sectionsOrder.length && sectionsOrder[currentSectionIndex] === 'speaking') {
                 renderBreakScreen();
-                return;
+            } else {
+                renderCurrentScreen();
             }
-            renderCurrentScreen();
         }
 
-        // --- Screen Rendering Functions ---
         function renderInstructionScreen(sectionName) {
-            examContentEl.innerHTML = `
-                    <div class="instruction-screen">
-                        <h2>${sectionName.charAt(0).toUpperCase() + sectionName.slice(1)} Section</h2>
-                        <p>Click "Continue" when you are ready to begin.</p>
-                        <button onclick="next()">Continue</button>
-                    </div>
-                `;
+            examContentEl.innerHTML = `<div class="instruction-screen"><h2>${sectionName.charAt(0).toUpperCase() + sectionName.slice(1)} Section</h2><p>Click "Continue" when you are ready to begin.</p><button onclick="next()">Continue</button></div>`;
         }
 
         function renderPlaceholderScreen(sectionName, taskNumber) {
-            examContentEl.innerHTML = `
-                    <div class="placeholder-screen">
-                        <h2>${sectionName.charAt(0).toUpperCase() + sectionName.slice(1)} Section - Task ${taskNumber}</h2>
-                        <p>This section is currently under development.</p>
-                        <button onclick="next()">Next Task</button>
-                    </div>
-                `;
+            examContentEl.innerHTML = `<div class="placeholder-screen"><h2>${sectionName.charAt(0).toUpperCase() + sectionName.slice(1)} Section - Task ${taskNumber}</h2><p>This section is currently under development.</p><button onclick="next()">Next Task</button></div>`;
         }
 
         function renderWritingTask(question) {
@@ -236,18 +223,7 @@
             } else {
                 contentHTML = `<h3>Professor's Prompt</h3><p>${question.professor_prompt}</p><hr><p><b>${question.student1_author}:</b> ${question.student1_post}</p><p><b>${question.student2_author}:</b> ${question.student2_post}</p>`;
             }
-            examContentEl.innerHTML = `
-                    <div class="writing-task-container">
-                        <div class="writing-content">${contentHTML}</div>
-                        <div class="writing-response">
-                            <textarea id="writing-textarea" placeholder="Start writing your response here..."></textarea>
-                            <div class="word-count" id="word-counter">Words: 0</div>
-                        </div>
-                    </div>
-                    <div style="text-align: center; margin-top: 24px;">
-                        <button id="submit-writing-btn" onclick="submitWriting()">Submit & Continue</button>
-                    </div>
-                `;
+            examContentEl.innerHTML = `<div class="writing-task-container"><div class="writing-content">${contentHTML}</div><div class="writing-response"><textarea id="writing-textarea" placeholder="Start writing your response here..."></textarea><div class="word-count" id="word-counter">Words: 0</div></div></div><div style="text-align: center; margin-top: 24px;"><button id="submit-writing-btn" onclick="submitWriting()">Submit & Continue</button></div>`;
             document.getElementById('writing-textarea').addEventListener('input', (e) => {
                 const words = e.target.value.trim().match(/\S+/g)?.length || 0;
                 document.getElementById('word-counter').textContent = `Words: ${words}`;
@@ -256,44 +232,28 @@
 
         function renderBreakScreen() {
             sectionTitleEl.textContent = "Official Break";
-            examContentEl.innerHTML = `
-                    <div class="break-screen">
-                        <h2>10-Minute Break</h2>
-                        <p>You may now take a scheduled 10-minute break.</p>
-                        <button onclick="nextSection()">End Break & Continue</button>
-                    </div>
-                `;
+            examContentEl.innerHTML = `<div class="break-screen"><h2>10-Minute Break</h2><p>You may now take a scheduled 10-minute break.</p><button onclick="nextSection()">End Break & Continue</button></div>`;
         }
 
         function renderEndScreen() {
             sectionTitleEl.textContent = "Test Finished";
             mainTimerEl.style.display = 'none';
-            examContentEl.innerHTML = `
-                    <div class="end-screen">
-                        <h2>Congratulations!</h2>
-                        <p>You have completed the TOEFL Mock Test. You can view your writing submissions in the History section.</p>
-                        <a href="/history.html"><button>View My History</button></a>
-                    </div>
-                `;
+            examContentEl.innerHTML = `<div class="end-screen"><h2>Congratulations!</h2><p>You have completed the TOEFL Mock Test. You can view your writing submissions in the History section.</p><a href="/history.html"><button>View My History</button></a></div>`;
         }
 
-        // --- 【关键修正】: 实现了真正的提交功能 ---
         async function submitWriting() {
             const submitBtn = document.getElementById('submit-writing-btn');
             submitBtn.disabled = true;
             submitBtn.textContent = 'Submitting...';
-
             const textarea = document.getElementById('writing-textarea');
             const content = textarea.value;
             const wordCount = content.trim().match(/\S+/g)?.length || 0;
-
             if (wordCount === 0) {
                 alert("Response cannot be empty.");
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Submit & Continue';
                 return;
             }
-
             try {
                 const response = await fetch('/api/submit-response', {
                     method: 'POST',
@@ -301,19 +261,16 @@
                     body: JSON.stringify({
                         content: content,
                         wordCount: wordCount,
-                        questionId: currentWritingQuestion.id, // Use the stored question object
+                        questionId: currentWritingQuestion.id,
                         task_type: currentWritingQuestion.task_type
                     }),
                 });
-
                 if (!response.ok) {
                     const errorResult = await response.json();
                     throw new Error(errorResult.message || 'Submission failed.');
                 }
-
                 console.log("Submission successful!");
-                next(); // Move to the next task/section after successful submission
-
+                next();
             } catch (error) {
                 alert(`Error: ${error.message}`);
                 submitBtn.disabled = false;
