@@ -167,6 +167,7 @@
     <div class="main-container">
         <h1>Writing History</h1>
         <p class="subtitle">Review your past practice sessions.</p>
+
         <div id="history-list">
             <div class="loading-state">Loading your history...</div>
         </div>
@@ -186,7 +187,9 @@
                 historyList.innerHTML = '';
 
                 if (historyData.length === 0) {
-                    historyList.innerHTML = '<div class="empty-state">You haven''t completed any practice sessions yet. <a href="/">Start one now!</a></div>';
+                    // ============ 关键修复！使用了正确的 JavaScript 字符串 ============
+                    historyList.innerHTML = `<div class="empty-state">You haven't completed any practice sessions yet. <a href="/">Start one now!</a></div>`;
+                    // ===============================================================
                     return;
                 }
 
@@ -198,7 +201,6 @@
                         year: 'numeric', month: 'long', day: 'numeric'
                     });
 
-                    // ============ 关键升级！这里的链接现在指向详情页 ============
                     itemElement.innerHTML = `
                             <div class="item-details">
                                 <h2>${item.question_title}</h2>
@@ -215,7 +217,6 @@
                             </div>
                             <a href="/history-detail.html?id=${item.id}" class="view-button">View Details</a>
                         `;
-                    // =======================================================
                     historyList.appendChild(itemElement);
                 });
 
