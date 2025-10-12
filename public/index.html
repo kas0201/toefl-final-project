@@ -319,7 +319,7 @@
             submitBtn.disabled = true;
 
             try {
-                // ============ 关键！请务必将这里的 URL 换成你自己的 Render 网址 ============
+                // ================== 关键！已经为您填好了正确的网址！ ==================
                 const apiUrl = 'https://toefl-final-project.onrender.com/api/submit-response';
                 // ======================================================================
 
@@ -336,14 +336,13 @@
                         statusMessageEl.textContent = "✓ Submission successful!";
                         statusMessageEl.style.color = 'var(--accent-green)';
                         textarea.disabled = true;
-                        // ============ 关键修复！提交成功后，停止计时器 ============
                         clearInterval(timer);
-                        // =======================================================
                     } else {
                         throw new Error(result.message);
                     }
                 } else {
-                    throw new Error("Server returned an unexpected response.");
+                    const text = await response.text();
+                    throw new Error("Server returned an unexpected response: " + text.substring(0, 100));
                 }
 
             } catch (error) {
