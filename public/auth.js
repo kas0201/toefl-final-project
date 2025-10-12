@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const user = JSON.parse(userString);
         navbar.innerHTML = `
             <div>
-                <a href="/" class="nav-link">Full Mock Test</a>
+                <a href="/" class="nav-link">Writing Test</a>
                 <a href="/practice-center.html" class="nav-link" style="margin-left: 20px;">Practice Center</a>
             </div>
             <div class="nav-right">
@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         navbar.innerHTML = `
             <div>
-                <a href="/" class="nav-link">Full Mock Test</a>
+                <a href="/" class="nav-link">Writing Test</a>
                 <a href="/practice-center.html" class="nav-link" style="margin-left: 20px;">Practice Center</a>
             </div>
             <div class="nav-right">

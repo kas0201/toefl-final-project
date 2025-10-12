@@ -34,48 +34,26 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-// ======================= 【新增 API】: 获取完整模拟考试数据 =======================
-app.get('/api/tests/:id', async (req, res) => {
-    const { id } = req.params;
+// ======================= API: 获取写作模拟考试题目 =======================
+app.get('/api/writing-test', async (req, res) => {
     try {
         const sql = `
-            SELECT 
-                t.name as test_name,
-                tq.section,
-                tq."order",
-                q.*
-            FROM tests t
-            JOIN test_questions tq ON t.id = tq.test_id
-            JOIN questions q ON tq.question_id = q.id
-            WHERE t.id = $1
-            ORDER BY tq.section, tq."order";
+            (SELECT * FROM questions WHERE task_type = 'integrated_writing' ORDER BY RANDOM() LIMIT 1)
+            UNION ALL
+            (SELECT * FROM questions WHERE task_type = 'academic_discussion' ORDER BY RANDOM() LIMIT 1);
         `;
-        const result = await pool.query(sql, [id]);
-        if (result.rows.length === 0) {
-            return res.status(404).json({ message: "Test not found." });
+        const result = await pool.query(sql);
+        if (result.rows.length < 2) {
+            return res.status(404).json({ message: "Not enough questions in database to start a full writing test." });
         }
-
-        const testData = {
-            testName: result.rows[0].test_name,
-            sections: { reading: [], listening: [], speaking: [], writing: [] }
-        };
-
-        result.rows.forEach(row => {
-            if (testData.sections[row.section]) {
-                testData.sections[row.section].push(row);
-            }
-        });
-
-        res.json(testData);
-
+        res.json(result.rows);
     } catch (err) {
-        console.error(`获取考试 ID ${id} 失败:`, err);
+        console.error("获取写作考试题目失败:", err);
         res.status(500).json({ message: "服务器内部错误。" });
     }
 });
 
-
-// (原有 API 保持不变，用于专项练习)
+// ======================= API: 用于专项练习和历史记录 =======================
 app.get('/api/questions', async (req, res) => {
     try {
         const sql = `SELECT id, title, topic, task_type FROM questions ORDER BY id`;
@@ -102,6 +80,7 @@ app.get('/api/questions/:id', async (req, res) => {
     }
 });
 
+// ======================= API: 认证与提交 =======================
 app.post('/api/auth/register', async (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) {

@@ -1,0 +1,283 @@
+﻿<!-- START OF FILE public/writing-test.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOEFL® Writing Test In Progress</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500&display=swap');
+
+        :root {
+            --bg-color: #f0f0f5;
+            --container-bg: #fff;
+            --text-primary: #1d1d1f;
+            --text-secondary: #6e6e73;
+            --accent-blue: #007aff;
+            --accent-blue-hover: #0060c5;
+            --border-color: #e5e5ea;
+            --accent-red: #ff453a;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+        }
+
+        .exam-header {
+            background-color: var(--container-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+            .exam-header h1 {
+                font-size: 20px;
+                margin: 0;
+            }
+
+            .exam-header .timer {
+                font-family: 'Roboto Mono', monospace;
+                font-size: 20px;
+                font-weight: 500;
+            }
+
+        .exam-container {
+            max-width: 1000px;
+            margin: 24px auto;
+            padding: 24px;
+            background-color: var(--container-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+        }
+
+        .instruction-screen, .placeholder-screen, .break-screen, .end-screen {
+            text-align: center;
+            padding: 80px 40px;
+        }
+
+        h2 {
+            font-size: 32px;
+        }
+
+        p {
+            color: var(--text-secondary);
+            line-height: 1.6;
+            font-size: 18px;
+        }
+
+        button {
+            background-color: var(--accent-blue);
+            color: #fff;
+            padding: 12px 32px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all .2s ease;
+            border: none;
+            cursor: pointer;
+        }
+
+            button:hover:not(:disabled) {
+                background-color: var(--accent-blue-hover);
+            }
+
+            button:disabled {
+                background-color: #dcdce1;
+                cursor: not-allowed;
+            }
+
+        .writing-task-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .writing-content {
+            font-size: 15px;
+            line-height: 1.65;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 350px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 16px;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+
+        .word-count {
+            font-size: 14px;
+            text-align: right;
+            margin-top: 8px;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="exam-header">
+        <h1 id="task-title">Loading Writing Test...</h1>
+        <div class="timer" id="task-timer">--:--</div>
+    </div>
+    <div class="exam-container" id="exam-content"></div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) window.location.href = '/login.html';
+
+        const taskTitleEl = document.getElementById('task-title');
+        const taskTimerEl = document.getElementById('task-timer');
+        const examContentEl = document.getElementById('exam-content');
+
+        let writingTasks = [];
+        let currentTaskIndex = -1;
+        let timer;
+
+        async function startTest() {
+            try {
+                const response = await fetch('/api/writing-test');
+                if (!response.ok) throw new Error('Could not load the writing test.');
+                writingTasks = await response.json();
+                renderCurrentTask();
+            } catch (error) {
+                examContentEl.innerHTML = `<div class="instruction-screen"><h2>Error</h2><p>${error.message}</p></div>`;
+            }
+        }
+
+        function renderCurrentTask() {
+            if (currentTaskIndex === -1) {
+                renderInstructionScreen();
+                return;
+            }
+            if (currentTaskIndex >= writingTasks.length) {
+                renderEndScreen();
+                return;
+            }
+
+            const task = writingTasks[currentTaskIndex];
+            const isIntegrated = task.task_type === 'integrated_writing';
+            const timeLimit = isIntegrated ? 1200 : 600; // 20 mins or 10 mins
+            taskTitleEl.textContent = isIntegrated ? "Task 1: Integrated Writing" : "Task 2: Academic Discussion";
+
+            let contentHTML = '';
+            if (isIntegrated) {
+                contentHTML = `<h3>Reading Passage</h3><p>${task.reading_passage}</p><hr><h3>Lecture Script</h3><p>${task.lecture_script}</p>`;
+            } else {
+                contentHTML = `<h3>Professor's Prompt</h3><p>${task.professor_prompt}</p><hr><p><b>${task.student1_author}:</b> ${task.student1_post}</p><p><b>${task.student2_author}:</b> ${task.student2_post}</p>`;
+            }
+
+            examContentEl.innerHTML = `
+                <div class="writing-task-container">
+                    <div class="writing-content">${contentHTML}</div>
+                    <div class="writing-response">
+                        <textarea id="writing-textarea" placeholder="Start writing your response here..."></textarea>
+                        <div class="word-count" id="word-counter">Words: 0</div>
+                    </div>
+                </div>
+                <div style="text-align: center; margin-top: 24px;">
+                    <button id="submit-writing-btn" onclick="submitWriting()">Submit & Continue</button>
+                </div>`;
+
+            document.getElementById('writing-textarea').addEventListener('input', (e) => {
+                const words = e.target.value.trim().match(/\S+/g)?.length || 0;
+                document.getElementById('word-counter').textContent = `Words: ${words}`;
+            });
+            startTimer(timeLimit);
+        }
+
+        function nextTask() {
+            clearInterval(timer);
+            currentTaskIndex++;
+            renderCurrentTask();
+        }
+
+        function renderInstructionScreen() {
+            taskTitleEl.textContent = "Writing Section";
+            taskTimerEl.textContent = "--:--";
+            examContentEl.innerHTML = `<div class="instruction-screen"><h2>Writing Section</h2><p>This section consists of two writing tasks. Click "Start" when you are ready to begin the first task.</p><button onclick="nextTask()">Start</button></div>`;
+        }
+
+        function renderEndScreen() {
+            taskTitleEl.textContent = "Test Finished";
+            taskTimerEl.style.display = 'none';
+            examContentEl.innerHTML = `<div class="end-screen"><h2>Congratulations!</h2><p>You have completed the Writing Test. You can view your submissions in the History section.</p><a href="/history.html"><button>View My History</button></a></div>`;
+        }
+
+        function startTimer(duration) {
+            clearInterval(timer);
+            let timeRemaining = duration;
+            const updateDisplay = () => {
+                const minutes = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
+                const seconds = (timeRemaining % 60).toString().padStart(2, '0');
+                taskTimerEl.textContent = `${minutes}:${seconds}`;
+            };
+            updateDisplay();
+            timer = setInterval(() => {
+                timeRemaining--;
+                updateDisplay();
+                if (timeRemaining <= 0) {
+                    clearInterval(timer);
+                    alert("Time's Up!");
+                    submitWriting(true);
+                }
+            }, 1000);
+        }
+
+        async function submitWriting(force = false) {
+            const submitBtn = document.getElementById('submit-writing-btn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
+            const textarea = document.getElementById('writing-textarea');
+            const content = textarea.value;
+            const wordCount = content.trim().match(/\S+/g)?.length || 0;
+
+            if (wordCount === 0 && !force) {
+                alert("Response cannot be empty.");
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit & Continue';
+                return;
+            }
+
+            try {
+                const task = writingTasks[currentTaskIndex];
+                const response = await fetch('/api/submit-response', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({
+                        content: content,
+                        wordCount: wordCount,
+                        questionId: task.id,
+                        task_type: task.task_type
+                    }),
+                });
+                if (!response.ok) {
+                    const errorResult = await response.json();
+                    throw new Error(errorResult.message || 'Submission failed.');
+                }
+                nextTask();
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit & Continue';
+            }
+        }
+        document.addEventListener('DOMContentLoaded', startTest);
+    </script>
+</body>
+</html>
