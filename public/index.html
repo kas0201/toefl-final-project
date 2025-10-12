@@ -4,27 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Academic Discussion - TOEFL® Practice</title>
-    <!-- 引入 Google Fonts: Inter & Roboto Mono -->
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500&display=swap');
 
-        /* --- 动画效果 --- */
         @keyframes fadeIn {
             from {
                 opacity: 0;
-                transform: translateY(10px);
+                transform: translateY(10px)
             }
 
             to {
                 opacity: 1;
-                transform: translateY(0);
+                transform: translateY(0)
             }
         }
 
-        /* --- 苹果风格 Pro 基础样式 --- */
         :root {
             --bg-color: #f0f0f5;
-            --container-bg: #ffffff;
+            --container-bg: #fff;
             --text-primary: #1d1d1f;
             --text-secondary: #6e6e73;
             --text-tertiary: #86868b;
@@ -33,11 +30,11 @@
             --accent-green: #30d158;
             --accent-red: #ff453a;
             --border-color: #d6d6d6;
-            --control-bg: #f5f5f7;
+            --control-bg: #f5f5f7
         }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
             background-color: var(--bg-color);
             color: var(--text-primary);
             display: flex;
@@ -48,70 +45,66 @@
             padding: 24px;
             box-sizing: border-box;
             -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
+            -moz-osx-font-smoothing: grayscale
         }
 
-        /* --- 主容器 --- */
         .main-container {
             width: 100%;
             max-width: 760px;
             background-color: var(--container-bg);
             border-radius: 20px;
-            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 20px 40px -10px rgba(0,0,0,.1);
             padding: 40px;
-            border: 1px solid rgba(0,0,0,0.08);
-            animation: fadeIn 0.6s ease-out forwards;
+            border: 1px solid rgba(0,0,0,.08);
+            animation: fadeIn .6s ease-out forwards
         }
 
-        /* --- 标题 --- */
         h1 {
             font-size: 32px;
             font-weight: 700;
             text-align: center;
             margin: 0 0 8px 0;
-            letter-spacing: -0.5px;
+            letter-spacing: -.5px
         }
 
         .subtitle {
             text-align: center;
             color: var(--text-secondary);
             margin-bottom: 32px;
-            font-size: 17px;
+            font-size: 17px
         }
 
-        /* --- 帖子卡片 --- */
         .post {
             border-radius: 12px;
             padding: 20px;
             margin-bottom: 20px;
-            border: 1px solid var(--border-color);
+            border: 1px solid var(--border-color)
         }
 
         .post-author {
             font-size: 17px;
             font-weight: 600;
-            margin-bottom: 12px;
+            margin-bottom: 12px
         }
 
         .post-content {
             font-size: 16px;
             line-height: 1.65;
-            color: var(--text-secondary);
+            color: var(--text-secondary)
         }
 
             .post-content strong {
                 color: var(--text-primary);
-                font-weight: 600;
+                font-weight: 600
             }
 
         .response-header {
             font-size: 21px;
             font-weight: 700;
             margin-top: 32px;
-            margin-bottom: 16px;
+            margin-bottom: 16px
         }
 
-        /* --- 文本输入框 --- */
         #user-textarea {
             width: 100%;
             min-height: 160px;
@@ -119,24 +112,23 @@
             border-radius: 12px;
             padding: 14px;
             font-size: 16px;
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter',sans-serif;
             resize: vertical;
             box-sizing: border-box;
             background-color: #fff;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            transition: border-color .2s ease,box-shadow .2s ease
         }
 
             #user-textarea:focus {
-                outline: none;
+                outline: 0;
                 border-color: var(--accent-blue);
-                box-shadow: inset 0 0 0 1px var(--accent-blue);
+                box-shadow: inset 0 0 0 1px var(--accent-blue)
             }
 
             #user-textarea:disabled {
-                background-color: var(--control-bg);
+                background-color: var(--control-bg)
             }
 
-        /* --- 控制面板 --- */
         .controls-container {
             background-color: var(--control-bg);
             border-radius: 12px;
@@ -145,50 +137,49 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border: 1px solid rgba(0,0,0,0.05);
-            box-shadow: inset 0 1px 1px rgba(0,0,0,0.02);
+            border: 1px solid rgba(0,0,0,.05);
+            box-shadow: inset 0 1px 1px rgba(0,0,0,.02)
         }
 
         .stats {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 16px
         }
 
         .timer-group {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 8px
         }
 
         .icon {
             width: 20px;
             height: 20px;
             stroke-width: 1.5;
-            color: var(--text-tertiary);
+            color: var(--text-tertiary)
         }
 
         #timer {
-            font-family: 'Roboto Mono', 'SF Mono', Menlo, Monaco, Consolas, "Courier New", monospace;
+            font-family: 'Roboto Mono','SF Mono',Menlo,Monaco,Consolas,"Courier New",monospace;
             font-size: 18px;
             font-weight: 500;
-            color: var(--text-primary);
+            color: var(--text-primary)
         }
 
         #word-count {
             color: var(--text-tertiary);
             font-size: 14px;
-            font-weight: 500;
+            font-weight: 500
         }
 
             #word-count.sufficient {
-                color: var(--accent-green);
+                color: var(--accent-green)
             }
 
-        /* --- 按钮 --- */
         .buttons {
             display: flex;
-            gap: 10px;
+            gap: 10px
         }
 
             .buttons button {
@@ -197,38 +188,38 @@
                 font-weight: 600;
                 border-radius: 8px;
                 cursor: pointer;
-                transition: all 0.2s ease;
-                border: none;
+                transition: all .2s ease;
+                border: none
             }
 
                 .buttons button:active:not(:disabled) {
-                    transform: scale(0.97);
+                    transform: scale(.97)
                 }
 
         #start-btn, #submit-btn {
             background-color: var(--accent-blue);
-            color: white;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            color: #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,.1)
         }
 
             #start-btn:hover, #submit-btn:hover:not(:disabled) {
-                background-color: var(--accent-blue-hover);
+                background-color: var(--accent-blue-hover)
             }
 
             #start-btn:disabled, #submit-btn:disabled {
                 background-color: #dcdce1;
                 color: var(--text-tertiary);
                 cursor: not-allowed;
-                box-shadow: none;
+                box-shadow: none
             }
 
         #reset-btn {
             background-color: #e5e5ea;
-            color: var(--text-primary);
+            color: var(--text-primary)
         }
 
             #reset-btn:hover {
-                background-color: #dcdce1;
+                background-color: #dcdce1
             }
 
         #status-message {
@@ -237,7 +228,7 @@
             font-weight: 500;
             font-size: 15px;
             height: 20px;
-            transition: color 0.3s ease;
+            transition: color .3s ease
         }
     </style>
 </head>
@@ -313,16 +304,11 @@
 
                 topicTitleEl.textContent = question.topic;
 
-                // ============== 关键修正！更稳健的分割逻辑 ==============
-                const promptParts = question.professor_prompt.split(/:(.*)/s);
-                const professorName = promptParts[0];
-                const professorText = promptParts[1] ? promptParts[1].trim() : '';
-                // =======================================================
-
+                // ============== 关键修正！直接从各自的字段读取数据，不再分割！ ==============
                 questionContentEl.innerHTML = `
                         <div class="post">
-                            <p class="post-author">${professorName}</p>
-                            <p class="post-content">${professorText}</p>
+                            <p class="post-author">${question.professor_author}</p>
+                            <p class="post-content">${question.professor_prompt}</p>
                         </div>
                         <div class="post">
                             <p class="post-author">${question.student1_author}</p>
@@ -333,6 +319,7 @@
                             <p class="post-content">${question.student2_post}</p>
                         </div>
                     `;
+                // =======================================================================
             } catch (error) {
                 console.error('Error fetching question:', error);
                 topicTitleEl.textContent = "Error";
@@ -343,16 +330,13 @@
         async function submitResponse() {
             const content = textarea.value;
             const wordCount = content ? content.match(/\S+/g).length : 0;
-
             if (wordCount === 0) {
                 alert("Cannot submit an empty response.");
                 return;
             }
-
             statusMessageEl.textContent = "Submitting...";
             statusMessageEl.style.color = 'var(--accent-blue)';
             submitBtn.disabled = true;
-
             try {
                 const apiUrl = 'https://toefl-final-project.onrender.com/api/submit-response';
                 const response = await fetch(apiUrl, {
@@ -364,7 +348,6 @@
                         questionId: currentQuestionId
                     }),
                 });
-
                 const contentType = response.headers.get("content-type");
                 if (contentType && contentType.indexOf("application/json") !== -1) {
                     const result = await response.json();
@@ -379,14 +362,12 @@
                 } else {
                     throw new Error("Server returned an unexpected response.");
                 }
-
             } catch (error) {
                 statusMessageEl.textContent = "✗ " + error.message;
                 statusMessageEl.style.color = 'var(--accent-red)';
                 submitBtn.disabled = false;
             }
         }
-
         function updateTimerDisplay() {
             const minutes = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
             const seconds = (timeRemaining % 60).toString().padStart(2, '0');
@@ -395,14 +376,12 @@
                 timerEl.style.color = 'var(--accent-red)';
             }
         }
-
         function startTimer() {
             startBtn.disabled = true;
             submitBtn.disabled = false;
             textarea.disabled = false;
             textarea.focus();
             statusMessageEl.textContent = '';
-
             timer = setInterval(() => {
                 timeRemaining--;
                 updateTimerDisplay();
@@ -416,7 +395,6 @@
                 }
             }, 1000);
         }
-
         function resetTimer() {
             clearInterval(timer);
             timeRemaining = 600;
@@ -429,7 +407,6 @@
             timerEl.style.color = 'var(--text-primary)';
             statusMessageEl.textContent = '';
         }
-
         function updateWordCount() {
             const text = textarea.value.trim();
             const words = text ? text.match(/\S+/g).length : 0;
@@ -440,14 +417,11 @@
                 wordCountEl.classList.remove('sufficient');
             }
         }
-
         startBtn.addEventListener('click', startTimer);
         submitBtn.addEventListener('click', submitResponse);
         resetBtn.addEventListener('click', resetTimer);
         textarea.addEventListener('input', updateWordCount);
-
         resetTimer();
-
     </script>
 
 </body>
