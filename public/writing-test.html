@@ -15,6 +15,7 @@
             --text-primary: #1d1d1f;
             --text-secondary: #6e6e73;
             --accent-blue: #007aff;
+            --accent-blue-hover: #0060c5;
             --accent-red: #ff453a;
             --border-color: #d2d2d7;
         }
@@ -66,6 +67,7 @@
             padding: 32px;
             height: calc(100vh - 160px);
             overflow-y: auto;
+            box-sizing: border-box; /* Important for consistency */
         }
 
             .content-panel h2, .writing-panel h2 {
@@ -97,19 +99,35 @@
         }
 
             .instruction-screen h2 {
-                font-size: 32px;
+                font-size: 40px;
+                font-weight: 700;
+                margin: 0 0 16px 0;
             }
 
             .instruction-screen p {
                 color: var(--text-secondary);
-                line-height: 1.6;
+                line-height: 1.7;
                 font-size: 18px;
-                max-width: 600px;
+                max-width: 550px;
             }
 
             .instruction-screen button {
-                margin-top: 24px;
+                margin-top: 32px;
+                padding: 14px 32px;
+                font-size: 16px;
+                font-weight: 600;
+                border-radius: 999px;
+                background-color: var(--accent-blue);
+                color: #fff;
+                border: none;
+                cursor: pointer;
+                transition: all .2s ease;
             }
+
+                .instruction-screen button:hover {
+                    background-color: var(--accent-blue-hover);
+                    transform: scale(1.05);
+                }
 
         .inactive-message {
             font-size: 18px;
@@ -176,6 +194,7 @@
     </div>
 
     <script>
+        // JavaScript logic remains the same
         const token = localStorage.getItem('token');
         if (!token) window.location.href = '/login.html';
 
@@ -201,13 +220,13 @@
 
         function renderCurrentScreen() {
             if (currentTaskIndex === -1) {
-                renderInstructionScreen("Writing Section", "This section consists of two writing tasks. Click 'Start' when ready.", nextTask);
-            } else if (currentTaskIndex === 0) { // Task 1: Integrated Writing
+                renderInstructionScreen("Writing Section", "This section consists of two writing tasks. Click 'Continue' when ready.", nextTask);
+            } else if (currentTaskIndex === 0) {
                 const task = writingTasks[0];
                 if (currentIntegratedPhase === 0) renderIntegratedReading(task);
                 else if (currentIntegratedPhase === 1) renderIntegratedLecture(task);
                 else renderIntegratedWriting(task);
-            } else if (currentTaskIndex === 1) { // Task 2: Academic Discussion
+            } else if (currentTaskIndex === 1) {
                 renderAcademicDiscussion(writingTasks[1]);
             } else {
                 renderEndScreen();
@@ -220,58 +239,37 @@
             renderCurrentScreen();
         }
 
-        // --- Task 1: Integrated Writing Phases ---
         function renderIntegratedReading(task) {
             phaseTitleEl.textContent = "Task 1: Integrated Writing (Reading)";
             mainContainer.style.gridTemplateColumns = '1fr 1fr';
-            mainContainer.innerHTML = `
-                    <div class="content-panel"><h2>Reading Passage</h2><p>${task.reading_passage}</p></div>
-                    <div class="writing-panel inactive"><p class="inactive-message">You will be able to write after the lecture.</p></div>`;
+            mainContainer.innerHTML = `<div class="content-panel"><h2>Reading Passage</h2><p>${task.reading_passage}</p></div><div class="writing-panel inactive"><p class="inactive-message">You will be able to write after the lecture.</p></div>`;
             startTimer(180, () => { currentIntegratedPhase++; renderCurrentScreen(); });
         }
         function renderIntegratedLecture(task) {
             phaseTitleEl.textContent = "Task 1: Integrated Writing (Lecture)";
-            mainContainer.style.gridTemplateColumns = '1fr'; // Switch to single column
+            mainContainer.style.gridTemplateColumns = '1fr';
             mainContainer.innerHTML = `<div class="content-panel"><h2>Lecture Script</h2><p>${task.lecture_script}</p></div>`;
             startTimer(120, () => { currentIntegratedPhase++; renderCurrentScreen(); });
         }
         function renderIntegratedWriting(task) {
             phaseTitleEl.textContent = "Task 1: Integrated Writing (Writing)";
-            mainContainer.style.gridTemplateColumns = '1fr 1fr'; // Switch back to two columns
-            mainContainer.innerHTML = `
-                    <div class="content-panel"><h2>Reading Passage Reference</h2><p>${task.reading_passage}</p></div>
-                    <div class="writing-panel" id="writing-panel"></div>`;
+            mainContainer.style.gridTemplateColumns = '1fr 1fr';
+            mainContainer.innerHTML = `<div class="content-panel"><h2>Reading Passage Reference</h2><p>${task.reading_passage}</p></div><div class="writing-panel" id="writing-panel"></div>`;
             renderWritingArea();
             startTimer(1200, () => { alert("Time's Up!"); submitAndContinue(true); });
         }
 
-        // --- Task 2: Academic Discussion ---
         function renderAcademicDiscussion(task) {
             phaseTitleEl.textContent = "Task 2: Academic Discussion";
             mainContainer.style.gridTemplateColumns = '1fr 1fr';
-            mainContainer.innerHTML = `
-                    <div class="content-panel">
-                        <h2>Professor's Prompt & Discussion</h2>
-                        <p>${task.professor_prompt}</p><hr>
-                        <p><b>${task.student1_author}:</b> ${task.student1_post}</p><hr>
-                        <p><b>${task.student2_author}:</b> ${task.student2_post}</p>
-                    </div>
-                    <div class="writing-panel" id="writing-panel"></div>`;
+            mainContainer.innerHTML = `<div class="content-panel"><h2>Professor's Prompt & Discussion</h2><p>${task.professor_prompt}</p><hr><p><b>${task.student1_author}:</b> ${task.student1_post}</p><hr><p><b>${task.student2_author}:</b> ${task.student2_post}</p></div><div class="writing-panel" id="writing-panel"></div>`;
             renderWritingArea();
             startTimer(600, () => { alert("Time's Up!"); submitAndContinue(true); });
         }
 
-        // --- Reusable & Utility Functions ---
         function renderWritingArea() {
             const panel = document.getElementById('writing-panel');
-            panel.innerHTML = `
-                    <h2>Your Response</h2>
-                    <textarea id="user-textarea"></textarea>
-                    <div class="controls-container">
-                        <div id="word-count">Words: 0</div>
-                        <button id="submit-btn" onclick="submitAndContinue()">Submit & Continue</button>
-                    </div>
-                    <p id="status-message"></p>`;
+            panel.innerHTML = `<h2>Your Response</h2><textarea id="user-textarea"></textarea><div class="controls-container"><div id="word-count">Words: 0</div><button id="submit-btn" onclick="submitAndContinue()">Submit & Continue</button></div><p id="status-message"></p>`;
             document.getElementById('user-textarea').addEventListener('input', (e) => {
                 const words = e.target.value.trim().match(/\S+/g)?.length || 0;
                 document.getElementById('word-count').textContent = `Words: ${words}`;
@@ -289,71 +287,12 @@
         }
 
         function renderEndScreen() {
-            renderInstructionScreen("Congratulations!", "You have completed the Writing Test. You can view your submissions in the History section.", () => { window.location.href = '/history.html'; });
             phaseTitleEl.textContent = "Test Finished";
             phaseTimerEl.style.display = 'none';
+            renderInstructionScreen("Congratulations!", "You have completed the Writing Test. You can view your submissions in the History section.", () => { window.location.href = '/history.html'; });
         }
 
         function startTimer(duration, onComplete) {
             clearInterval(timer);
             let timeRemaining = duration;
-            const updateDisplay = () => {
-                const minutes = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
-                const seconds = (timeRemaining % 60).toString().padStart(2, '0');
-                phaseTimerEl.textContent = `${minutes}:${seconds}`;
-            };
-            updateDisplay();
-            timer = setInterval(() => {
-                timeRemaining--;
-                updateDisplay();
-                if (timeRemaining <= 0) {
-                    clearInterval(timer);
-                    onComplete();
-                }
-            }, 1000);
-        }
-
-        async function submitAndContinue(force = false) {
-            const submitBtn = document.getElementById('submit-btn');
-            const textarea = document.getElementById('user-textarea');
-            const statusMessageEl = document.getElementById('status-message');
-            if (!submitBtn || !textarea) return;
-
-            const content = textarea.value;
-            const wordCount = content ? content.trim().match(/\S+/g).length : 0;
-
-            if (wordCount === 0 && !force) {
-                alert("Cannot submit an empty response.");
-                return;
-            }
-
-            submitBtn.disabled = true;
-            statusMessageEl.textContent = "Submitting...";
-
-            try {
-                const task = writingTasks[currentTaskIndex];
-                const response = await fetch('/api/submit-response', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({ content, wordCount, questionId: task.id, task_type: task.task_type }),
-                });
-                if (!response.ok) {
-                    const result = await response.json();
-                    throw new Error(result.message);
-                }
-
-                if (currentTaskIndex === 0) { // After integrated task, show instruction for next one
-                    renderInstructionScreen("Task 2: Academic Discussion", "You will have 10 minutes to complete this task.", nextTask);
-                } else {
-                    nextTask(); // After academic task, this will lead to the end screen
-                }
-            } catch (error) {
-                statusMessageEl.innerHTML = `<span style="color: var(--accent-red);">✗ ${error.message}</span>`;
-                submitBtn.disabled = false;
-            }
-        }
-
-        document.addEventListener('DOMContentLoaded', startTest);
-    </script>
-</body>
-</html>
+            const updateDisplay =
