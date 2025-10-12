@@ -48,6 +48,38 @@
             -moz-osx-font-smoothing: grayscale
         }
 
+        .navbar {
+            max-width: 800px;
+            margin: 20px auto 0;
+            padding: 0 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center
+        }
+
+        .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 15px;
+            transition: color .2s ease
+        }
+
+            .nav-link:hover {
+                color: var(--accent-blue)
+            }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 20px
+        }
+
+        .nav-user {
+            color: var(--text-secondary);
+            font-weight: 500
+        }
+
         .main-container {
             width: 100%;
             max-width: 760px;
@@ -233,7 +265,7 @@
     </style>
 </head>
 <body>
-
+    <div class="navbar"></div>
     <div class="main-container">
         <h1>Academic Discussion</h1>
         <p class="subtitle" id="topic-title">Loading Topic...</p>
@@ -263,7 +295,13 @@
         </div>
     </div>
 
+    <script src="/auth.js"></script>
     <script>
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/login.html';
+        }
+
         const startBtn = document.getElementById('start-btn');
         const submitBtn = document.getElementById('submit-btn');
         const resetBtn = document.getElementById('reset-btn');
@@ -276,12 +314,12 @@
 
         let timer;
         let timeRemaining = 600;
-        let currentQuestionId = null; // 新增一个变量来存储当前题目ID
+        let currentQuestionId = null;
 
         document.addEventListener('DOMContentLoaded', async () => {
             const urlParams = new URLSearchParams(window.location.search);
             const questionId = urlParams.get('id');
-            currentQuestionId = questionId; // 存储ID，以便提交时使用
+            currentQuestionId = questionId;
 
             if (!questionId) {
                 topicTitleEl.textContent = "Error: No question ID provided.";
@@ -292,6 +330,7 @@
             }
 
             try {
+                // 这个 API 是公开的，不需要 token
                 const response = await fetch(`/api/questions/${questionId}`);
                 if (!response.ok) {
                     throw new Error('Failed to fetch question details.');
@@ -299,16 +338,10 @@
                 const question = await response.json();
 
                 topicTitleEl.textContent = question.topic;
-
-                // 使用更稳健的分割逻辑
-                const promptParts = question.professor_prompt.split(/:(.*)/s);
-                const professorName = promptParts[0];
-                const professorText = promptParts[1] ? promptParts[1].trim() : '';
-
                 questionContentEl.innerHTML = `
                         <div class="post">
-                            <p class="post-author">${question.professor_author || professorName}</p>
-                            <p class="post-content">${professorText || question.professor_prompt}</p>
+                            <p class="post-author">${question.professor_author}</p>
+                            <p class="post-content">${question.professor_prompt}</p>
                         </div>
                         <div class="post">
                             <p class="post-author">${question.student1_author}</p>
@@ -336,18 +369,20 @@
             statusMessageEl.textContent = "Submitting...";
             statusMessageEl.style.color = 'var(--accent-blue)';
             submitBtn.disabled = true;
+
             try {
                 const apiUrl = 'https://toefl-final-project.onrender.com/api/submit-response';
                 const response = await fetch(apiUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    // ============ 关键升级！提交时带上题目 ID ============
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}` // 在请求头中附上通行证
+                    },
                     body: JSON.stringify({
                         content: content,
                         wordCount: wordCount,
                         questionId: currentQuestionId
                     }),
-                    // =======================================================
                 });
 
                 const contentType = response.headers.get("content-type");

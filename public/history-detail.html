@@ -20,7 +20,7 @@
         }
 
         :root {
-            --bg-color: #f0f0f5;
+            --bg-color: #f0f0f-5;
             --container-bg: #fff;
             --text-primary: #1d1d1f;
             --text-secondary: #6e6e73;
@@ -43,7 +43,10 @@
         .navbar {
             max-width: 800px;
             margin: 20px auto 0;
-            padding: 0 10px
+            padding: 0 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center
         }
 
         .nav-link {
@@ -57,6 +60,17 @@
             .nav-link:hover {
                 color: var(--accent-blue)
             }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 20px
+        }
+
+        .nav-user {
+            color: var(--text-secondary);
+            font-weight: 500
+        }
 
         .main-container {
             max-width: 800px;
@@ -130,9 +144,7 @@
 </head>
 <body>
 
-    <div class="navbar">
-        <a href="/history.html" class="nav-link">&larr; Back to Writing History</a>
-    </div>
+    <div class="navbar"></div>
 
     <div class="main-container">
         <h1 id="review-title">Reviewing Submission</h1>
@@ -143,8 +155,15 @@
         </div>
     </div>
 
+    <script src="/auth.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = '/login.html';
+                return;
+            }
+
             const reviewTitleEl = document.getElementById('review-title');
             const reviewSubtitleEl = document.getElementById('review-subtitle');
             const reviewContentEl = document.getElementById('review-content');
@@ -160,41 +179,51 @@
             }
 
             try {
-                // 从我们全新的 /api/history/:id 接口获取数据
-                const response = await fetch(`/api/history/${historyId}`);
+                // 在请求头中附上通行证
+                const response = await fetch(`/api/history/${historyId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.status === 401 || response.status === 403) {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    window.location.href = '/login.html';
+                    return;
+                }
+
                 if (!response.ok) {
                     throw new Error('Failed to fetch submission details.');
                 }
                 const data = await response.json();
 
-                // 格式化日期和元数据
                 const submittedDate = new Date(data.submitted_at).toLocaleString('en-US', {
                     year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
                 });
                 reviewTitleEl.textContent = data.title;
                 reviewSubtitleEl.textContent = `Submitted on ${submittedDate} • ${data.word_count} words`;
 
-                // 动态填充页面内容
                 reviewContentEl.innerHTML = `
-                    <h2 class="section-header">Original Prompt</h2>
-                    <div class="post">
-                        <p class="post-author">${data.professor_author}</p>
-                        <p class="post-content">${data.professor_prompt}</p>
-                    </div>
-                    <div class="post">
-                        <p class="post-author">${data.student1_author}</p>
-                        <p class="post-content">${data.student1_post}</p>
-                    </div>
-                    <div class="post">
-                        <p class="post-author">${data.student2_author}</p>
-                        <p class="post-content">${data.student2_post}</p>
-                    </div>
+                        <h2 class="section-header">Original Prompt</h2>
+                        <div class="post">
+                            <p class="post-author">${data.professor_author}</p>
+                            <p class="post-content">${data.professor_prompt}</p>
+                        </div>
+                        <div class="post">
+                            <p class="post-author">${data.student1_author}</p>
+                            <p class="post-content">${data.student1_post}</p>
+                        </div>
+                        <div class="post">
+                            <p class="post-author">${data.student2_author}</p>
+                            <p class="post-content">${data.student2_post}</p>
+                        </div>
 
-                    <h2 class="section-header">Your Response</h2>
-                    <div class="user-response-card">
-                        <p class="user-response-content">${data.user_response}</p>
-                    </div>
-                `;
+                        <h2 class="section-header">Your Response</h2>
+                        <div class="user-response-card">
+                            <p class="user-response-content">${data.user_response}</p>
+                        </div>
+                    `;
 
             } catch (error) {
                 console.error('Error loading submission details:', error);
@@ -204,6 +233,5 @@
             }
         });
     </script>
-
 </body>
 </html>

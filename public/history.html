@@ -61,6 +61,17 @@
                 color: var(--accent-blue)
             }
 
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 20px
+        }
+
+        .nav-user {
+            color: var(--text-secondary);
+            font-weight: 500
+        }
+
         .main-container {
             max-width: 800px;
             margin: 20px auto 40px;
@@ -159,48 +170,58 @@
 </head>
 <body>
 
-    <div class="navbar">
-        <a href="/" class="nav-link">&larr; Back to Practice Center</a>
-        <a href="#" class="nav-link">My Profile</a>
-    </div>
+    <div class="navbar"></div>
 
     <div class="main-container">
         <h1>Writing History</h1>
         <p class="subtitle">Review your past practice sessions.</p>
-
         <div id="history-list">
             <div class="loading-state">Loading your history...</div>
         </div>
     </div>
 
+    <script src="/auth.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = '/login.html';
+                return;
+            }
+
             const historyList = document.getElementById('history-list');
 
             try {
-                const response = await fetch('/api/history');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch writing history.');
-                }
-                const historyData = await response.json();
+                // 在请求头中附上通行证
+                const response = await fetch('/api/history', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
 
+                if (response.status === 401 || response.status === 403) {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    window.location.href = '/login.html';
+                    return;
+                }
+
+                if (!response.ok) throw new Error('Failed to fetch history.');
+
+                const historyData = await response.json();
                 historyList.innerHTML = '';
 
                 if (historyData.length === 0) {
-                    // ============ 关键修复！使用了正确的 JavaScript 字符串 ============
                     historyList.innerHTML = `<div class="empty-state">You haven't completed any practice sessions yet. <a href="/">Start one now!</a></div>`;
-                    // ===============================================================
                     return;
                 }
 
                 historyData.forEach(item => {
                     const itemElement = document.createElement('div');
                     itemElement.className = 'history-item';
-
                     const submittedDate = new Date(item.submitted_at).toLocaleDateString('en-US', {
                         year: 'numeric', month: 'long', day: 'numeric'
                     });
-
                     itemElement.innerHTML = `
                             <div class="item-details">
                                 <h2>${item.question_title}</h2>
@@ -222,10 +243,9 @@
 
             } catch (error) {
                 console.error('Error loading history:', error);
-                historyList.innerHTML = '<div class="loading-state">Error loading your history. Please try again later.</div>';
+                historyList.innerHTML = '<div class="loading-state">Error loading your history.</div>';
             }
         });
     </script>
-
 </body>
 </html>
