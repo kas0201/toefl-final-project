@@ -161,14 +161,12 @@
 
     <div class="navbar">
         <a href="/" class="nav-link">&larr; Back to Practice Center</a>
-        <!-- 我们暂时还没有 "My Profile" 页面，所以这里先用 # -->
         <a href="#" class="nav-link">My Profile</a>
     </div>
 
     <div class="main-container">
         <h1>Writing History</h1>
         <p class="subtitle">Review your past practice sessions.</p>
-
         <div id="history-list">
             <div class="loading-state">Loading your history...</div>
         </div>
@@ -179,7 +177,6 @@
             const historyList = document.getElementById('history-list');
 
             try {
-                // 从我们全新的 /api/history 接口获取数据
                 const response = await fetch('/api/history');
                 if (!response.ok) {
                     throw new Error('Failed to fetch writing history.');
@@ -197,28 +194,28 @@
                     const itemElement = document.createElement('div');
                     itemElement.className = 'history-item';
 
-                    // 格式化日期
                     const submittedDate = new Date(item.submitted_at).toLocaleDateString('en-US', {
                         year: 'numeric', month: 'long', day: 'numeric'
                     });
 
+                    // ============ 关键升级！这里的链接现在指向详情页 ============
                     itemElement.innerHTML = `
-                        <div class="item-details">
-                            <h2>${item.question_title}</h2>
-                            <div class="item-meta">
-                                <div class="meta-group">
-                                    <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                    <span>${submittedDate}</span>
-                                </div>
-                                <div class="meta-group">
-                                    <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.232 5.232z" /></svg>
-                                    <span>${item.word_count} words</span>
+                            <div class="item-details">
+                                <h2>${item.question_title}</h2>
+                                <div class="item-meta">
+                                    <div class="meta-group">
+                                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                        <span>${submittedDate}</span>
+                                    </div>
+                                    <div class="meta-group">
+                                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.232 5.232z" /></svg>
+                                        <span>${item.word_count} words</span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <!-- 我们暂时还没有详情页，所以这里的链接先用 # -->
-                        <a href="#" class="view-button">View Details</a>
-                    `;
+                            <a href="/history-detail.html?id=${item.id}" class="view-button">View Details</a>
+                        `;
+                    // =======================================================
                     historyList.appendChild(itemElement);
                 });
 
