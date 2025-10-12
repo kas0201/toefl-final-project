@@ -233,6 +233,7 @@
     </style>
 </head>
 <body>
+
     <div class="main-container">
         <h1>Academic Discussion</h1>
         <p class="subtitle" id="topic-title">Loading Topic...</p>
@@ -261,24 +262,169 @@
             <p id="status-message"></p>
         </div>
     </div>
+
     <script>
-        const startBtn = document.getElementById('start-btn'), submitBtn = document.getElementById("submit-btn"), resetBtn = document.getElementById("reset-btn"), timerEl = document.getElementById("timer"), wordCountEl = document.getElementById("word-count"), textarea = document.getElementById("user-textarea"), statusMessageEl = document.getElementById("status-message"), topicTitleEl = document.getElementById("topic-title"), questionContentEl = document.getElementById("question-content"); let timer, timeRemaining = 600, currentQuestionId = null; async function submitResponse() { const e = textarea.value, t = e ? e.match(/\S+/g).length : 0; if (0 === t) return void alert("Cannot submit an empty response."); statusMessageEl.textContent = "Submitting...", statusMessageEl.style.color = "var(--accent-blue)", submitBtn.disabled = !0; try { const n = "https://toefl-final-project.onrender.com/api/submit-response", o = await fetch(n, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: e, wordCount: t, questionId: currentQuestionId }) }), d = o.headers.get("content-type"); if (d && -1 !== d.indexOf("application/json")) { const e = await o.json(); if (o.ok) statusMessageEl.textContent = "✓ Submission successful!", statusMessageEl.style.color = "var(--accent-green)", textarea.disabled = !0, clearInterval(timer); else throw new Error(e.message) } else { const e = await o.text(); throw new Error("Server returned an unexpected response.") } } catch (e) { statusMessageEl.textContent = "✗ " + e.message, statusMessageEl.style.color = "var(--accent-red)", submitBtn.disabled = !1 } } function updateTimerDisplay() { const e = Math.floor(timeRemaining / 60).toString().padStart(2, "0"), t = (timeRemaining % 60).toString().padStart(2, "0"); timerEl.textContent = `${e}:${t}`, timeRemaining < 60 && !timerEl.style.color.includes("ff453a") && (timerEl.style.color = "var(--accent-red)") } function startTimer() { startBtn.disabled = !0, submitBtn.disabled = !1, textarea.disabled = !1, textarea.focus(), statusMessageEl.textContent = "", timer = setInterval(() => { timeRemaining--, updateTimerDisplay(), timeRemaining <= 0 && (clearInterval(timer), timerEl.textContent = "00:00", textarea.disabled = !0, submitBtn.disabled = !0, alert("Time's Up! Automatically submitting your response."), submitResponse()) }, 1e3) } function resetTimer() { clearInterval(timer), timeRemaining = 600, updateTimerDisplay(), startBtn.disabled = !1, submitBtn.disabled = !0, textarea.disabled = !0, textarea.value = "", updateWordCount(), timerEl.style.color = "var(--text-primary)", statusMessageEl.textContent = "" } function updateWordCount() { const e = textarea.value.trim(), t = e ? e.match(/\S+/g).length : 0; wordCountEl.textContent = `Words: ${t}`, t >= 100 ? wordCountEl.classList.add("sufficient") : wordCountEl.classList.remove("sufficient") } document.addEventListener("DOMContentLoaded", async () => {
-            const e = new URLSearchParams(window.location.search), t = e.get("id"); if (currentQuestionId = t, !t) return topicTitleEl.textContent = "Error: No question ID provided.", questionContentEl.innerHTML = '<div class="post">Please select a question from the <a href="/">Practice Center</a>.</div>', startBtn.disabled = !0, void (resetBtn.disabled = !0); try {
-                const e = await fetch(`/api/questions/${t}`); if (!e.ok) throw new Error("Failed to fetch question details."); const n = await e.json(); topicTitleEl.textContent = n.topic, questionContentEl.innerHTML = `
+        const startBtn = document.getElementById('start-btn');
+        const submitBtn = document.getElementById('submit-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const timerEl = document.getElementById('timer');
+        const wordCountEl = document.getElementById('word-count');
+        const textarea = document.getElementById('user-textarea');
+        const statusMessageEl = document.getElementById('status-message');
+        const topicTitleEl = document.getElementById('topic-title');
+        const questionContentEl = document.getElementById('question-content');
+
+        let timer;
+        let timeRemaining = 600;
+        let currentQuestionId = null; // 新增一个变量来存储当前题目ID
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const questionId = urlParams.get('id');
+            currentQuestionId = questionId; // 存储ID，以便提交时使用
+
+            if (!questionId) {
+                topicTitleEl.textContent = "Error: No question ID provided.";
+                questionContentEl.innerHTML = `<div class="post">Please select a question from the <a href="/">Practice Center</a>.</div>`;
+                startBtn.disabled = true;
+                resetBtn.disabled = true;
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/questions/${questionId}`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch question details.');
+                }
+                const question = await response.json();
+
+                topicTitleEl.textContent = question.topic;
+
+                // 使用更稳健的分割逻辑
+                const promptParts = question.professor_prompt.split(/:(.*)/s);
+                const professorName = promptParts[0];
+                const professorText = promptParts[1] ? promptParts[1].trim() : '';
+
+                questionContentEl.innerHTML = `
                         <div class="post">
-                            <p class="post-author">${n.professor_author}</p>
-                            <p class="post-content">${n.professor_prompt}</p>
+                            <p class="post-author">${question.professor_author || professorName}</p>
+                            <p class="post-content">${professorText || question.professor_prompt}</p>
                         </div>
                         <div class="post">
-                            <p class="post-author">${n.student1_author}</p>
-                            <p class="post-content">${n.student1_post}</p>
+                            <p class="post-author">${question.student1_author}</p>
+                            <p class="post-content">${question.student1_post}</p>
                         </div>
                         <div class="post">
-                            <p class="post-author">${n.student2_author}</p>
-                            <p class="post-content">${n.student2_post}</p>
+                            <p class="post-author">${question.student2_author}</p>
+                            <p class="post-content">${question.student2_post}</p>
                         </div>
-                    `} catch (e) { console.error("Error fetching question:", e), topicTitleEl.textContent = "Error", questionContentEl.innerHTML = '<div class="post">Could not load the question. Please try again.</div>' }
-        }), startBtn.addEventListener("click", startTimer), submitBtn.addEventListener("click", submitResponse), resetBtn.addEventListener("click", resetTimer), textarea.addEventListener("input", updateWordCount), resetTimer();
+                    `;
+            } catch (error) {
+                console.error('Error fetching question:', error);
+                topicTitleEl.textContent = "Error";
+                questionContentEl.innerHTML = '<div class="post">Could not load the question. Please try again.</div>';
+            }
+        });
+
+        async function submitResponse() {
+            const content = textarea.value;
+            const wordCount = content ? content.match(/\S+/g).length : 0;
+            if (wordCount === 0) {
+                alert("Cannot submit an empty response.");
+                return;
+            }
+            statusMessageEl.textContent = "Submitting...";
+            statusMessageEl.style.color = 'var(--accent-blue)';
+            submitBtn.disabled = true;
+            try {
+                const apiUrl = 'https://toefl-final-project.onrender.com/api/submit-response';
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    // ============ 关键升级！提交时带上题目 ID ============
+                    body: JSON.stringify({
+                        content: content,
+                        wordCount: wordCount,
+                        questionId: currentQuestionId
+                    }),
+                    // =======================================================
+                });
+
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    const result = await response.json();
+                    if (response.ok) {
+                        statusMessageEl.textContent = "✓ Submission successful!";
+                        statusMessageEl.style.color = 'var(--accent-green)';
+                        textarea.disabled = true;
+                        clearInterval(timer);
+                    } else {
+                        throw new Error(result.message);
+                    }
+                } else {
+                    throw new Error("Server returned an unexpected response.");
+                }
+            } catch (error) {
+                statusMessageEl.textContent = "✗ " + error.message;
+                statusMessageEl.style.color = 'var(--accent-red)';
+                submitBtn.disabled = false;
+            }
+        }
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
+            const seconds = (timeRemaining % 60).toString().padStart(2, '0');
+            timerEl.textContent = `${minutes}:${seconds}`;
+            if (timeRemaining < 60 && !timerEl.style.color.includes('ff453a')) {
+                timerEl.style.color = 'var(--accent-red)';
+            }
+        }
+        function startTimer() {
+            startBtn.disabled = true;
+            submitBtn.disabled = false;
+            textarea.disabled = false;
+            textarea.focus();
+            statusMessageEl.textContent = '';
+            timer = setInterval(() => {
+                timeRemaining--;
+                updateTimerDisplay();
+                if (timeRemaining <= 0) {
+                    clearInterval(timer);
+                    timerEl.textContent = "00:00";
+                    textarea.disabled = true;
+                    submitBtn.disabled = true;
+                    alert("Time's Up! Automatically submitting your response.");
+                    submitResponse();
+                }
+            }, 1000);
+        }
+        function resetTimer() {
+            clearInterval(timer);
+            timeRemaining = 600;
+            updateTimerDisplay();
+            startBtn.disabled = false;
+            submitBtn.disabled = true;
+            textarea.disabled = true;
+            textarea.value = '';
+            updateWordCount();
+            timerEl.style.color = 'var(--text-primary)';
+            statusMessageEl.textContent = '';
+        }
+        function updateWordCount() {
+            const text = textarea.value.trim();
+            const words = text ? text.match(/\S+/g).length : 0;
+            wordCountEl.textContent = `Words: ${words}`;
+            if (words >= 100) {
+                wordCountEl.classList.add('sufficient');
+            } else {
+                wordCountEl.classList.remove('sufficient');
+            }
+        }
+        startBtn.addEventListener('click', startTimer);
+        submitBtn.addEventListener('click', submitResponse);
+        resetBtn.addEventListener('click', resetTimer);
+        textarea.addEventListener('input', updateWordCount);
+        resetTimer();
     </script>
+
 </body>
 </html>
