@@ -1,4 +1,5 @@
 ﻿<!-- START OF FILE public/history-detail.html -->
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -95,6 +96,7 @@
         color: var(--text-secondary);
         padding: 40px;
       }
+
       #ai-score-card {
         background-color: #eef5ff;
         border: 1px solid #cce0ff;
@@ -142,44 +144,75 @@
       <p class="subtitle" id="review-subtitle">Loading details...</p>
       <div id="review-content"><div class="loading-state">Loading...</div></div>
     </div>
+
     <script src="/auth.js"></script>
     <script>
       document.addEventListener("DOMContentLoaded", async () => {
-        const e = localStorage.getItem("token");
-        if (!e) return void (window.location.href = "/login.html");
-        const t = document.getElementById("review-title"),
-          n = document.getElementById("review-subtitle"),
-          o = document.getElementById("review-content"),
-          a = new URLSearchParams(window.location.search).get("id");
-        if (!a) return;
+        const token = localStorage.getItem("token");
+        if (!token) {
+          window.location.href = "/login.html";
+          return;
+        }
+
+        const reviewTitleEl = document.getElementById("review-title");
+        const reviewSubtitleEl = document.getElementById("review-subtitle");
+        const reviewContentEl = document.getElementById("review-content");
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const historyId = urlParams.get("id");
+        if (!historyId) {
+          return;
+        }
+
         try {
-          const r = await fetch(`/api/history/${a}`, {
-            headers: { Authorization: `Bearer ${e}` },
+          const response = await fetch(`/api/history/${historyId}`, {
+            headers: { Authorization: `Bearer ${token}` },
           });
-          if (401 === r.status || 403 === r.status) return;
-          if (!r.ok) throw new Error("Failed to fetch submission details.");
-          const i = await r.json(),
-            s = new Date(i.submitted_at).toLocaleString("en-US", {
-              dateStyle: "long",
-              timeStyle: "short",
-            });
-          (t.textContent = i.title || "Practice Response"),
-            (n.textContent = `Submitted on ${s} • ${i.word_count} words`);
-          let c = "";
-          c =
-            null !== i.ai_score
-              ? `\n                        <div id="ai-score-card">\n                            <h3>AI-Powered Feedback</h3>\n                            <div class="score-display">\n                                <span class="score-value">${i.ai_score}</span>\n                                <span class="score-label">/ 30</span>\n                            </div>\n                            <p id="ai-feedback-content">${i.ai_feedback}</p>\n                        </div>\n                    `
-              : `\n                        <div id="ai-score-card">\n                            <h3>AI-Powered Feedback</h3>\n                            <p class="scoring-pending">Scoring in progress... Please check back in a moment.</p>\n                        </div>\n                    `;
-          let d = "";
-          (d =
-            "integrated_writing" === i.task_type
-              ? `<div class="post"><p class="post-content">${i.reading_passage}</p></div>`
-              : `\n                        <div class="post"><p class="post-author">${i.professor_author}</p><p class="post-content">${i.professor_prompt}</p></div>\n                        <div class="post"><p class="post-author">${i.student1_author}</p><p class="post-content">${i.student1_post}</p></div>\n                    `),
-            (o.innerHTML = `\n                    ${c} \n                    <h2 class="section-header">Your Response</h2>\n                    <div class="user-response-card"><p class="user-response-content">${i.user_response}</p></div>\n                    <h2 class="section-header">Original Prompt</h2>\n                    ${d}\n                `);
-        } catch (e) {
-          console.error("Error loading submission details:", e),
-            (o.innerHTML =
-              '<div class="loading-state">An error occurred. Please try again.</div>');
+          if (response.status === 401 || response.status === 403) {
+            return;
+          }
+          if (!response.ok)
+            throw new Error("Failed to fetch submission details.");
+
+          const data = await response.json();
+
+          const submittedDate = new Date(data.submitted_at).toLocaleString(
+            "en-US",
+            { dateStyle: "long", timeStyle: "short" }
+          );
+          reviewTitleEl.textContent = data.title || "Practice Response";
+          reviewSubtitleEl.textContent = `Submitted on ${submittedDate} • ${data.word_count} words`;
+
+          let aiCardHTML = "";
+          if (data.ai_score !== null) {
+            aiCardHTML = `<div id="ai-score-card"><h3>AI-Powered Feedback</h3><div class="score-display"><span class="score-value">${data.ai_score}</span><span class="score-label">/ 30</span></div><p id="ai-feedback-content">${data.ai_feedback}</p></div>`;
+          } else {
+            aiCardHTML = `<div id="ai-score-card"><h3>AI-Powered Feedback</h3><p class="scoring-pending">Scoring in progress... Please check back in a moment.</p></div>`;
+          }
+
+          let promptHTML = "";
+          if (data.task_type === "integrated_writing") {
+            promptHTML = `<div class="post"><p class="post-content">${data.reading_passage}</p></div>`;
+          } else {
+            // --- 【关键修正】: 补全了第二个学生的发言 ---
+            promptHTML = `
+                        <div class="post"><p class="post-author">${data.professor_author}</p><p class="post-content">${data.professor_prompt}</p></div>
+                        <div class="post"><p class="post-author">${data.student1_author}</p><p class="post-content">${data.student1_post}</p></div>
+                        <div class="post"><p class="post-author">${data.student2_author}</p><p class="post-content">${data.student2_post}</p></div>
+                    `;
+          }
+
+          reviewContentEl.innerHTML = `
+                    ${aiCardHTML} 
+                    <h2 class="section-header">Your Response</h2>
+                    <div class="user-response-card"><p class="user-response-content">${data.user_response}</p></div>
+                    <h2 class="section-header">Original Prompt</h2>
+                    ${promptHTML}
+                `;
+        } catch (error) {
+          console.error("Error loading submission details:", error);
+          reviewContentEl.innerHTML =
+            '<div class="loading-state">An error occurred. Please try again.</div>';
         }
       });
     </script>
