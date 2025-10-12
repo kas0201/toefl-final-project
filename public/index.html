@@ -289,18 +289,16 @@
 
         let timer;
         let timeRemaining = 600;
-        let currentQuestionId = null; // 新增一个变量来存储当前题目ID
+        let currentQuestionId = null;
 
-        // ======================= 新增：加载题目内容的函数 =======================
         document.addEventListener('DOMContentLoaded', async () => {
             const urlParams = new URLSearchParams(window.location.search);
             const questionId = urlParams.get('id');
-            currentQuestionId = questionId; // 存储ID
+            currentQuestionId = questionId;
 
             if (!questionId) {
                 topicTitleEl.textContent = "Error: No question ID provided.";
                 questionContentEl.innerHTML = `<div class="post">Please select a question from the <a href="/practice.html">Practice Center</a>.</div>`;
-                // 禁用所有按钮
                 startBtn.disabled = true;
                 resetBtn.disabled = true;
                 return;
@@ -314,10 +312,17 @@
                 const question = await response.json();
 
                 topicTitleEl.textContent = question.topic;
+
+                // ============== 关键修正！更稳健的分割逻辑 ==============
+                const promptParts = question.professor_prompt.split(/:(.*)/s);
+                const professorName = promptParts[0];
+                const professorText = promptParts[1] ? promptParts[1].trim() : '';
+                // =======================================================
+
                 questionContentEl.innerHTML = `
                         <div class="post">
-                            <p class="post-author">${question.professor_prompt.split(':')[0]}</p>
-                            <p class="post-content">${question.professor_prompt.substring(question.professor_prompt.indexOf(':') + 1)}</p>
+                            <p class="post-author">${professorName}</p>
+                            <p class="post-content">${professorText}</p>
                         </div>
                         <div class="post">
                             <p class="post-author">${question.student1_author}</p>
@@ -349,17 +354,14 @@
             submitBtn.disabled = true;
 
             try {
-                // ============ 关键！请务必将这里的 URL 换成你自己的 Render 网址 ============
                 const apiUrl = 'https://toefl-final-project.onrender.com/api/submit-response';
-                // ======================================================================
-
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         content: content,
                         wordCount: wordCount,
-                        questionId: currentQuestionId // 提交时带上题目ID
+                        questionId: currentQuestionId
                     }),
                 });
 
@@ -375,7 +377,6 @@
                         throw new Error(result.message);
                     }
                 } else {
-                    const text = await response.text();
                     throw new Error("Server returned an unexpected response.");
                 }
 
