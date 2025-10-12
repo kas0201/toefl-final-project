@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Practice Center - TOEFL® Writing</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display-swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
         @keyframes fadeIn {
             from {
@@ -159,44 +159,32 @@
     </style>
 </head>
 <body>
-
-    <div class="navbar">
-        <!-- 这个容器将由 auth.js 动态填充 -->
-    </div>
-
+    <div class="navbar"></div>
     <div class="main-container">
         <h1>Practice Center</h1>
         <p class="subtitle">Choose a topic to begin your writing practice.</p>
-
         <div id="questions-list">
             <div class="loading-state">Loading questions...</div>
         </div>
     </div>
-
-    <!-- 引入 auth.js 来处理导航栏和认证 -->
     <script src="/auth.js"></script>
     <script>
-        // 页面加载时立刻检查登录状态
-        if (!localStorage.getItem('token')) {
-            // 如果没有 token，立即重定向到登录页面
-            window.location.href = '/login.html';
-        }
-
         document.addEventListener('DOMContentLoaded', async () => {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = '/login.html';
+            }
             const questionsList = document.getElementById('questions-list');
-
             try {
+                // 这个请求是公共的，不需要 token
                 const response = await fetch('/api/questions');
                 if (!response.ok) throw new Error('Failed to fetch questions.');
                 const questions = await response.json();
-
                 questionsList.innerHTML = '';
-
                 if (questions.length === 0) {
                     questionsList.innerHTML = '<div class="loading-state">No questions found.</div>';
                     return;
                 }
-
                 questions.forEach(question => {
                     const card = document.createElement('div');
                     card.className = 'question-card';
@@ -211,10 +199,9 @@
                 });
             } catch (error) {
                 console.error('Error fetching questions:', error);
-                questionsList.innerHTML = '<div class="loading-state">Error loading questions. Please try again later.</div>';
+                questionsList.innerHTML = '<div class="loading-state">Error loading questions.</div>';
             }
         });
     </script>
-
 </body>
 </html>
