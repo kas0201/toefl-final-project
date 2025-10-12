@@ -1,4 +1,6 @@
-﻿<!DOCTYPE html>
+﻿<!-- START OF FILE practice-page.html -->
+﻿
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -333,19 +335,19 @@
 
                 topicTitleEl.textContent = question.topic;
                 questionContentEl.innerHTML = `
-                        <div class="post">
-                            <p class="post-author">${question.professor_author}</p>
-                            <p class="post-content">${question.professor_prompt}</p>
-                        </div>
-                        <div class="post">
-                            <p class="post-author">${question.student1_author}</p>
-                            <p class="post-content">${question.student1_post}</p>
-                        </div>
-                        <div class="post">
-                            <p class="post-author">${question.student2_author}</p>
-                            <p class="post-content">${question.student2_post}</p>
-                        </div>
-                    `;
+                            <div class="post">
+                                <p class="post-author">${question.professor_author}</p>
+                                <p class="post-content">${question.professor_prompt}</p>
+                            </div>
+                            <div class="post">
+                                <p class="post-author">${question.student1_author}</p>
+                                <p class="post-content">${question.student1_post}</p>
+                            </div>
+                            <div class="post">
+                                <p class="post-author">${question.student2_author}</p>
+                                <p class="post-content">${question.student2_post}</p>
+                            </div>
+                        `;
             } catch (error) {
                 console.error('Error fetching question:', error);
                 topicTitleEl.textContent = "Error";
@@ -365,7 +367,8 @@
             submitBtn.disabled = true;
 
             try {
-                const apiUrl = 'https://toefl-final-project.onrender.com/api/submit-response';
+                // --- 关键修正：使用相对路径 ---
+                const apiUrl = '/api/submit-response';
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: {

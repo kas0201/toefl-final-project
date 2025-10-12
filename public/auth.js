@@ -1,39 +1,44 @@
-// 这个函数会检查用户是否登录，并动态更新导航栏
-function setupNavbar() {
-    const token = localStorage.getItem('token');
-    const user = JSON.parse(localStorage.getItem('user'));
+// --- START OF FILE public/auth.js ---
+
+document.addEventListener('DOMContentLoaded', () => {
+    // 寻找页面上的导航栏容器
     const navbar = document.querySelector('.navbar');
+    if (!navbar) return; // 如果页面上没有 .navbar，就什么也不做
 
-    if (!navbar) return; // 如果页面没有导航栏，就什么都不做
+    // 从 localStorage 获取用户信息
+    const userString = localStorage.getItem('user');
 
-    if (token && user) {
-        // 用户已登录
+    if (userString) {
+        // 如果用户已登录
+        const user = JSON.parse(userString);
         navbar.innerHTML = `
             <a href="/" class="nav-link">Practice Center</a>
             <div class="nav-right">
-                <span class="nav-user">Welcome, ${user.username}!</span>
-                <a href="/history.html" class="nav-link">My History</a>
-                <a href="#" id="logout-btn" class="nav-link">Logout</a>
+                <a href="/history.html" class="nav-link">History</a>
+                <span class="nav-user">Hi, ${user.username}</span>
+                <a href="#" id="logout-btn" class="nav-link" style="color: var(--accent-red);">Logout</a>
             </div>
         `;
 
-        document.getElementById('logout-btn').addEventListener('click', (e) => {
-            e.preventDefault();
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = '/login.html';
-        });
+        // 绑定登出按钮的点击事件
+        const logoutBtn = document.getElementById('logout-btn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                // 从 localStorage 清除 token 和用户信息
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                // 跳转回登录页面
+                window.location.href = '/login.html';
+            });
+        }
     } else {
-        // 用户未登录
+        // 如果用户未登录
         navbar.innerHTML = `
             <a href="/" class="nav-link">Practice Center</a>
             <div class="nav-right">
-                <a href="/login.html" class="nav-link">Login</a>
-                <a href="/register.html" class="nav-link">Sign Up</a>
+                <a href="/login.html" class="nav-link">Log In</a>
             </div>
         `;
     }
-}
-
-// 在每个页面加载时，都运行这个函数
-document.addEventListener('DOMContentLoaded', setupNavbar);
+});
