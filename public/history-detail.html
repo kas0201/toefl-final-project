@@ -1,237 +1,187 @@
-﻿<!DOCTYPE html>
+﻿<!-- START OF FILE public/history-detail.html -->
+<!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Writing Review - TOEFL® Practice</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px)
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0)
-            }
-        }
-
-        :root {
-            --bg-color: #f0f0f-5;
-            --container-bg: #fff;
-            --text-primary: #1d1d1f;
-            --text-secondary: #6e6e73;
-            --text-tertiary: #86868b;
-            --accent-blue: #007aff;
-            --accent-green: #30d158;
-            --border-color: #e5e5ea
-        }
-
-        body {
-            font-family: 'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-primary);
-            margin: 0;
-            padding: 24px;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale
-        }
-
-        .navbar {
-            max-width: 800px;
-            margin: 20px auto 0;
-            padding: 0 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center
-        }
-
-        .nav-link {
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-weight: 500;
-            font-size: 15px;
-            transition: color .2s ease
-        }
-
-            .nav-link:hover {
-                color: var(--accent-blue)
-            }
-
-        .nav-right {
-            display: flex;
-            align-items: center;
-            gap: 20px
-        }
-
-        .nav-user {
-            color: var(--text-secondary);
-            font-weight: 500
-        }
-
-        .main-container {
-            max-width: 800px;
-            margin: 20px auto 40px;
-            animation: fadeIn .6s ease-out forwards
-        }
-
-        h1 {
-            font-size: 36px;
-            font-weight: 700;
-            text-align: center;
-            margin: 0 0 8px 0
-        }
-
-        .subtitle {
-            text-align: center;
-            color: var(--text-secondary);
-            margin-bottom: 40px;
-            font-size: 18px
-        }
-
-        .post, .user-response-card {
-            background-color: var(--container-bg);
-            border-radius: 12px;
-            padding: 24px;
-            border: 1px solid var(--border-color);
-            margin-bottom: 24px
-        }
-
-        .post-author {
-            font-size: 17px;
-            font-weight: 600;
-            margin-bottom: 12px;
-            color: var(--text-primary)
-        }
-
-        .post-content, .user-response-content {
-            font-size: 16px;
-            line-height: 1.65;
-            color: var(--text-secondary);
-            white-space: pre-wrap
-        }
-
-            .post-content strong {
-                color: var(--text-primary);
-                font-weight: 600
-            }
-
-        .section-header {
-            font-size: 21px;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-top: 40px;
-            margin-bottom: 16px
-        }
-
-        .user-response-card {
-            border-left: 5px solid var(--accent-green)
-        }
-
-        .loading-state {
-            text-align: center;
-            font-size: 18px;
-            color: var(--text-secondary);
-            padding: 40px;
-            background-color: var(--container-bg);
-            border-radius: 12px;
-            border: 1px solid var(--border-color)
-        }
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+      :root {
+        --bg-color: #f5f5f7;
+        --card-bg: #fff;
+        --text-primary: #1d1d1f;
+        --text-secondary: #6e6e73;
+        --accent-blue: #007aff;
+        --accent-green: #30d158;
+        --border-color: #d2d2d7;
+        --accent-red: #ff453a;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background-color: var(--bg-color);
+        margin: 0;
+        padding: 24px;
+      }
+      .navbar {
+        max-width: 800px;
+        margin: 20px auto 0;
+        padding: 0 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .nav-link {
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-weight: 500;
+      }
+      .nav-right {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+      .main-container {
+        max-width: 800px;
+        margin: 40px auto;
+      }
+      h1 {
+        font-size: 36px;
+        font-weight: 700;
+        text-align: center;
+        margin: 0 0 8px 0;
+      }
+      .subtitle {
+        text-align: center;
+        color: var(--text-secondary);
+        margin-bottom: 40px;
+        font-size: 18px;
+      }
+      .post,
+      .user-response-card {
+        background-color: var(--card-bg);
+        border-radius: 16px;
+        padding: 24px;
+        border: 1px solid var(--border-color);
+        margin-bottom: 24px;
+      }
+      .post-author {
+        font-size: 17px;
+        font-weight: 600;
+        margin-bottom: 12px;
+      }
+      .post-content,
+      .user-response-content {
+        font-size: 16px;
+        line-height: 1.7;
+        color: var(--text-secondary);
+        white-space: pre-wrap;
+      }
+      .section-header {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-top: 48px;
+        margin-bottom: 20px;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 8px;
+      }
+      .user-response-card {
+        border-left: 4px solid var(--accent-green);
+      }
+      .loading-state {
+        text-align: center;
+        font-size: 18px;
+        color: var(--text-secondary);
+        padding: 40px;
+      }
+      #ai-score-card {
+        background-color: #eef5ff;
+        border: 1px solid #cce0ff;
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 24px;
+      }
+      #ai-score-card h3 {
+        font-size: 20px;
+        margin: 0 0 16px 0;
+        color: #0052cc;
+      }
+      .score-display {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+      .score-value {
+        font-size: 48px;
+        font-weight: 700;
+        color: var(--accent-blue);
+      }
+      .score-label {
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--text-secondary);
+      }
+      #ai-feedback-content {
+        font-size: 15px;
+        line-height: 1.7;
+        white-space: pre-wrap;
+        color: var(--text-secondary);
+      }
+      .scoring-pending {
+        font-style: italic;
+        color: var(--text-secondary);
+      }
     </style>
-</head>
-<body>
-
+  </head>
+  <body>
     <div class="navbar"></div>
-
     <div class="main-container">
-        <h1 id="review-title">Reviewing Submission</h1>
-        <p class="subtitle" id="review-subtitle">Loading details...</p>
-
-        <div id="review-content">
-            <div class="loading-state">Loading your submission details...</div>
-        </div>
+      <h1 id="review-title">Reviewing Submission</h1>
+      <p class="subtitle" id="review-subtitle">Loading details...</p>
+      <div id="review-content"><div class="loading-state">Loading...</div></div>
     </div>
-
     <script src="/auth.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', async () => {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                window.location.href = '/login.html';
-                return;
-            }
-
-            const reviewTitleEl = document.getElementById('review-title');
-            const reviewSubtitleEl = document.getElementById('review-subtitle');
-            const reviewContentEl = document.getElementById('review-content');
-
-            const urlParams = new URLSearchParams(window.location.search);
-            const historyId = urlParams.get('id');
-
-            if (!historyId) {
-                reviewTitleEl.textContent = 'Error';
-                reviewSubtitleEl.textContent = 'No submission ID provided.';
-                reviewContentEl.innerHTML = '<div class="loading-state">Please select a submission from your history.</div>';
-                return;
-            }
-
-            try {
-                // 在请求头中附上通行证
-                const response = await fetch(`/api/history/${historyId}`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                if (response.status === 401 || response.status === 403) {
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
-                    window.location.href = '/login.html';
-                    return;
-                }
-
-                if (!response.ok) {
-                    throw new Error('Failed to fetch submission details.');
-                }
-                const data = await response.json();
-
-                const submittedDate = new Date(data.submitted_at).toLocaleString('en-US', {
-                    year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                });
-                reviewTitleEl.textContent = data.title;
-                reviewSubtitleEl.textContent = `Submitted on ${submittedDate} • ${data.word_count} words`;
-
-                reviewContentEl.innerHTML = `
-                        <h2 class="section-header">Original Prompt</h2>
-                        <div class="post">
-                            <p class="post-author">${data.professor_author}</p>
-                            <p class="post-content">${data.professor_prompt}</p>
-                        </div>
-                        <div class="post">
-                            <p class="post-author">${data.student1_author}</p>
-                            <p class="post-content">${data.student1_post}</p>
-                        </div>
-                        <div class="post">
-                            <p class="post-author">${data.student2_author}</p>
-                            <p class="post-content">${data.student2_post}</p>
-                        </div>
-
-                        <h2 class="section-header">Your Response</h2>
-                        <div class="user-response-card">
-                            <p class="user-response-content">${data.user_response}</p>
-                        </div>
-                    `;
-
-            } catch (error) {
-                console.error('Error loading submission details:', error);
-                reviewTitleEl.textContent = 'Error';
-                reviewSubtitleEl.textContent = 'Could not load submission.';
-                reviewContentEl.innerHTML = '<div class="loading-state">An error occurred. Please try again later.</div>';
-            }
-        });
+      document.addEventListener("DOMContentLoaded", async () => {
+        const e = localStorage.getItem("token");
+        if (!e) return void (window.location.href = "/login.html");
+        const t = document.getElementById("review-title"),
+          n = document.getElementById("review-subtitle"),
+          o = document.getElementById("review-content"),
+          a = new URLSearchParams(window.location.search).get("id");
+        if (!a) return;
+        try {
+          const r = await fetch(`/api/history/${a}`, {
+            headers: { Authorization: `Bearer ${e}` },
+          });
+          if (401 === r.status || 403 === r.status) return;
+          if (!r.ok) throw new Error("Failed to fetch submission details.");
+          const i = await r.json(),
+            s = new Date(i.submitted_at).toLocaleString("en-US", {
+              dateStyle: "long",
+              timeStyle: "short",
+            });
+          (t.textContent = i.title || "Practice Response"),
+            (n.textContent = `Submitted on ${s} • ${i.word_count} words`);
+          let c = "";
+          c =
+            null !== i.ai_score
+              ? `\n                        <div id="ai-score-card">\n                            <h3>AI-Powered Feedback</h3>\n                            <div class="score-display">\n                                <span class="score-value">${i.ai_score}</span>\n                                <span class="score-label">/ 30</span>\n                            </div>\n                            <p id="ai-feedback-content">${i.ai_feedback}</p>\n                        </div>\n                    `
+              : `\n                        <div id="ai-score-card">\n                            <h3>AI-Powered Feedback</h3>\n                            <p class="scoring-pending">Scoring in progress... Please check back in a moment.</p>\n                        </div>\n                    `;
+          let d = "";
+          (d =
+            "integrated_writing" === i.task_type
+              ? `<div class="post"><p class="post-content">${i.reading_passage}</p></div>`
+              : `\n                        <div class="post"><p class="post-author">${i.professor_author}</p><p class="post-content">${i.professor_prompt}</p></div>\n                        <div class="post"><p class="post-author">${i.student1_author}</p><p class="post-content">${i.student1_post}</p></div>\n                    `),
+            (o.innerHTML = `\n                    ${c} \n                    <h2 class="section-header">Your Response</h2>\n                    <div class="user-response-card"><p class="user-response-content">${i.user_response}</p></div>\n                    <h2 class="section-header">Original Prompt</h2>\n                    ${d}\n                `);
+        } catch (e) {
+          console.error("Error loading submission details:", e),
+            (o.innerHTML =
+              '<div class="loading-state">An error occurred. Please try again.</div>');
+        }
+      });
     </script>
-</body>
+  </body>
 </html>

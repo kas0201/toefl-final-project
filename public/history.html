@@ -1,251 +1,190 @@
-﻿<!DOCTYPE html>
+﻿<!-- START OF FILE public/history.html -->
+<!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Writing History - TOEFL® Practice</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px)
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0)
-            }
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
         }
-
-        :root {
-            --bg-color: #f0f0f5;
-            --container-bg: #fff;
-            --text-primary: #1d1d1f;
-            --text-secondary: #6e6e73;
-            --text-tertiary: #86868b;
-            --accent-blue: #007aff;
-            --accent-blue-hover: #0060c5;
-            --border-color: #e5e5ea
+        to {
+          opacity: 1;
+          transform: translateY(0);
         }
-
-        body {
-            font-family: 'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-primary);
-            margin: 0;
-            padding: 24px;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale
-        }
-
-        .navbar {
-            max-width: 800px;
-            margin: 20px auto 0;
-            padding: 0 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center
-        }
-
-        .nav-link {
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-weight: 500;
-            font-size: 15px;
-            transition: color .2s ease
-        }
-
-            .nav-link:hover {
-                color: var(--accent-blue)
-            }
-
-        .nav-right {
-            display: flex;
-            align-items: center;
-            gap: 20px
-        }
-
-        .nav-user {
-            color: var(--text-secondary);
-            font-weight: 500
-        }
-
-        .main-container {
-            max-width: 800px;
-            margin: 20px auto 40px;
-            animation: fadeIn .6s ease-out forwards
-        }
-
-        h1 {
-            font-size: 36px;
-            font-weight: 700;
-            text-align: center;
-            margin: 0 0 8px 0
-        }
-
-        .subtitle {
-            text-align: center;
-            color: var(--text-secondary);
-            margin-bottom: 40px;
-            font-size: 18px
-        }
-
-        #history-list {
-            display: grid;
-            gap: 16px
-        }
-
-        .history-item {
-            background-color: var(--container-bg);
-            border-radius: 12px;
-            padding: 20px 24px;
-            border: 1px solid var(--border-color);
-            box-shadow: 0 4px 12px rgba(0,0,0,.04);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: transform .2s ease,box-shadow .2s ease
-        }
-
-            .history-item:hover {
-                transform: translateY(-4px);
-                box-shadow: 0 8px 16px rgba(0,0,0,.06)
-            }
-
-        .item-details h2 {
-            font-size: 19px;
-            font-weight: 600;
-            margin: 0 0 10px 0;
-            color: var(--text-primary)
-        }
-
-        .item-meta {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            font-size: 14px;
-            color: var(--text-tertiary)
-        }
-
-        .meta-group {
-            display: flex;
-            align-items: center;
-            gap: 6px
-        }
-
-        .icon {
-            width: 16px;
-            height: 16px;
-            stroke-width: 2
-        }
-
-        .view-button {
-            background-color: var(--accent-blue);
-            color: #fff;
-            padding: 10px 24px;
-            border-radius: 999px;
-            text-decoration: none;
-            font-weight: 500;
-            font-size: 15px;
-            transition: background-color .2s ease;
-            white-space: nowrap
-        }
-
-            .view-button:hover {
-                background-color: var(--accent-blue-hover)
-            }
-
-        .loading-state, .empty-state {
-            text-align: center;
-            font-size: 18px;
-            color: var(--text-secondary);
-            padding: 40px;
-            background-color: var(--container-bg);
-            border-radius: 12px;
-            border: 1px solid var(--border-color)
-        }
+      }
+      :root {
+        --bg-color: #f5f5f7;
+        --container-bg: #fff;
+        --text-primary: #1d1d1f;
+        --text-secondary: #6e6e73;
+        --text-tertiary: #86868b;
+        --accent-blue: #007aff;
+        --accent-blue-hover: #0060c5;
+        --border-color: #d2d2d7;
+        --accent-red: #ff453a;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-primary);
+        margin: 0;
+        padding: 24px;
+      }
+      .navbar {
+        max-width: 800px;
+        margin: 20px auto 0;
+        padding: 0 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .nav-link {
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-weight: 500;
+      }
+      .nav-right {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+      .main-container {
+        max-width: 800px;
+        margin: 40px auto;
+        animation: fadeIn 0.6s ease-out forwards;
+      }
+      h1 {
+        font-size: 36px;
+        font-weight: 700;
+        text-align: center;
+        margin: 0 0 8px 0;
+      }
+      .subtitle {
+        text-align: center;
+        color: var(--text-secondary);
+        margin-bottom: 40px;
+        font-size: 18px;
+      }
+      #history-list {
+        display: grid;
+        gap: 16px;
+      }
+      .history-item {
+        background-color: var(--container-bg);
+        border-radius: 16px;
+        padding: 20px 24px;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      .history-item:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.06);
+      }
+      .item-details h2 {
+        font-size: 19px;
+        font-weight: 600;
+        margin: 0 0 10px 0;
+        color: var(--text-primary);
+      }
+      .item-meta {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        font-size: 14px;
+        color: var(--text-tertiary);
+      }
+      .meta-group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .icon {
+        width: 16px;
+        height: 16px;
+        stroke-width: 2;
+      }
+      .view-button {
+        background-color: var(--accent-blue);
+        color: #fff;
+        padding: 10px 24px;
+        border-radius: 999px;
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 15px;
+        transition: background-color 0.2s ease;
+        white-space: nowrap;
+      }
+      .view-button:hover {
+        background-color: var(--accent-blue-hover);
+      }
+      .loading-state,
+      .empty-state {
+        text-align: center;
+        font-size: 18px;
+        color: var(--text-secondary);
+        padding: 40px;
+        background-color: var(--container-bg);
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+      }
     </style>
-</head>
-<body>
-
+  </head>
+  <body>
     <div class="navbar"></div>
-
     <div class="main-container">
-        <h1>Writing History</h1>
-        <p class="subtitle">Review your past practice sessions.</p>
-        <div id="history-list">
-            <div class="loading-state">Loading your history...</div>
-        </div>
+      <h1>Writing History</h1>
+      <p class="subtitle">Review your past practice sessions.</p>
+      <div id="history-list">
+        <div class="loading-state">Loading your history...</div>
+      </div>
     </div>
-
     <script src="/auth.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', async () => {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                window.location.href = '/login.html';
-                return;
-            }
-
-            const historyList = document.getElementById('history-list');
-
-            try {
-                // 在请求头中附上通行证
-                const response = await fetch('/api/history', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                if (response.status === 401 || response.status === 403) {
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
-                    window.location.href = '/login.html';
-                    return;
-                }
-
-                if (!response.ok) throw new Error('Failed to fetch history.');
-
-                const historyData = await response.json();
-                historyList.innerHTML = '';
-
-                if (historyData.length === 0) {
-                    historyList.innerHTML = `<div class="empty-state">You haven't completed any practice sessions yet. <a href="/">Start one now!</a></div>`;
-                    return;
-                }
-
-                historyData.forEach(item => {
-                    const itemElement = document.createElement('div');
-                    itemElement.className = 'history-item';
-                    const submittedDate = new Date(item.submitted_at).toLocaleDateString('en-US', {
-                        year: 'numeric', month: 'long', day: 'numeric'
-                    });
-                    itemElement.innerHTML = `
-                            <div class="item-details">
-                                <h2>${item.question_title}</h2>
-                                <div class="item-meta">
-                                    <div class="meta-group">
-                                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                        <span>${submittedDate}</span>
-                                    </div>
-                                    <div class="meta-group">
-                                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.232 5.232z" /></svg>
-                                        <span>${item.word_count} words</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <a href="/history-detail.html?id=${item.id}" class="view-button">View Details</a>
-                        `;
-                    historyList.appendChild(itemElement);
-                });
-
-            } catch (error) {
-                console.error('Error loading history:', error);
-                historyList.innerHTML = '<div class="loading-state">Error loading your history.</div>';
-            }
-        });
+      document.addEventListener("DOMContentLoaded", async () => {
+        const e = localStorage.getItem("token");
+        if (!e) return void (window.location.href = "/login.html");
+        const t = document.getElementById("history-list");
+        try {
+          const n = await fetch("/api/history", {
+            headers: { Authorization: `Bearer ${e}` },
+          });
+          if (401 === n.status || 403 === n.status)
+            return (
+              localStorage.removeItem("token"),
+              localStorage.removeItem("user"),
+              void (window.location.href = "/login.html")
+            );
+          if (!n.ok) throw new Error("Failed to fetch history.");
+          const o = await n.json();
+          if (((t.innerHTML = ""), 0 === o.length))
+            return void (t.innerHTML =
+              '<div class="empty-state">You haven\'t completed any practice sessions yet. <a href="/">Start one now!</a></div>');
+          o.forEach((e) => {
+            const n = document.createElement("div");
+            n.className = "history-item";
+            const o = new Date(e.submitted_at).toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            });
+            (n.innerHTML = `\n                            <div class="item-details">\n                                <h2>${e.question_title}</h2>\n                                <div class="item-meta">\n                                    <div class="meta-group">\n                                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>\n                                        <span>${o}</span>\n                                    </div>\n                                    <div class="meta-group">\n                                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.232 5.232z"/></svg>\n                                        <span>${e.word_count} words</span>\n                                    </div>\n                                </div>\n                            </div>\n                            <a href="/history-detail.html?id=${e.id}" class="view-button">View Details</a>\n                        `),
+              t.appendChild(n);
+          });
+        } catch (e) {
+          console.error("Error loading history:", e),
+            (t.innerHTML =
+              '<div class="loading-state">Error loading your history.</div>');
+        }
+      });
     </script>
-</body>
+  </body>
 </html>
