@@ -245,27 +245,10 @@
 
     <div class="main-container">
         <h1>Academic Discussion</h1>
-        <p class="subtitle">TOEFL® Writing Practice</p>
+        <p class="subtitle" id="topic-title">Loading Topic...</p>
 
-        <div class="post">
-            <p class="post-author">Professor Anya Sharma</p>
-            <p class="post-content">
-                Hello class. This week, we're discussing the impact of technology on social connections. Some argue that social media and instant messaging have made us more connected than ever, allowing us to maintain relationships across vast distances. Others claim that these technologies lead to more superficial, low-quality interactions and actually increase feelings of loneliness. So, for our discussion this week, I want to ask you: <strong>Does modern technology, especially social media, ultimately bring people closer together or drive them further apart?</strong>
-            </p>
-        </div>
-
-        <div class="post">
-            <p class="post-author">Paul</p>
-            <p class="post-content">
-                I definitely believe that modern technology brings people closer. Before, if your best friend moved to another country, you might lose touch completely. Now, you can video chat with them every day and feel like you're in the same room. It also helps people find communities they wouldn't have access to otherwise, like online groups for rare hobbies or support groups for people with specific health conditions. It has opened up a whole new world of social connection that was impossible before.
-            </p>
-        </div>
-
-        <div class="post">
-            <p class="post-author">Sarah</p>
-            <p class="post-content">
-                I have to disagree with Paul. While it's true we can "connect" with more people, I think these connections are weak and superficial. People spend hours scrolling through photos and leaving one-word comments instead of having a deep, meaningful conversation. I've seen groups of friends at a restaurant all staring at their phones instead of talking to each other. This isn't real connection; it's a distraction that actually pulls us away from the people who are right in front of us. It creates an illusion of closeness while making us feel more isolated.
-            </p>
+        <div id="question-content">
+            <div class="post">Loading question content, please wait...</div>
         </div>
 
         <div class="user-response-area">
@@ -301,9 +284,56 @@
         const wordCountEl = document.getElementById('word-count');
         const textarea = document.getElementById('user-textarea');
         const statusMessageEl = document.getElementById('status-message');
+        const topicTitleEl = document.getElementById('topic-title');
+        const questionContentEl = document.getElementById('question-content');
 
         let timer;
         let timeRemaining = 600;
+        let currentQuestionId = null; // 新增一个变量来存储当前题目ID
+
+        // ======================= 新增：加载题目内容的函数 =======================
+        document.addEventListener('DOMContentLoaded', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const questionId = urlParams.get('id');
+            currentQuestionId = questionId; // 存储ID
+
+            if (!questionId) {
+                topicTitleEl.textContent = "Error: No question ID provided.";
+                questionContentEl.innerHTML = `<div class="post">Please select a question from the <a href="/practice.html">Practice Center</a>.</div>`;
+                // 禁用所有按钮
+                startBtn.disabled = true;
+                resetBtn.disabled = true;
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/questions/${questionId}`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch question details.');
+                }
+                const question = await response.json();
+
+                topicTitleEl.textContent = question.topic;
+                questionContentEl.innerHTML = `
+                        <div class="post">
+                            <p class="post-author">${question.professor_prompt.split(':')[0]}</p>
+                            <p class="post-content">${question.professor_prompt.substring(question.professor_prompt.indexOf(':') + 1)}</p>
+                        </div>
+                        <div class="post">
+                            <p class="post-author">${question.student1_author}</p>
+                            <p class="post-content">${question.student1_post}</p>
+                        </div>
+                        <div class="post">
+                            <p class="post-author">${question.student2_author}</p>
+                            <p class="post-content">${question.student2_post}</p>
+                        </div>
+                    `;
+            } catch (error) {
+                console.error('Error fetching question:', error);
+                topicTitleEl.textContent = "Error";
+                questionContentEl.innerHTML = '<div class="post">Could not load the question. Please try again.</div>';
+            }
+        });
 
         async function submitResponse() {
             const content = textarea.value;
@@ -319,14 +349,18 @@
             submitBtn.disabled = true;
 
             try {
-                // ================== 关键！已经为您填好了正确的网址！ ==================
+                // ============ 关键！请务必将这里的 URL 换成你自己的 Render 网址 ============
                 const apiUrl = 'https://toefl-final-project.onrender.com/api/submit-response';
                 // ======================================================================
 
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content: content, wordCount: wordCount }),
+                    body: JSON.stringify({
+                        content: content,
+                        wordCount: wordCount,
+                        questionId: currentQuestionId // 提交时带上题目ID
+                    }),
                 });
 
                 const contentType = response.headers.get("content-type");
@@ -342,7 +376,7 @@
                     }
                 } else {
                     const text = await response.text();
-                    throw new Error("Server returned an unexpected response: " + text.substring(0, 100));
+                    throw new Error("Server returned an unexpected response.");
                 }
 
             } catch (error) {
