@@ -1,4 +1,5 @@
 ﻿<!-- START OF FILE public/practice-page.html -->
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -7,19 +8,9 @@
     <title>Academic Discussion - TOEFL® Practice</title>
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500&display=swap");
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
       :root {
         --bg-color: #f5f5f7;
-        --card-bg: #fff;
+        --card-bg: #ffffff;
         --control-bg: #f5f5f7;
         --text-primary: #1d1d1f;
         --text-secondary: #6e6e73;
@@ -29,6 +20,16 @@
         --accent-green: #30d158;
         --accent-red: #ff453a;
         --border-color: #d2d2d7;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
@@ -272,108 +273,112 @@
     <script>
       const token = localStorage.getItem("token");
       if (!token) window.location.href = "/login.html";
-      const startBtn = document.getElementById("start-btn"),
-        submitBtn = document.getElementById("submit-btn"),
-        resetBtn = document.getElementById("reset-btn"),
-        timerEl = document.getElementById("timer"),
-        wordCountEl = document.getElementById("word-count"),
-        textarea = document.getElementById("user-textarea"),
-        statusMessageEl = document.getElementById("status-message"),
-        topicTitleEl = document.getElementById("topic-title"),
-        questionContentEl = document.getElementById("question-content");
-      let timer,
-        timeRemaining = 600,
-        currentQuestion = null;
-      function updateTimerDisplay() {
-        const e = Math.floor(timeRemaining / 60)
-            .toString()
-            .padStart(2, "0"),
-          t = (timeRemaining % 60).toString().padStart(2, "0");
-        timerEl.textContent = `${e}:${t}`;
-      }
-      async function submitResponse() {
-        const e = textarea.value,
-          t = e ? e.match(/\S+/g).length : 0;
-        if (0 === t) return alert("Cannot submit an empty response.");
-        (statusMessageEl.textContent = "Submitting..."),
-          (submitBtn.disabled = !0);
-        try {
-          const e = await fetch("/api/submit-response", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                content: textarea.value,
-                wordCount: t,
-                questionId: currentQuestion.id,
-                task_type: "academic_discussion",
-              }),
-            }),
-            n = await e.json();
-          if (!e.ok) throw new Error(n.message);
-          (statusMessageEl.textContent = "✓ Submission successful!"),
-            (textarea.disabled = !0),
-            clearInterval(timer);
-        } catch (e) {
-          (statusMessageEl.textContent = `✗ ${e.message}`),
-            (submitBtn.disabled = !1);
+      const startBtn = document.getElementById("start-btn");
+      const submitBtn = document.getElementById("submit-btn");
+      const resetBtn = document.getElementById("reset-btn");
+      const timerEl = document.getElementById("timer");
+      const wordCountEl = document.getElementById("word-count");
+      const textarea = document.getElementById("user-textarea");
+      const statusMessageEl = document.getElementById("status-message");
+      const topicTitleEl = document.getElementById("topic-title");
+      const questionContentEl = document.getElementById("question-content");
+      let timer;
+      let timeRemaining = 600;
+      let currentQuestion = null;
+
+      document.addEventListener("DOMContentLoaded", async () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const questionId = urlParams.get("id");
+        if (!questionId) {
+          topicTitleEl.textContent = "Error: No question ID provided.";
+          startBtn.disabled = true;
+          return;
         }
+        try {
+          const response = await fetch(`/api/questions/${questionId}`);
+          if (!response.ok)
+            throw new Error("Failed to fetch question details.");
+          currentQuestion = await response.json();
+          topicTitleEl.textContent = currentQuestion.topic;
+          questionContentEl.innerHTML = `<div class="post"><p class="post-author">${currentQuestion.professor_author}</p><p class="post-content">${currentQuestion.professor_prompt}</p></div><div class="post"><p class="post-author">${currentQuestion.student1_author}</p><p class="post-content">${currentQuestion.student1_post}</p></div><div class="post"><p class="post-author">${currentQuestion.student2_author}</p><p class="post-content">${currentQuestion.student2_post}</p></div>`;
+        } catch (error) {
+          console.error("Error fetching question:", error);
+          topicTitleEl.textContent = "Error loading question.";
+        }
+      });
+
+      async function submitResponse() {
+        const content = textarea.value;
+        const wordCount = content ? content.match(/\S+/g).length : 0;
+        if (wordCount === 0) return alert("Cannot submit an empty response.");
+        statusMessageEl.textContent = "Submitting...";
+        submitBtn.disabled = true;
+        try {
+          const response = await fetch("/api/submit-response", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              content,
+              wordCount,
+              questionId: currentQuestion.id,
+              task_type: "academic_discussion",
+            }),
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.message);
+          // --- 【修正】: 跳转到成功页面 ---
+          window.location.href = `/submission-success.html?id=${result.id}`;
+        } catch (error) {
+          statusMessageEl.textContent = `✗ ${error.message}`;
+          submitBtn.disabled = false;
+        }
+      }
+      function updateTimerDisplay() {
+        const minutes = Math.floor(timeRemaining / 60)
+          .toString()
+          .padStart(2, "0");
+        const seconds = (timeRemaining % 60).toString().padStart(2, "0");
+        timerEl.textContent = `${minutes}:${seconds}`;
       }
       function startTimer() {
-        (startBtn.disabled = !0),
-          (submitBtn.disabled = !1),
-          (textarea.disabled = !1),
-          textarea.focus(),
-          (timer = setInterval(() => {
-            timeRemaining--,
-              updateTimerDisplay(),
-              timeRemaining <= 0 &&
-                (clearInterval(timer),
-                alert("Time's Up! Submitting your response."),
-                submitResponse());
-          }, 1e3));
+        startBtn.disabled = true;
+        submitBtn.disabled = false;
+        textarea.disabled = false;
+        textarea.focus();
+        timer = setInterval(() => {
+          timeRemaining--;
+          updateTimerDisplay();
+          if (timeRemaining <= 0) {
+            clearInterval(timer);
+            alert("Time's Up!");
+            submitResponse();
+          }
+        }, 1000);
       }
       function resetTimer() {
-        clearInterval(timer),
-          (timeRemaining = 600),
-          updateTimerDisplay(),
-          (startBtn.disabled = !1),
-          (submitBtn.disabled = !0),
-          (textarea.disabled = !0),
-          (textarea.value = ""),
-          updateWordCount(),
-          (statusMessageEl.textContent = "");
+        clearInterval(timer);
+        timeRemaining = 600;
+        updateTimerDisplay();
+        startBtn.disabled = false;
+        submitBtn.disabled = true;
+        textarea.disabled = true;
+        textarea.value = "";
+        updateWordCount();
+        statusMessageEl.textContent = "";
       }
       function updateWordCount() {
-        const e = textarea.value.trim().match(/\S+/g)?.length || 0;
-        (wordCountEl.textContent = `Words: ${e}`),
-          wordCountEl.classList.toggle("sufficient", e >= 100);
+        const words = textarea.value.trim().match(/\S+/g)?.length || 0;
+        wordCountEl.textContent = `Words: ${words}`;
+        wordCountEl.classList.toggle("sufficient", words >= 100);
       }
-      document.addEventListener("DOMContentLoaded", async () => {
-        const e = new URLSearchParams(window.location.search).get("id");
-        if (!e)
-          return (
-            (topicTitleEl.textContent = "Error: No question ID provided."),
-            void (startBtn.disabled = !0)
-          );
-        try {
-          const t = await fetch(`/api/questions/${e}`);
-          if (!t.ok) throw new Error("Failed to fetch question details.");
-          (currentQuestion = await t.json()),
-            (topicTitleEl.textContent = currentQuestion.topic),
-            (questionContentEl.innerHTML = `\n                    <div class="post"><p class="post-author">${currentQuestion.professor_author}</p><p class="post-content">${currentQuestion.professor_prompt}</p></div>\n                    <div class="post"><p class="post-author">${currentQuestion.student1_author}</p><p class="post-content">${currentQuestion.student1_post}</p></div>\n                    <div class="post"><p class="post-author">${currentQuestion.student2_author}</p><p class="post-content">${currentQuestion.student2_post}</p></div>`);
-        } catch (e) {
-          console.error("Error fetching question:", e),
-            (topicTitleEl.textContent = "Error loading question.");
-        }
-      }),
-        startBtn.addEventListener("click", startTimer),
-        submitBtn.addEventListener("click", submitResponse),
-        resetBtn.addEventListener("click", resetTimer),
-        textarea.addEventListener("input", updateWordCount),
-        resetTimer();
+      startBtn.addEventListener("click", startTimer);
+      submitBtn.addEventListener("click", submitResponse);
+      resetBtn.addEventListener("click", resetTimer);
+      textarea.addEventListener("input", updateWordCount);
+      resetTimer();
     </script>
   </body>
 </html>

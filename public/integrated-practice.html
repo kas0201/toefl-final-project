@@ -245,20 +245,18 @@
     <script>
       const token = localStorage.getItem("token");
       if (!token) window.location.href = "/login.html";
-
-      const titleEl = document.getElementById("task-title");
-      const topicEl = document.getElementById("task-topic");
-      const phaseIndicatorEl = document.getElementById("phase-indicator");
-      const contentDisplayEl = document.getElementById("content-display");
-      const textarea = document.getElementById("user-textarea");
-      const timerEl = document.getElementById("timer");
-      const wordCountEl = document.getElementById("word-count");
-      const submitBtn = document.getElementById("submit-btn");
-      const statusMessageEl = document.getElementById("status-message");
-
-      let timer;
-      let timeRemaining;
-      let currentQuestion = null;
+      const titleEl = document.getElementById("task-title"),
+        topicEl = document.getElementById("task-topic"),
+        phaseIndicatorEl = document.getElementById("phase-indicator"),
+        contentDisplayEl = document.getElementById("content-display"),
+        textarea = document.getElementById("user-textarea"),
+        timerEl = document.getElementById("timer"),
+        wordCountEl = document.getElementById("word-count"),
+        submitBtn = document.getElementById("submit-btn"),
+        statusMessageEl = document.getElementById("status-message");
+      let timer,
+        timeRemaining,
+        currentQuestion = null;
 
       async function startReadingPhase() {
         phaseIndicatorEl.textContent = "Phase 1: Reading (3 Minutes)";
@@ -266,14 +264,12 @@
         timeRemaining = 180;
         startTimer(startLecturePhase);
       }
-
       function startLecturePhase() {
         phaseIndicatorEl.textContent = "Phase 2: Lecture Script (2 Minutes)";
         contentDisplayEl.innerHTML = `<p>${currentQuestion.lecture_script}</p>`;
         timeRemaining = 120;
         startTimer(startWritingPhase);
       }
-
       function startWritingPhase() {
         phaseIndicatorEl.textContent = "Phase 3: Writing (20 Minutes)";
         contentDisplayEl.innerHTML = `<h4>Reading Passage Reference</h4><p>${currentQuestion.reading_passage}</p><hr><p><strong>Question:</strong> Summarize the points made in the lecture, being sure to explain how they challenge the specific points made in the reading passage.</p>`;
@@ -282,11 +278,10 @@
         textarea.focus();
         timeRemaining = 1200;
         startTimer(() => {
-          alert("Time's Up! Submitting your response.");
+          alert("Time's Up!");
           submitResponse(true);
         });
       }
-
       function startTimer(onComplete) {
         clearInterval(timer);
         const updateDisplay = () => {
@@ -306,13 +301,11 @@
           }
         }, 1000);
       }
-
       async function submitResponse(force = false) {
         const content = textarea.value;
         const wordCount = content ? content.trim().match(/\S+/g).length : 0;
         if (wordCount === 0 && !force)
           return alert("Cannot submit an empty response.");
-
         statusMessageEl.textContent = "Submitting...";
         submitBtn.disabled = true;
         try {
@@ -323,22 +316,21 @@
               Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({
-              content: content,
-              wordCount: wordCount,
+              content,
+              wordCount,
               questionId: currentQuestion.id,
               task_type: "integrated_writing",
             }),
           });
           const result = await response.json();
           if (!response.ok) throw new Error(result.message);
-
+          // --- 【修正】: 跳转到成功页面 ---
           window.location.href = `/submission-success.html?id=${result.id}`;
         } catch (error) {
           statusMessageEl.innerHTML = `<span style="color: var(--accent-red);">✗ ${error.message}</span>`;
           submitBtn.disabled = false;
         }
       }
-
       document.addEventListener("DOMContentLoaded", async () => {
         const urlParams = new URLSearchParams(window.location.search);
         const questionId = urlParams.get("id");
@@ -359,7 +351,6 @@
           topicEl.textContent = "Error loading question.";
         }
       });
-
       textarea.addEventListener("input", () => {
         const words = textarea.value.trim().match(/\S+/g)?.length || 0;
         wordCountEl.textContent = `Words: ${words}`;
