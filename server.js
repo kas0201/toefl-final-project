@@ -54,7 +54,7 @@ The user's response correctly identifies the main conflict. The structure is cle
       endpoint,
       {
         // 【模型升级】: 使用 coder 模型，它更擅长遵循复杂指令和结构化输出
-        model: "deepseek-coder",
+        model: "deepseek-Reasoner",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
