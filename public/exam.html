@@ -83,8 +83,13 @@
             cursor: pointer;
         }
 
-            button:hover {
+            button:hover:not(:disabled) {
                 background-color: var(--accent-blue-hover);
+            }
+
+            button:disabled {
+                background-color: #dcdce1;
+                cursor: not-allowed;
             }
         /* Writing Task Specific Styles */
         .writing-task-container {
@@ -146,13 +151,13 @@
 
         let testData = null;
         let currentSectionIndex = 0;
-        let currentQuestionIndex = 0;
+        let currentQuestionIndex = 0; // This is the index within the current section's questions array
         const sectionsOrder = ['reading', 'listening', 'speaking', 'writing'];
+        let currentWritingQuestion = null; // To hold the question object for submission
 
-        // --- Core Exam Flow Logic ---
         async function startExam() {
             try {
-                const response = await fetch('/api/tests/1'); // Fetch "Mock Test 1"
+                const response = await fetch('/api/tests/1');
                 if (!response.ok) throw new Error('Could not load the test.');
                 testData = await response.json();
                 renderCurrentScreen();
@@ -172,31 +177,33 @@
 
             sectionTitleEl.textContent = `${currentSectionName.charAt(0).toUpperCase() + currentSectionName.slice(1)} Section`;
 
-            if (currentQuestionIndex === 0) { // Show instructions at the start of each section
+            // Use currentQuestionIndex to check if we are at the start of a section's tasks
+            if (currentQuestionIndex === 0 && currentSectionData.length > 0) {
                 renderInstructionScreen(currentSectionName);
-            } else {
-                const question = currentSectionData[currentQuestionIndex - 1];
+            } else if (currentQuestionIndex < currentSectionData.length) {
+                const question = currentSectionData[currentQuestionIndex];
                 if (currentSectionName === 'writing' && question) {
+                    currentWritingQuestion = question; // Store current question for submission
                     renderWritingTask(question);
-                } else { // Placeholder for other sections
-                    renderPlaceholderScreen(currentSectionName);
+                } else {
+                    renderPlaceholderScreen(currentSectionName, currentQuestionIndex + 1);
                 }
+            } else { // No tasks for this section or section finished
+                nextSection();
             }
         }
 
         function next() {
-            const currentSectionName = sectionsOrder[currentSectionIndex];
-            const sectionLength = testData.sections[currentSectionName].length;
-
             currentQuestionIndex++;
+            renderCurrentScreen();
+        }
 
-            if (currentQuestionIndex > sectionLength) { // Move to next section
-                currentQuestionIndex = 0;
-                currentSectionIndex++;
-                if (sectionsOrder[currentSectionIndex] === 'speaking') { // Break before Speaking
-                    renderBreakScreen();
-                    return;
-                }
+        function nextSection() {
+            currentQuestionIndex = 0;
+            currentSectionIndex++;
+            if (currentSectionIndex < sectionsOrder.length && sectionsOrder[currentSectionIndex] === 'speaking') {
+                renderBreakScreen();
+                return;
             }
             renderCurrentScreen();
         }
@@ -204,57 +211,43 @@
         // --- Screen Rendering Functions ---
         function renderInstructionScreen(sectionName) {
             examContentEl.innerHTML = `
-                <div class="instruction-screen">
-                    <h2>${sectionName.charAt(0).toUpperCase() + sectionName.slice(1)} Section</h2>
-                    <p>Click "Continue" when you are ready to begin.</p>
-                    <button onclick="next()">Continue</button>
-                </div>
-            `;
+                    <div class="instruction-screen">
+                        <h2>${sectionName.charAt(0).toUpperCase() + sectionName.slice(1)} Section</h2>
+                        <p>Click "Continue" when you are ready to begin.</p>
+                        <button onclick="next()">Continue</button>
+                    </div>
+                `;
         }
 
-        function renderPlaceholderScreen(sectionName) {
+        function renderPlaceholderScreen(sectionName, taskNumber) {
             examContentEl.innerHTML = `
-                <div class="placeholder-screen">
-                    <h2>${sectionName.charAt(0).toUpperCase() + sectionName.slice(1)} Section - Task ${currentQuestionIndex}</h2>
-                    <p>This section is currently under development.</p>
-                    <button onclick="next()">Next Task</button>
-                </div>
-            `;
+                    <div class="placeholder-screen">
+                        <h2>${sectionName.charAt(0).toUpperCase() + sectionName.slice(1)} Section - Task ${taskNumber}</h2>
+                        <p>This section is currently under development.</p>
+                        <button onclick="next()">Next Task</button>
+                    </div>
+                `;
         }
 
         function renderWritingTask(question) {
             let contentHTML = '';
             if (question.task_type === 'integrated_writing') {
-                contentHTML = `
-                    <h3>Reading Passage</h3>
-                    <p>${question.reading_passage}</p>
-                    <hr>
-                    <h3>Lecture Script</h3>
-                    <p>${question.lecture_script}</p>
-                `;
-            } else { // academic_discussion
-                contentHTML = `
-                    <h3>Professor's Prompt</h3>
-                    <p>${question.professor_prompt}</p>
-                    <hr>
-                    <p><b>${question.student1_author}:</b> ${question.student1_post}</p>
-                    <p><b>${question.student2_author}:</b> ${question.student2_post}</p>
-                `;
+                contentHTML = `<h3>Reading Passage</h3><p>${question.reading_passage}</p><hr><h3>Lecture Script</h3><p>${question.lecture_script}</p>`;
+            } else {
+                contentHTML = `<h3>Professor's Prompt</h3><p>${question.professor_prompt}</p><hr><p><b>${question.student1_author}:</b> ${question.student1_post}</p><p><b>${question.student2_author}:</b> ${question.student2_post}</p>`;
             }
-
             examContentEl.innerHTML = `
-                <div class="writing-task-container">
-                    <div class="writing-content">${contentHTML}</div>
-                    <div class="writing-response">
-                        <textarea id="writing-textarea" placeholder="Start writing your response here..."></textarea>
-                        <div class="word-count" id="word-counter">Words: 0</div>
+                    <div class="writing-task-container">
+                        <div class="writing-content">${contentHTML}</div>
+                        <div class="writing-response">
+                            <textarea id="writing-textarea" placeholder="Start writing your response here..."></textarea>
+                            <div class="word-count" id="word-counter">Words: 0</div>
+                        </div>
                     </div>
-                </div>
-                <div style="text-align: center; margin-top: 24px;">
-                    <button onclick="submitWriting()">Submit & Continue</button>
-                </div>
-            `;
-            // Add word count listener
+                    <div style="text-align: center; margin-top: 24px;">
+                        <button id="submit-writing-btn" onclick="submitWriting()">Submit & Continue</button>
+                    </div>
+                `;
             document.getElementById('writing-textarea').addEventListener('input', (e) => {
                 const words = e.target.value.trim().match(/\S+/g)?.length || 0;
                 document.getElementById('word-counter').textContent = `Words: ${words}`;
@@ -264,31 +257,68 @@
         function renderBreakScreen() {
             sectionTitleEl.textContent = "Official Break";
             examContentEl.innerHTML = `
-                <div class="break-screen">
-                    <h2>10-Minute Break</h2>
-                    <p>You may now take a scheduled 10-minute break.</p>
-                    <button onclick="next()">End Break & Continue</button>
-                </div>
-            `;
+                    <div class="break-screen">
+                        <h2>10-Minute Break</h2>
+                        <p>You may now take a scheduled 10-minute break.</p>
+                        <button onclick="nextSection()">End Break & Continue</button>
+                    </div>
+                `;
         }
 
         function renderEndScreen() {
             sectionTitleEl.textContent = "Test Finished";
             mainTimerEl.style.display = 'none';
             examContentEl.innerHTML = `
-                <div class="end-screen">
-                    <h2>Congratulations!</h2>
-                    <p>You have completed the TOEFL Mock Test. You can view your writing submissions in the History section.</p>
-                    <a href="/history.html"><button>View My History</button></a>
-                </div>
-            `;
+                    <div class="end-screen">
+                        <h2>Congratulations!</h2>
+                        <p>You have completed the TOEFL Mock Test. You can view your writing submissions in the History section.</p>
+                        <a href="/history.html"><button>View My History</button></a>
+                    </div>
+                `;
         }
 
-        function submitWriting() {
-            // In a real scenario, you would save the response here via API
-            // For this simulation, we'll just move to the next task.
-            console.log("Submitting writing task...");
-            next();
+        // --- 【关键修正】: 实现了真正的提交功能 ---
+        async function submitWriting() {
+            const submitBtn = document.getElementById('submit-writing-btn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
+            const textarea = document.getElementById('writing-textarea');
+            const content = textarea.value;
+            const wordCount = content.trim().match(/\S+/g)?.length || 0;
+
+            if (wordCount === 0) {
+                alert("Response cannot be empty.");
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit & Continue';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/submit-response', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({
+                        content: content,
+                        wordCount: wordCount,
+                        questionId: currentWritingQuestion.id, // Use the stored question object
+                        task_type: currentWritingQuestion.task_type
+                    }),
+                });
+
+                if (!response.ok) {
+                    const errorResult = await response.json();
+                    throw new Error(errorResult.message || 'Submission failed.');
+                }
+
+                console.log("Submission successful!");
+                next(); // Move to the next task/section after successful submission
+
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit & Continue';
+            }
         }
 
         document.addEventListener('DOMContentLoaded', startExam);
