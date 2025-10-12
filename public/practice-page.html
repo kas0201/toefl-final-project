@@ -9,6 +9,21 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500&display=swap');
 
+        /* --- Apple-inspired Design System --- */
+        :root {
+            --bg-color: #f5f5f7;
+            --card-bg: #ffffff;
+            --control-bg: #f5f5f7;
+            --text-primary: #1d1d1f;
+            --text-secondary: #6e6e73;
+            --text-tertiary: #86868b;
+            --accent-blue: #007aff;
+            --accent-blue-hover: #0060c5;
+            --accent-green: #30d158;
+            --accent-red: #ff453a;
+            --border-color: #d2d2d7;
+        }
+
         @keyframes fadeIn {
             from {
                 opacity: 0;
@@ -21,27 +36,14 @@
             }
         }
 
-        :root {
-            --bg-color: #f0f0f5;
-            --container-bg: #fff;
-            --text-primary: #1d1d1f;
-            --text-secondary: #6e6e73;
-            --text-tertiary: #86868b;
-            --accent-blue: #007aff;
-            --accent-blue-hover: #0060c5;
-            --accent-green: #30d158;
-            --accent-red: #ff453a;
-            --border-color: #d6d6d6;
-            --control-bg: #f5f5f7;
-        }
-
         body {
-            font-family: 'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-primary);
             margin: 0;
             padding: 24px;
-            box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         .navbar {
@@ -69,13 +71,13 @@
         .main-container {
             width: 100%;
             max-width: 760px;
-            background-color: var(--container-bg);
+            background-color: var(--card-bg);
             border-radius: 20px;
-            box-shadow: 0 20px 40px -10px rgba(0,0,0,.1);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.08);
             padding: 40px;
-            border: 1px solid rgba(0,0,0,.08);
+            border: 1px solid rgba(0,0,0,0.05);
             animation: fadeIn .6s ease-out forwards;
-            margin: 20px auto 40px;
+            margin: 40px auto;
         }
 
         h1 {
@@ -88,56 +90,55 @@
         .subtitle {
             text-align: center;
             color: var(--text-secondary);
-            margin-bottom: 32px;
+            margin-bottom: 40px;
             font-size: 17px;
         }
 
         .post {
-            border-radius: 12px;
-            padding: 20px;
+            border-radius: 16px;
+            padding: 24px;
             margin-bottom: 20px;
             border: 1px solid var(--border-color);
+            background-color: #fafafa;
         }
 
         .post-author {
             font-size: 17px;
             font-weight: 600;
-            margin-bottom: 12px;
+            margin: 0 0 12px 0;
         }
 
         .post-content {
             font-size: 16px;
             line-height: 1.65;
             color: var(--text-secondary);
+            margin: 0;
         }
-
-            .post-content strong {
-                color: var(--text-primary);
-                font-weight: 600;
-            }
 
         .response-header {
             font-size: 21px;
             font-weight: 700;
-            margin-top: 32px;
+            margin-top: 40px;
             margin-bottom: 16px;
         }
 
         #user-textarea {
             width: 100%;
-            min-height: 160px;
+            min-height: 180px;
             border: 1px solid var(--border-color);
             border-radius: 12px;
-            padding: 14px;
+            padding: 16px;
             font-size: 16px;
+            font-family: inherit;
             resize: vertical;
             box-sizing: border-box;
+            transition: border-color .2s ease, box-shadow .2s ease;
         }
 
             #user-textarea:focus {
                 outline: 0;
                 border-color: var(--accent-blue);
-                box-shadow: inset 0 0 0 1px var(--accent-blue);
+                box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
             }
 
             #user-textarea:disabled {
@@ -145,45 +146,63 @@
             }
 
         .controls-container {
-            background-color: var(--control-bg);
-            border-radius: 12px;
-            padding: 12px 16px;
+            background-color: transparent;
+            padding: 0;
             margin-top: 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        .timer-group {
+        .stats {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .stat-item {
             display: flex;
             align-items: center;
             gap: 8px;
         }
 
+            .stat-item .icon {
+                width: 20px;
+                height: 20px;
+                color: var(--text-tertiary);
+            }
+
         #timer {
-            font-family: 'Roboto Mono',monospace;
+            font-family: 'Roboto Mono', monospace;
             font-size: 18px;
             font-weight: 500;
         }
 
         #word-count {
-            color: var(--text-tertiary);
-            font-size: 14px;
+            font-size: 16px;
             font-weight: 500;
+            color: var(--text-tertiary);
         }
 
             #word-count.sufficient {
                 color: var(--accent-green);
+                font-weight: 600;
             }
 
-        .buttons button {
-            padding: 8px 20px;
-            font-size: 14px;
-            font-weight: 600;
-            border-radius: 8px;
-            cursor: pointer;
-            border: none;
+        .buttons {
+            display: flex;
+            gap: 12px;
         }
+
+            .buttons button {
+                padding: 10px 24px;
+                font-size: 15px;
+                font-weight: 600;
+                border-radius: 999px;
+                cursor: pointer;
+                border: none;
+                transition: background-color .2s ease;
+            }
 
         #start-btn, #submit-btn {
             background-color: var(--accent-blue);
@@ -195,7 +214,7 @@
             }
 
             #start-btn:disabled, #submit-btn:disabled {
-                background-color: #dcdce1;
+                background-color: #e5e5ea;
                 color: var(--text-tertiary);
                 cursor: not-allowed;
             }
@@ -205,9 +224,13 @@
             color: var(--text-primary);
         }
 
+            #reset-btn:hover {
+                background-color: #dcdce1;
+            }
+
         #status-message {
             text-align: center;
-            margin-top: 20px;
+            margin-top: 24px;
             font-weight: 500;
             font-size: 15px;
             height: 20px;
@@ -224,10 +247,16 @@
             <p class="response-header">Your Response</p>
             <textarea id="user-textarea" placeholder="Click 'Start' to begin..." disabled></textarea>
             <div class="controls-container">
-                <div class="timer-group">
-                    <div id="timer">10:00</div>
+                <div class="stats">
+                    <div class="stat-item">
+                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <div id="timer">10:00</div>
+                    </div>
+                    <div class="stat-item">
+                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+                        <div id="word-count">Words: 0</div>
+                    </div>
                 </div>
-                <div id="word-count">Words: 0</div>
                 <div class="buttons">
                     <button id="start-btn">Start</button>
                     <button id="submit-btn" disabled>Submit</button>
@@ -239,9 +268,9 @@
     </div>
     <script src="/auth.js"></script>
     <script>
+        // JavaScript logic remains the same
         const token = localStorage.getItem('token');
         if (!token) window.location.href = '/login.html';
-
         const startBtn = document.getElementById('start-btn');
         const submitBtn = document.getElementById('submit-btn');
         const resetBtn = document.getElementById('reset-btn');
@@ -251,11 +280,9 @@
         const statusMessageEl = document.getElementById('status-message');
         const topicTitleEl = document.getElementById('topic-title');
         const questionContentEl = document.getElementById('question-content');
-
         let timer;
         let timeRemaining = 600;
         let currentQuestion = null;
-
         document.addEventListener('DOMContentLoaded', async () => {
             const urlParams = new URLSearchParams(window.location.search);
             const questionId = urlParams.get('id');
@@ -270,20 +297,18 @@
                 currentQuestion = await response.json();
                 topicTitleEl.textContent = currentQuestion.topic;
                 questionContentEl.innerHTML = `
-                    <div class="post"><p class="post-author">${currentQuestion.professor_author}</p><p class="post-content">${currentQuestion.professor_prompt}</p></div>
-                    <div class="post"><p class="post-author">${currentQuestion.student1_author}</p><p class="post-content">${currentQuestion.student1_post}</p></div>
-                    <div class="post"><p class="post-author">${currentQuestion.student2_author}</p><p class="post-content">${currentQuestion.student2_post}</p></div>`;
+                        <div class="post"><p class="post-author">${currentQuestion.professor_author}</p><p class="post-content">${currentQuestion.professor_prompt}</p></div>
+                        <div class="post"><p class="post-author">${currentQuestion.student1_author}</p><p class="post-content">${currentQuestion.student1_post}</p></div>
+                        <div class="post"><p class="post-author">${currentQuestion.student2_author}</p><p class="post-content">${currentQuestion.student2_post}</p></div>`;
             } catch (error) {
                 console.error('Error fetching question:', error);
                 topicTitleEl.textContent = "Error loading question.";
             }
         });
-
         async function submitResponse() {
             const content = textarea.value;
             const wordCount = content ? content.match(/\S+/g).length : 0;
             if (wordCount === 0) return alert("Cannot submit an empty response.");
-
             statusMessageEl.textContent = "Submitting...";
             submitBtn.disabled = true;
             try {
@@ -348,332 +373,6 @@
         resetBtn.addEventListener('click', resetTimer);
         textarea.addEventListener('input', updateWordCount);
         resetTimer();
-    </script>
-</body>
-</html>```
-
-#### `public/integrated-practice.html` (恢复的综合写作练习页)
-```html
-<!-- START OF FILE public/integrated-practice.html -->
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Integrated Writing - TOEFL® Practice</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500&display=swap');
-
-        :root {
-            --bg-color: #f0f0f5;
-            --container-bg: #fff;
-            --text-primary: #1d1d1f;
-            --text-secondary: #6e6e73;
-            --text-tertiary: #86868b;
-            --accent-blue: #007aff;
-            --accent-blue-hover: #0060c5;
-            --accent-green: #30d158;
-            --accent-red: #ff453a;
-            --border-color: #d6d6d6;
-            --control-bg: #f5f5f7;
-            --accent-purple: #5856d6;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-            }
-
-            to {
-                opacity: 1;
-            }
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-primary);
-            margin: 0;
-            padding: 24px;
-        }
-
-        .navbar {
-            max-width: 1000px;
-            margin: 20px auto 0;
-            padding: 0 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .nav-link {
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-weight: 500;
-            font-size: 15px;
-        }
-
-        .nav-right {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .main-container {
-            max-width: 1000px;
-            margin: 20px auto 40px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 32px;
-            animation: fadeIn .6s ease-out;
-        }
-
-        .left-panel, .right-panel {
-            display: flex;
-            flex-direction: column;
-        }
-
-        h1 {
-            font-size: 32px;
-            font-weight: 700;
-            margin: 0 0 8px 0;
-        }
-
-        .subtitle {
-            color: var(--text-secondary);
-            margin-bottom: 24px;
-            font-size: 17px;
-        }
-
-        .content-card {
-            background-color: var(--container-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 24px;
-            overflow-y: auto;
-            line-height: 1.65;
-            font-size: 16px;
-            color: var(--text-secondary);
-            height: 400px;
-            white-space: pre-wrap;
-        }
-
-        #user-textarea {
-            width: 100%;
-            min-height: 350px;
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 14px;
-            font-size: 16px;
-            resize: vertical;
-            box-sizing: border-box;
-        }
-
-            #user-textarea:focus {
-                outline: 0;
-                border-color: var(--accent-blue);
-                box-shadow: inset 0 0 0 1px var(--accent-blue);
-            }
-
-            #user-textarea:disabled {
-                background-color: var(--control-bg);
-            }
-
-        .controls-container {
-            background-color: var(--control-bg);
-            border-radius: 12px;
-            padding: 12px 16px;
-            margin-top: 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .timer-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        #timer {
-            font-family: 'Roboto Mono', monospace;
-            font-size: 18px;
-            font-weight: 500;
-        }
-
-        #word-count {
-            color: var(--text-tertiary);
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        #phase-indicator {
-            text-align: center;
-            font-size: 18px;
-            font-weight: 600;
-            color: var(--accent-purple);
-            margin-bottom: 16px;
-        }
-
-        button {
-            padding: 10px 24px;
-            font-size: 15px;
-            font-weight: 600;
-            border-radius: 8px;
-            cursor: pointer;
-            border: none;
-            background-color: var(--accent-blue);
-            color: #fff;
-        }
-
-            button:disabled {
-                background-color: #dcdce1;
-                cursor: not-allowed;
-            }
-
-        #status-message {
-            text-align: center;
-            margin-top: 16px;
-            font-weight: 500;
-            height: 20px;
-        }
-    </style>
-</head>
-<body>
-    <div class="navbar"></div>
-    <div class="main-container">
-        <div class="left-panel">
-            <h1 id="task-title">Integrated Writing</h1>
-            <p class="subtitle" id="task-topic">Loading Topic...</p>
-            <div id="phase-indicator">Phase 1: Reading</div>
-            <div id="content-display" class="content-card">Loading content...</div>
-        </div>
-        <div class="right-panel">
-            <p style="font-size: 21px; font-weight: 700;">Your Response</p>
-            <textarea id="user-textarea" placeholder="You can write after the reading and lecture phases." disabled></textarea>
-            <div class="controls-container">
-                <div class="timer-group"><div id="timer">03:00</div></div>
-                <div id="word-count">Words: 0</div>
-                <button id="submit-btn" disabled>Submit</button>
-            </div>
-            <p id="status-message"></p>
-        </div>
-    </div>
-    <script src="/auth.js"></script>
-    <script>
-        const token = localStorage.getItem('token');
-        if (!token) window.location.href = '/login.html';
-
-        const titleEl = document.getElementById('task-title');
-        const topicEl = document.getElementById('task-topic');
-        const phaseIndicatorEl = document.getElementById('phase-indicator');
-        const contentDisplayEl = document.getElementById('content-display');
-        const textarea = document.getElementById('user-textarea');
-        const timerEl = document.getElementById('timer');
-        const wordCountEl = document.getElementById('word-count');
-        const submitBtn = document.getElementById('submit-btn');
-        const statusMessageEl = document.getElementById('status-message');
-
-        let timer;
-        let timeRemaining;
-        let currentQuestion = null;
-
-        async function startReadingPhase() {
-            phaseIndicatorEl.textContent = "Phase 1: Reading (3 Minutes)";
-            contentDisplayEl.innerHTML = `<p>${currentQuestion.reading_passage}</p>`;
-            timeRemaining = 180;
-            startTimer(startLecturePhase);
-        }
-
-        function startLecturePhase() {
-            phaseIndicatorEl.textContent = "Phase 2: Lecture Script (2 Minutes)";
-            contentDisplayEl.innerHTML = `<p>${currentQuestion.lecture_script}</p>`;
-            timeRemaining = 120;
-            startTimer(startWritingPhase);
-        }
-
-        function startWritingPhase() {
-            phaseIndicatorEl.textContent = "Phase 3: Writing (20 Minutes)";
-            contentDisplayEl.innerHTML = `<h4>Reading Passage Reference</h4><p>${currentQuestion.reading_passage}</p><hr><p><strong>Question:</strong> Summarize the points made in the lecture, being sure to explain how they challenge the specific points made in the reading passage.</p>`;
-            textarea.disabled = false;
-            submitBtn.disabled = false;
-            textarea.focus();
-            timeRemaining = 1200;
-            startTimer(() => {
-                alert("Time's Up! Submitting your response.");
-                submitResponse();
-            });
-        }
-
-        function startTimer(onComplete) {
-            clearInterval(timer);
-            const updateDisplay = () => {
-                const minutes = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
-                const seconds = (timeRemaining % 60).toString().padStart(2, '0');
-                timerEl.textContent = `${minutes}:${seconds}`;
-            };
-            updateDisplay();
-            timer = setInterval(() => {
-                timeRemaining--;
-                updateDisplay();
-                if (timeRemaining <= 0) {
-                    clearInterval(timer);
-                    onComplete();
-                }
-            }, 1000);
-        }
-
-        async function submitResponse() {
-            const content = textarea.value;
-            const wordCount = content ? content.trim().match(/\S+/g).length : 0;
-            if (wordCount === 0) return alert("Cannot submit an empty response.");
-            statusMessageEl.textContent = "Submitting...";
-            submitBtn.disabled = true;
-            try {
-                const response = await fetch('/api/submit-response', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({
-                        content: content,
-                        wordCount: wordCount,
-                        questionId: currentQuestion.id,
-                        task_type: 'integrated_writing'
-                    }),
-                });
-                const result = await response.json();
-                if (!response.ok) throw new Error(result.message);
-                statusMessageEl.textContent = "✓ Submission successful!";
-                textarea.disabled = true;
-                clearInterval(timer);
-            } catch (error) {
-                statusMessageEl.textContent = `✗ ${error.message}`;
-                submitBtn.disabled = false;
-            }
-        }
-
-        document.addEventListener('DOMContentLoaded', async () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const questionId = urlParams.get('id');
-            if (!questionId) { topicEl.textContent = "Error: No question ID provided."; return; }
-            try {
-                const response = await fetch(`/api/questions/${questionId}`);
-                if (!response.ok) throw new Error('Failed to fetch question details.');
-                currentQuestion = await response.json();
-                titleEl.textContent = currentQuestion.title;
-                topicEl.textContent = currentQuestion.topic;
-                startReadingPhase();
-            } catch (error) {
-                console.error('Error fetching question:', error);
-                topicEl.textContent = "Error loading question.";
-            }
-        });
-
-        textarea.addEventListener('input', () => {
-            const words = textarea.value.trim().match(/\S+/g)?.length || 0;
-            wordCountEl.textContent = `Words: ${words}`;
-        });
-        submitBtn.addEventListener('click', submitResponse);
     </script>
 </body>
 </html>
