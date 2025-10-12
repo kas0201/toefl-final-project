@@ -1,4 +1,5 @@
 ﻿<!-- START OF FILE public/integrated-practice.html -->
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -9,7 +10,7 @@
       @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500&display=swap");
       :root {
         --bg-color: #f5f5f7;
-        --card-bg: #fff;
+        --card-bg: #ffffff;
         --text-primary: #1d1d1f;
         --text-secondary: #6e6e73;
         --text-tertiary: #86868b;
@@ -18,6 +19,7 @@
         --accent-green: #30d158;
         --accent-red: #ff453a;
         --border-color: #d2d2d7;
+        --control-bg: #f5f5f7;
         --accent-purple: #5856d6;
       }
       @keyframes fadeIn {
@@ -62,6 +64,11 @@
         grid-template-columns: 1fr 1fr;
         gap: 32px;
         animation: fadeIn 0.6s ease-out;
+      }
+      .left-panel,
+      .right-panel {
+        display: flex;
+        flex-direction: column;
       }
       h1 {
         font-size: 28px;
@@ -238,108 +245,126 @@
     <script>
       const token = localStorage.getItem("token");
       if (!token) window.location.href = "/login.html";
-      const titleEl = document.getElementById("task-title"),
-        topicEl = document.getElementById("task-topic"),
-        phaseIndicatorEl = document.getElementById("phase-indicator"),
-        contentDisplayEl = document.getElementById("content-display"),
-        textarea = document.getElementById("user-textarea"),
-        timerEl = document.getElementById("timer"),
-        wordCountEl = document.getElementById("word-count"),
-        submitBtn = document.getElementById("submit-btn"),
-        statusMessageEl = document.getElementById("status-message");
-      let timer,
-        timeRemaining,
-        currentQuestion = null;
+
+      const titleEl = document.getElementById("task-title");
+      const topicEl = document.getElementById("task-topic");
+      const phaseIndicatorEl = document.getElementById("phase-indicator");
+      const contentDisplayEl = document.getElementById("content-display");
+      const textarea = document.getElementById("user-textarea");
+      const timerEl = document.getElementById("timer");
+      const wordCountEl = document.getElementById("word-count");
+      const submitBtn = document.getElementById("submit-btn");
+      const statusMessageEl = document.getElementById("status-message");
+
+      let timer;
+      let timeRemaining;
+      let currentQuestion = null;
+
       async function startReadingPhase() {
-        (phaseIndicatorEl.textContent = "Phase 1: Reading (3 Minutes)"),
-          (contentDisplayEl.innerHTML = `<p>${currentQuestion.reading_passage}</p>`),
-          (timeRemaining = 180),
-          startTimer(startLecturePhase);
+        phaseIndicatorEl.textContent = "Phase 1: Reading (3 Minutes)";
+        contentDisplayEl.innerHTML = `<p>${currentQuestion.reading_passage}</p>`;
+        timeRemaining = 180;
+        startTimer(startLecturePhase);
       }
+
       function startLecturePhase() {
-        (phaseIndicatorEl.textContent = "Phase 2: Lecture Script (2 Minutes)"),
-          (contentDisplayEl.innerHTML = `<p>${currentQuestion.lecture_script}</p>`),
-          (timeRemaining = 120),
-          startTimer(startWritingPhase);
+        phaseIndicatorEl.textContent = "Phase 2: Lecture Script (2 Minutes)";
+        contentDisplayEl.innerHTML = `<p>${currentQuestion.lecture_script}</p>`;
+        timeRemaining = 120;
+        startTimer(startWritingPhase);
       }
+
       function startWritingPhase() {
-        (phaseIndicatorEl.textContent = "Phase 3: Writing (20 Minutes)"),
-          (contentDisplayEl.innerHTML = `<h4>Reading Passage Reference</h4><p>${currentQuestion.reading_passage}</p><hr><p><strong>Question:</strong> Summarize the points made in the lecture, being sure to explain how they challenge the specific points made in the reading passage.</p>`),
-          (textarea.disabled = !1),
-          (submitBtn.disabled = !1),
-          textarea.focus(),
-          (timeRemaining = 1200),
-          startTimer(() => {
-            alert("Time's Up! Submitting your response."), submitResponse();
-          });
+        phaseIndicatorEl.textContent = "Phase 3: Writing (20 Minutes)";
+        contentDisplayEl.innerHTML = `<h4>Reading Passage Reference</h4><p>${currentQuestion.reading_passage}</p><hr><p><strong>Question:</strong> Summarize the points made in the lecture, being sure to explain how they challenge the specific points made in the reading passage.</p>`;
+        textarea.disabled = false;
+        submitBtn.disabled = false;
+        textarea.focus();
+        timeRemaining = 1200;
+        startTimer(() => {
+          alert("Time's Up! Submitting your response.");
+          submitResponse(true);
+        });
       }
-      function startTimer(e) {
+
+      function startTimer(onComplete) {
         clearInterval(timer);
-        const t = () => {
-          const e = Math.floor(timeRemaining / 60)
-              .toString()
-              .padStart(2, "0"),
-            t = (timeRemaining % 60).toString().padStart(2, "0");
-          timerEl.textContent = `${e}:${t}`;
+        const updateDisplay = () => {
+          const minutes = Math.floor(timeRemaining / 60)
+            .toString()
+            .padStart(2, "0");
+          const seconds = (timeRemaining % 60).toString().padStart(2, "0");
+          timerEl.textContent = `${minutes}:${seconds}`;
         };
-        t(),
-          (timer = setInterval(() => {
-            timeRemaining--,
-              t(),
-              timeRemaining <= 0 && (clearInterval(timer), e());
-          }, 1e3));
-      }
-      async function submitResponse() {
-        const e = textarea.value,
-          t = e ? e.trim().match(/\S+/g).length : 0;
-        if (0 === t) return alert("Cannot submit an empty response.");
-        (statusMessageEl.textContent = "Submitting..."),
-          (submitBtn.disabled = !0);
-        try {
-          const e = await fetch("/api/submit-response", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                content: textarea.value,
-                wordCount: t,
-                questionId: currentQuestion.id,
-                task_type: "integrated_writing",
-              }),
-            }),
-            n = await e.json();
-          if (!e.ok) throw new Error(n.message);
-          (statusMessageEl.textContent = "✓ Submission successful!"),
-            (textarea.disabled = !0),
+        updateDisplay();
+        timer = setInterval(() => {
+          timeRemaining--;
+          updateDisplay();
+          if (timeRemaining <= 0) {
             clearInterval(timer);
-        } catch (e) {
-          (statusMessageEl.textContent = `✗ ${e.message}`),
-            (submitBtn.disabled = !1);
+            onComplete();
+          }
+        }, 1000);
+      }
+
+      async function submitResponse(force = false) {
+        const content = textarea.value;
+        const wordCount = content ? content.trim().match(/\S+/g).length : 0;
+        if (wordCount === 0 && !force)
+          return alert("Cannot submit an empty response.");
+
+        statusMessageEl.textContent = "Submitting...";
+        submitBtn.disabled = true;
+        try {
+          const response = await fetch("/api/submit-response", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              content: content,
+              wordCount: wordCount,
+              questionId: currentQuestion.id,
+              task_type: "integrated_writing",
+            }),
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.message);
+
+          window.location.href = `/submission-success.html?id=${result.id}`;
+        } catch (error) {
+          statusMessageEl.innerHTML = `<span style="color: var(--accent-red);">✗ ${error.message}</span>`;
+          submitBtn.disabled = false;
         }
       }
+
       document.addEventListener("DOMContentLoaded", async () => {
-        const e = new URLSearchParams(window.location.search).get("id");
-        if (!e)
-          return void (topicEl.textContent = "Error: No question ID provided.");
-        try {
-          const t = await fetch(`/api/questions/${e}`);
-          if (!t.ok) throw new Error("Failed to fetch question details.");
-          (currentQuestion = await t.json()),
-            (titleEl.textContent = currentQuestion.title),
-            (topicEl.textContent = currentQuestion.topic),
-            startReadingPhase();
-        } catch (e) {
-          console.error("Error fetching question:", e),
-            (topicEl.textContent = "Error loading question.");
+        const urlParams = new URLSearchParams(window.location.search);
+        const questionId = urlParams.get("id");
+        if (!questionId) {
+          topicEl.textContent = "Error: No question ID provided.";
+          return;
         }
-      }),
-        textarea.addEventListener("input", () => {
-          const e = textarea.value.trim().match(/\S+/g)?.length || 0;
-          wordCountEl.textContent = `Words: ${e}`;
-        }),
-        submitBtn.addEventListener("click", submitResponse);
+        try {
+          const response = await fetch(`/api/questions/${questionId}`);
+          if (!response.ok)
+            throw new Error("Failed to fetch question details.");
+          currentQuestion = await response.json();
+          titleEl.textContent = currentQuestion.title;
+          topicEl.textContent = currentQuestion.topic;
+          startReadingPhase();
+        } catch (error) {
+          console.error("Error fetching question:", error);
+          topicEl.textContent = "Error loading question.";
+        }
+      });
+
+      textarea.addEventListener("input", () => {
+        const words = textarea.value.trim().match(/\S+/g)?.length || 0;
+        wordCountEl.textContent = `Words: ${words}`;
+      });
+      submitBtn.addEventListener("click", () => submitResponse(false));
     </script>
   </body>
 </html>
