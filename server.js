@@ -29,7 +29,6 @@ const authenticateToken = (req, res, next) => {
     const token = authHeader && authHeader.split(' ')[1];
     if (token == null) return res.sendStatus(401);
 
-    // 在验证时使用环境变量，并提供一个默认值以防万一
     jwt.verify(token, process.env.JWT_SECRET || 'your_default_secret_key', (err, user) => {
         if (err) return res.sendStatus(403);
         req.user = user;
@@ -39,10 +38,11 @@ const authenticateToken = (req, res, next) => {
 
 // ======================= 公共 API (无需登录) =======================
 
-// --- 【代码修正】: 实现了获取题目列表的 API ---
+// --- 【代码修正】: 在返回题目列表时，同时返回题目类型 ---
 app.get('/api/questions', async (req, res) => {
     try {
-        const sql = `SELECT id, title, topic FROM questions ORDER BY id`;
+        // 在查询中加入了 task_type 字段
+        const sql = `SELECT id, title, topic, task_type FROM questions ORDER BY id`;
         const result = await pool.query(sql);
         res.json(result.rows);
     } catch (err) {
@@ -51,7 +51,7 @@ app.get('/api/questions', async (req, res) => {
     }
 });
 
-// --- 【代码修正】: 实现了获取单个题目详情的 API ---
+// --- 实现了获取单个题目详情的 API ---
 app.get('/api/questions/:id', async (req, res) => {
     const { id } = req.params;
     try {
@@ -69,68 +69,49 @@ app.get('/api/questions/:id', async (req, res) => {
 
 
 // ======================= 认证 API (用于登录注册) =======================
-
-// --- 【代码修正】: 实现了用户注册的 API ---
+// (注册和登录部分代码保持不变)
 app.post('/api/auth/register', async (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) {
         return res.status(400).json({ message: "用户名和密码不能为空。" });
     }
-
     try {
-        // 检查用户名是否已存在
         const userCheck = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
         if (userCheck.rows.length > 0) {
             return res.status(409).json({ message: "用户名已存在。" });
         }
-
-        // 哈希密码
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-
-        // 存入数据库
         const sql = `INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username`;
         const newUser = await pool.query(sql, [username, hashedPassword]);
-
         res.status(201).json({ message: "注册成功！", user: newUser.rows[0] });
-
     } catch (err) {
         console.error("注册失败:", err);
         res.status(500).json({ message: "服务器内部错误。" });
     }
 });
-
-// --- 【代码修正】: 实现了用户登录的 API ---
 app.post('/api/auth/login', async (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) {
         return res.status(400).json({ message: "用户名和密码不能为空。" });
     }
-
     try {
-        // 查找用户
         const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
         const user = result.rows[0];
         if (!user) {
             return res.status(401).json({ message: "用户名或密码错误。" });
         }
-
-        // 验证密码
         const isMatch = await bcrypt.compare(password, user.password_hash);
         if (!isMatch) {
             return res.status(401).json({ message: "用户名或密码错误。" });
         }
-
-        // 创建并签发 JWT
         const payload = { id: user.id, username: user.username };
         const token = jwt.sign(payload, process.env.JWT_SECRET || 'your_default_secret_key', { expiresIn: '1d' });
-
         res.json({
             message: "登录成功！",
             token,
             user: { id: user.id, username: user.username }
         });
-
     } catch (err) {
         console.error("登录失败:", err);
         res.status(500).json({ message: "服务器内部错误。" });
@@ -139,15 +120,14 @@ app.post('/api/auth/login', async (req, res) => {
 
 
 // ======================= 受保护的 API (需要安检) =======================
-
-// --- API (最终修正版): 处理提交作文的请求 ---
+// --- 【代码修正】: 在提交时，可以接收并存储 task_type ---
 app.post('/api/submit-response', authenticateToken, async (req, res) => {
-    const { content, wordCount, questionId, task_type = 'academic_discussion' } = req.body;
+    // 增加了对 task_type 的接收
+    const { content, wordCount, questionId, task_type } = req.body;
     const userId = req.user.id;
 
-    // 关键修正！确保 questionId 是一个有效的整数
     const qId = parseInt(questionId, 10);
-    if (!content || !wordCount || isNaN(qId)) {
+    if (!content || !wordCount || isNaN(qId) || !task_type) {
         return res.status(400).json({ message: "请求缺少必要信息或格式不正确。" });
     }
 
@@ -162,7 +142,7 @@ app.post('/api/submit-response', authenticateToken, async (req, res) => {
     }
 });
 
-// --- API (最终修正版): 获取写作历史列表 ---
+// (获取历史记录部分代码保持不变)
 app.get('/api/history', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     try {
@@ -188,8 +168,6 @@ app.get('/api/history', authenticateToken, async (req, res) => {
         res.status(500).json({ message: "服务器内部错误。" });
     }
 });
-
-// --- API (最终修正版): 获取写作历史详情 ---
 app.get('/api/history/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id;
@@ -209,7 +187,6 @@ app.get('/api/history/:id', authenticateToken, async (req, res) => {
 
 
 // --- 静态文件服务 ---
-// 【重要】将所有HTML, JS, CSS文件放在一个名为 'public' 的文件夹中
 app.use(express.static('public'));
 
 // --- 启动服务器 ---

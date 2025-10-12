@@ -1,4 +1,6 @@
-﻿<!DOCTYPE html>
+﻿<!-- START OF FILE index.html -->
+﻿
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -7,18 +9,6 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px)
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0)
-            }
-        }
-
         :root {
             --bg-color: #f0f0f5;
             --container-bg: #fff;
@@ -26,7 +16,21 @@
             --text-secondary: #6e6e73;
             --accent-blue: #007aff;
             --accent-blue-hover: #0060c5;
-            --border-color: #e5e5ea
+            --border-color: #e5e5ea;
+            --accent-purple: #5856d6;
+            --accent-green: #30d158;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         body {
@@ -36,7 +40,6 @@
             margin: 0;
             padding: 24px;
             -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale
         }
 
         .navbar {
@@ -45,7 +48,7 @@
             padding: 0 10px;
             display: flex;
             justify-content: space-between;
-            align-items: center
+            align-items: center;
         }
 
         .nav-link {
@@ -53,47 +56,47 @@
             text-decoration: none;
             font-weight: 500;
             font-size: 15px;
-            transition: color .2s ease
+            transition: color .2s ease;
         }
 
             .nav-link:hover {
-                color: var(--accent-blue)
+                color: var(--accent-blue);
             }
 
         .nav-right {
             display: flex;
             align-items: center;
-            gap: 20px
+            gap: 20px;
         }
 
         .nav-user {
             color: var(--text-secondary);
-            font-weight: 500
+            font-weight: 500;
         }
 
         .main-container {
             max-width: 800px;
             margin: 20px auto 40px;
-            animation: fadeIn .6s ease-out forwards
+            animation: fadeIn .6s ease-out forwards;
         }
 
         h1 {
             font-size: 36px;
             font-weight: 700;
             text-align: center;
-            margin: 0 0 8px 0
+            margin: 0 0 8px 0;
         }
 
         .subtitle {
             text-align: center;
             color: var(--text-secondary);
             margin-bottom: 40px;
-            font-size: 18px
+            font-size: 18px;
         }
 
         #questions-list {
             display: grid;
-            gap: 20px
+            gap: 20px;
         }
 
         .question-card {
@@ -105,30 +108,54 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            transition: transform .2s ease,box-shadow .2s ease
+            transition: transform .2s ease,box-shadow .2s ease;
         }
 
             .question-card:hover {
                 transform: translateY(-4px);
-                box-shadow: 0 8px 16px rgba(0,0,0,.06)
+                box-shadow: 0 8px 16px rgba(0,0,0,.06);
             }
 
-        .card-content h2 {
-            font-size: 20px;
-            font-weight: 600;
-            margin: 0 0 8px 0;
-            color: var(--text-primary)
+        .card-content {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
 
-        .card-content .topic-badge {
+            .card-content h2 {
+                font-size: 20px;
+                font-weight: 600;
+                margin: 0;
+                color: var(--text-primary);
+            }
+
+        .badge-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .topic-badge, .task-type-badge {
             display: inline-block;
-            background-color: #e5e5ea;
-            color: var(--text-secondary);
             padding: 4px 10px;
             border-radius: 999px;
             font-size: 12px;
             font-weight: 500;
-            text-transform: uppercase
+            text-transform: uppercase;
+        }
+
+        .topic-badge {
+            background-color: #e5e5ea;
+            color: var(--text-secondary);
+        }
+        /* --- 新增样式: 区分不同任务类型 --- */
+        .task-type-badge.academic {
+            background-color: var(--accent-purple);
+            color: white;
+        }
+
+        .task-type-badge.integrated {
+            background-color: var(--accent-green);
+            color: white;
         }
 
         .start-button {
@@ -140,11 +167,11 @@
             font-weight: 500;
             font-size: 15px;
             transition: background-color .2s ease;
-            white-space: nowrap
+            white-space: nowrap;
         }
 
             .start-button:hover {
-                background-color: var(--accent-blue-hover)
+                background-color: var(--accent-blue-hover);
             }
 
         .loading-state {
@@ -154,7 +181,7 @@
             padding: 40px;
             background-color: var(--container-bg);
             border-radius: 12px;
-            border: 1px solid var(--border-color)
+            border: 1px solid var(--border-color);
         }
     </style>
 </head>
@@ -173,10 +200,10 @@
             const token = localStorage.getItem('token');
             if (!token) {
                 window.location.href = '/login.html';
+                return;
             }
             const questionsList = document.getElementById('questions-list');
             try {
-                // 这个请求是公共的，不需要 token
                 const response = await fetch('/api/questions');
                 if (!response.ok) throw new Error('Failed to fetch questions.');
                 const questions = await response.json();
@@ -188,12 +215,28 @@
                 questions.forEach(question => {
                     const card = document.createElement('div');
                     card.className = 'question-card';
+
+                    // --- 【代码修正】: 根据题目类型决定跳转链接和徽章样式 ---
+                    let pageUrl, taskTypeLabel, taskTypeClass;
+                    if (question.task_type === 'integrated_writing') {
+                        pageUrl = `/integrated-practice.html?id=${question.id}`;
+                        taskTypeLabel = 'Integrated';
+                        taskTypeClass = 'integrated';
+                    } else {
+                        pageUrl = `/practice-page.html?id=${question.id}`;
+                        taskTypeLabel = 'Academic Discussion';
+                        taskTypeClass = 'academic';
+                    }
+
                     card.innerHTML = `
                             <div class="card-content">
                                 <h2>${question.title}</h2>
-                                <span class="topic-badge">${question.topic}</span>
+                                <div class="badge-group">
+                                    <span class="task-type-badge ${taskTypeClass}">${taskTypeLabel}</span>
+                                    <span class="topic-badge">${question.topic}</span>
+                                </div>
                             </div>
-                            <a href="/practice-page.html?id=${question.id}" class="start-button">Start Practice</a>
+                            <a href="${pageUrl}" class="start-button">Start Practice</a>
                         `;
                     questionsList.appendChild(card);
                 });
