@@ -1,0 +1,297 @@
+﻿<!-- START OF FILE public/exam.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOEFL® Mock Test In Progress</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500&display=swap');
+
+        :root {
+            --bg-color: #f0f0f5;
+            --container-bg: #fff;
+            --text-primary: #1d1d1f;
+            --text-secondary: #6e6e73;
+            --accent-blue: #007aff;
+            --accent-blue-hover: #0060c5;
+            --border-color: #e5e5ea;
+            --accent-red: #ff453a;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+        }
+
+        .exam-header {
+            background-color: var(--container-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+            .exam-header h1 {
+                font-size: 20px;
+                margin: 0;
+            }
+
+            .exam-header .timer {
+                font-family: 'Roboto Mono', monospace;
+                font-size: 20px;
+                font-weight: 500;
+            }
+
+        .exam-container {
+            max-width: 1000px;
+            margin: 24px auto;
+            padding: 24px;
+            background-color: var(--container-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+        }
+
+        .instruction-screen, .placeholder-screen, .break-screen, .end-screen {
+            text-align: center;
+            padding: 80px 40px;
+        }
+
+        h2 {
+            font-size: 32px;
+        }
+
+        p {
+            color: var(--text-secondary);
+            line-height: 1.6;
+            font-size: 18px;
+        }
+
+        button {
+            background-color: var(--accent-blue);
+            color: #fff;
+            padding: 12px 32px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all .2s ease;
+            border: none;
+            cursor: pointer;
+        }
+
+            button:hover {
+                background-color: var(--accent-blue-hover);
+            }
+        /* Writing Task Specific Styles */
+        .writing-task-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .writing-content, .writing-response {
+            font-size: 15px;
+            line-height: 1.65;
+            color: var(--text-secondary);
+        }
+
+        .writing-content {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 350px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 16px;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+
+        .word-count {
+            font-size: 14px;
+            text-align: right;
+            margin-top: 8px;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="exam-header">
+        <h1 id="section-title">Loading Test...</h1>
+        <div class="timer" id="main-timer">--:--</div>
+    </div>
+    <div class="exam-container" id="exam-content">
+        <!-- Content will be dynamically inserted here -->
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) window.location.href = '/login.html';
+
+        const sectionTitleEl = document.getElementById('section-title');
+        const mainTimerEl = document.getElementById('main-timer');
+        const examContentEl = document.getElementById('exam-content');
+
+        let testData = null;
+        let currentSectionIndex = 0;
+        let currentQuestionIndex = 0;
+        const sectionsOrder = ['reading', 'listening', 'speaking', 'writing'];
+
+        // --- Core Exam Flow Logic ---
+        async function startExam() {
+            try {
+                const response = await fetch('/api/tests/1'); // Fetch "Mock Test 1"
+                if (!response.ok) throw new Error('Could not load the test.');
+                testData = await response.json();
+                renderCurrentScreen();
+            } catch (error) {
+                examContentEl.innerHTML = `<div class="placeholder-screen"><h2>Error</h2><p>${error.message}</p></div>`;
+            }
+        }
+
+        function renderCurrentScreen() {
+            if (currentSectionIndex >= sectionsOrder.length) {
+                renderEndScreen();
+                return;
+            }
+
+            const currentSectionName = sectionsOrder[currentSectionIndex];
+            const currentSectionData = testData.sections[currentSectionName];
+
+            sectionTitleEl.textContent = `${currentSectionName.charAt(0).toUpperCase() + currentSectionName.slice(1)} Section`;
+
+            if (currentQuestionIndex === 0) { // Show instructions at the start of each section
+                renderInstructionScreen(currentSectionName);
+            } else {
+                const question = currentSectionData[currentQuestionIndex - 1];
+                if (currentSectionName === 'writing' && question) {
+                    renderWritingTask(question);
+                } else { // Placeholder for other sections
+                    renderPlaceholderScreen(currentSectionName);
+                }
+            }
+        }
+
+        function next() {
+            const currentSectionName = sectionsOrder[currentSectionIndex];
+            const sectionLength = testData.sections[currentSectionName].length;
+
+            currentQuestionIndex++;
+
+            if (currentQuestionIndex > sectionLength) { // Move to next section
+                currentQuestionIndex = 0;
+                currentSectionIndex++;
+                if (sectionsOrder[currentSectionIndex] === 'speaking') { // Break before Speaking
+                    renderBreakScreen();
+                    return;
+                }
+            }
+            renderCurrentScreen();
+        }
+
+        // --- Screen Rendering Functions ---
+        function renderInstructionScreen(sectionName) {
+            examContentEl.innerHTML = `
+                <div class="instruction-screen">
+                    <h2>${sectionName.charAt(0).toUpperCase() + sectionName.slice(1)} Section</h2>
+                    <p>Click "Continue" when you are ready to begin.</p>
+                    <button onclick="next()">Continue</button>
+                </div>
+            `;
+        }
+
+        function renderPlaceholderScreen(sectionName) {
+            examContentEl.innerHTML = `
+                <div class="placeholder-screen">
+                    <h2>${sectionName.charAt(0).toUpperCase() + sectionName.slice(1)} Section - Task ${currentQuestionIndex}</h2>
+                    <p>This section is currently under development.</p>
+                    <button onclick="next()">Next Task</button>
+                </div>
+            `;
+        }
+
+        function renderWritingTask(question) {
+            let contentHTML = '';
+            if (question.task_type === 'integrated_writing') {
+                contentHTML = `
+                    <h3>Reading Passage</h3>
+                    <p>${question.reading_passage}</p>
+                    <hr>
+                    <h3>Lecture Script</h3>
+                    <p>${question.lecture_script}</p>
+                `;
+            } else { // academic_discussion
+                contentHTML = `
+                    <h3>Professor's Prompt</h3>
+                    <p>${question.professor_prompt}</p>
+                    <hr>
+                    <p><b>${question.student1_author}:</b> ${question.student1_post}</p>
+                    <p><b>${question.student2_author}:</b> ${question.student2_post}</p>
+                `;
+            }
+
+            examContentEl.innerHTML = `
+                <div class="writing-task-container">
+                    <div class="writing-content">${contentHTML}</div>
+                    <div class="writing-response">
+                        <textarea id="writing-textarea" placeholder="Start writing your response here..."></textarea>
+                        <div class="word-count" id="word-counter">Words: 0</div>
+                    </div>
+                </div>
+                <div style="text-align: center; margin-top: 24px;">
+                    <button onclick="submitWriting()">Submit & Continue</button>
+                </div>
+            `;
+            // Add word count listener
+            document.getElementById('writing-textarea').addEventListener('input', (e) => {
+                const words = e.target.value.trim().match(/\S+/g)?.length || 0;
+                document.getElementById('word-counter').textContent = `Words: ${words}`;
+            });
+        }
+
+        function renderBreakScreen() {
+            sectionTitleEl.textContent = "Official Break";
+            examContentEl.innerHTML = `
+                <div class="break-screen">
+                    <h2>10-Minute Break</h2>
+                    <p>You may now take a scheduled 10-minute break.</p>
+                    <button onclick="next()">End Break & Continue</button>
+                </div>
+            `;
+        }
+
+        function renderEndScreen() {
+            sectionTitleEl.textContent = "Test Finished";
+            mainTimerEl.style.display = 'none';
+            examContentEl.innerHTML = `
+                <div class="end-screen">
+                    <h2>Congratulations!</h2>
+                    <p>You have completed the TOEFL Mock Test. You can view your writing submissions in the History section.</p>
+                    <a href="/history.html"><button>View My History</button></a>
+                </div>
+            `;
+        }
+
+        function submitWriting() {
+            // In a real scenario, you would save the response here via API
+            // For this simulation, we'll just move to the next task.
+            console.log("Submitting writing task...");
+            next();
+        }
+
+        document.addEventListener('DOMContentLoaded', startExam);
+    </script>
+</body>
+</html>
