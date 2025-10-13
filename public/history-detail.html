@@ -7,12 +7,15 @@
     <title>Writing Review - TOEFL® Practice</title>
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+      @import url("https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@500&display=swap");
+
       :root {
         --bg-color: #f5f5f7;
         --card-bg: #fff;
         --text-primary: #1d1d1f;
         --text-secondary: #6e6e73;
         --accent-blue: #007aff;
+        --accent-blue-hover: #0071e3;
         --accent-green: #30d158;
         --border-color: #d2d2d7;
         --accent-red: #ff453a;
@@ -257,7 +260,7 @@
         color: var(--text-secondary);
       }
 
-      /* === NEW APPLE-INSPIRED MODAL STYLES START === */
+      /* === REFINED APPLE-INSPIRED MODAL STYLES START === */
       .modal {
         display: none;
         position: fixed;
@@ -289,32 +292,29 @@
         justify-content: space-between;
         align-items: center;
         border-bottom: 1px solid var(--border-color);
-        padding: 16px 24px;
+        padding: 12px 24px;
         position: relative;
+        flex-shrink: 0;
       }
       .modal-header h2 {
-        font-size: 18px;
+        font-size: 17px;
         font-weight: 600;
         position: absolute;
         left: 50%;
         transform: translateX(-50%);
       }
-      /* --- 【样式修改】: 优化计时器样式 --- */
+      /* -- 【样式修改】: 计时器样式 -- */
       .modal-header .timer {
         font-family: "Roboto Mono", monospace;
-        font-size: 16px;
-        font-weight: 600;
-        color: var(--text-primary);
-        background-color: #e5e5ea;
-        padding: 6px 12px;
-        border-radius: 99px;
-        line-height: 1;
+        font-size: 15px;
+        color: var(--text-secondary);
+        font-weight: 500;
       }
-      /* --- 【样式修改】: 优化关闭按钮和 "X" 的对齐 --- */
+      /* -- 【样式修改】: 关闭按钮 "X" 居中 -- */
       .close-btn {
         color: var(--text-secondary);
         font-size: 24px;
-        font-weight: bold;
+        font-weight: 400;
         cursor: pointer;
         background: #e5e5ea;
         border-radius: 50%;
@@ -324,10 +324,7 @@
         align-items: center;
         justify-content: center;
         line-height: 1;
-        padding: 0;
-        padding-bottom: 2px; /* 垂直居中微调 */
-        box-sizing: border-box;
-        transition: background-color 0.2s ease;
+        transition: background-color 0.2s ease, color 0.2s ease;
       }
       .close-btn:hover {
         background: #dcdce1;
@@ -346,48 +343,68 @@
         background-color: #f5f5f7;
         border-right: 1px solid var(--border-color);
       }
+      /* -- 【样式修改】: 增加 macOS 风格滚动条 -- */
+      .reference-panel::-webkit-scrollbar {
+        width: 10px;
+      }
+      .reference-panel::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .reference-panel::-webkit-scrollbar-thumb {
+        background-color: rgba(0, 0, 0, 0.25);
+        border-radius: 5px;
+        border: 3px solid transparent;
+        background-clip: content-box;
+      }
+      .reference-panel::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(0, 0, 0, 0.4);
+      }
+
       .reference-panel h3 {
-        font-size: 14px;
+        font-size: 13px;
         text-transform: uppercase;
         color: var(--text-secondary);
         margin: 0 0 16px;
         letter-spacing: 0.5px;
+        font-weight: 500;
       }
+      /* -- 【样式修改】: 重构写作面板 -- */
       .response-panel {
         display: flex;
         flex-direction: column;
-        padding: 24px;
+        padding: 0;
       }
+      /* -- 【样式修改】: 移除 textarea 边框，使其融入面板 -- */
       .response-panel textarea {
         width: 100%;
         flex-grow: 1;
         box-sizing: border-box;
         resize: none;
         font-size: 17px;
-        line-height: 1.6;
-        padding: 16px;
-        border-radius: 12px;
-        border: 1px solid var(--border-color);
-        background-color: var(--card-bg);
+        line-height: 1.65;
+        padding: 24px;
+        border: none;
+        background-color: transparent;
+        color: var(--text-primary);
       }
       .response-panel textarea:focus {
         outline: none;
-        border-color: var(--accent-blue);
-        box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.2);
       }
       .modal-footer {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding-top: 16px;
+        padding: 16px 24px;
+        flex-shrink: 0;
       }
       .word-count {
         color: var(--text-secondary);
         font-size: 14px;
         font-weight: 500;
       }
+      /* -- 【样式修改】: 优化按钮样式 -- */
       .modal-footer button {
-        padding: 12px 28px;
+        padding: 10px 28px;
         font-size: 16px;
         font-weight: 600;
         border-radius: 999px;
@@ -399,7 +416,7 @@
       }
       .modal-footer button:hover {
         background-color: var(--accent-blue-hover);
-        transform: scale(1.03);
+        transform: scale(1.02);
       }
       .modal-footer button:disabled {
         background-color: #e5e5ea;
@@ -407,7 +424,7 @@
         cursor: not-allowed;
         transform: none;
       }
-      /* === NEW APPLE-INSPIRED MODAL STYLES END === */
+      /* === REFINED APPLE-INSPIRED MODAL STYLES END === */
     </style>
   </head>
   <body>
@@ -481,9 +498,7 @@
     <script src="/auth.js"></script>
     <script>
       document.addEventListener("DOMContentLoaded", () => {
-        // --- JavaScript logic is identical to the previous version ---
-        // (The following code is identical to your previous correct version and is included for completeness)
-
+        // --- JavaScript logic remains the same ---
         const token = localStorage.getItem("token");
         if (!token) {
           window.location.href = "/login.html";
@@ -558,13 +573,16 @@
           if (!pageData) return;
           const aiCard = document
             .getElementById("ai-score-card")
-            .cloneNode(true);
+            ?.cloneNode(true);
           const originalResponseCard = document
             .querySelector(".user-response-card")
-            .cloneNode(true);
+            ?.cloneNode(true);
+
           rewriteReferenceEl.innerHTML = `<h3>Reference</h3>`;
-          rewriteReferenceEl.appendChild(aiCard);
-          rewriteReferenceEl.appendChild(originalResponseCard);
+          if (aiCard) rewriteReferenceEl.appendChild(aiCard);
+          if (originalResponseCard)
+            rewriteReferenceEl.appendChild(originalResponseCard);
+
           const timeLimit =
             pageData.task_type === "integrated_writing" ? 1200 : 600;
           startTimer(timeLimit, rewriteTimerEl, () => {
