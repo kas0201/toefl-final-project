@@ -299,13 +299,20 @@
         left: 50%;
         transform: translateX(-50%);
       }
+      /* --- 【样式修改】: 优化计时器样式 --- */
       .modal-header .timer {
         font-family: "Roboto Mono", monospace;
-        font-size: 18px;
-        color: var(--text-secondary);
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--text-primary);
+        background-color: #e5e5ea;
+        padding: 6px 12px;
+        border-radius: 99px;
+        line-height: 1;
       }
+      /* --- 【样式修改】: 优化关闭按钮和 "X" 的对齐 --- */
       .close-btn {
-        color: #aaa;
+        color: var(--text-secondary);
         font-size: 24px;
         font-weight: bold;
         cursor: pointer;
@@ -317,9 +324,14 @@
         align-items: center;
         justify-content: center;
         line-height: 1;
+        padding: 0;
+        padding-bottom: 2px; /* 垂直居中微调 */
+        box-sizing: border-box;
+        transition: background-color 0.2s ease;
       }
       .close-btn:hover {
         background: #dcdce1;
+        color: var(--text-primary);
       }
       .rewrite-container {
         display: grid;
