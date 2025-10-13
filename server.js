@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Absolutely Complete Final Version with Dictionary Loading Fix) ---
+﻿// --- START OF FILE server.js (Absolutely Complete Final Version with Promisify Fix) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -9,6 +9,8 @@ const axios = require("axios");
 const cloudinary = require("cloudinary").v2;
 const fs = require("fs");
 const path = require("path");
+// 【关键修改 1/3】: 引入 Node.js 内置的 util 模块
+const util = require("util");
 
 // --- 配置 Cloudinary ---
 cloudinary.config({
@@ -717,20 +719,14 @@ app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
       });
     }
 
+    // 【关键修复】: 使用 util.promisify 和正确的异步加载流程
     const dictionaryModule = await import("dictionary-en");
-    const dictionary = dictionaryModule.default;
+    const loadDictionaryCallback = dictionaryModule.default;
+    const loadDictionary = util.promisify(loadDictionaryCallback);
 
-    const checkWord = await new Promise((resolve) => {
-      dictionary((err, dict) => {
-        if (err) {
-          console.error("Failed to load dictionary data:", err);
-          resolve(() => false);
-          return;
-        }
-        const wordSet = new Set(dict.words);
-        resolve((word) => wordSet.has(word));
-      });
-    });
+    const dict = await loadDictionary();
+    const wordSet = new Set(dict.words);
+    const checkWord = (word) => wordSet.has(word);
 
     const stopWords = new Set([
       "a",
@@ -795,14 +791,7 @@ app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
     res.json({ wordCloud: wordCloudData, commonMistakes: aiAnalysis.analysis });
   } catch (err) {
     console.error("Failed to get writing analysis data:", err);
-    if (err.code === "ERR_MODULE_NOT_FOUND") {
-      res.status(500).json({
-        message:
-          "Internal server error: A required module for analysis could not be found.",
-      });
-    } else {
-      res.status(500).json({ message: "Internal server error." });
-    }
+    res.status(500).json({ message: "Internal server error." });
   }
 });
 
