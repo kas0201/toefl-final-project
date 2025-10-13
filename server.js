@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Absolutely Complete Final Version with Promisify Fix) ---
+﻿// --- START OF FILE server.js (Absolutely Complete Final Version with Promisify Fix V2) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -9,7 +9,6 @@ const axios = require("axios");
 const cloudinary = require("cloudinary").v2;
 const fs = require("fs");
 const path = require("path");
-// 【关键修改 1/3】: 引入 Node.js 内置的 util 模块
 const util = require("util");
 
 // --- 配置 Cloudinary ---
@@ -721,7 +720,9 @@ app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
 
     // 【关键修复】: 使用 util.promisify 和正确的异步加载流程
     const dictionaryModule = await import("dictionary-en");
+    // 直接从默认导出获取函数
     const loadDictionaryCallback = dictionaryModule.default;
+    // 使用 promisify 转换
     const loadDictionary = util.promisify(loadDictionaryCallback);
 
     const dict = await loadDictionary();
