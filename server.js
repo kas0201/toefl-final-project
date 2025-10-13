@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (with practice tracking) ---
+﻿// --- START OF FILE server.js (with Review List feature) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -10,7 +10,7 @@ const cloudinary = require("cloudinary").v2;
 const fs = require("fs");
 const path = require("path");
 
-// --- 配置 Cloudinary (保持不变) ---
+// --- 配置与函数 (保持不变) ---
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -18,14 +18,12 @@ cloudinary.config({
   secure: true,
 });
 
-// --- AI评分函数 (严格托福标准版，保持不变) ---
 async function callAIScoringAPI(responseText, promptText, taskType) {
   console.log(
     `🤖 AI a commencé à noter (Mode: ${taskType}) avec le mode de pensée deepseek-reasoner...`
   );
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
-    console.error("❌ Erreur: DEEPSEEK_API_KEY non configuré.");
     throw new Error("AI service is not configured.");
   }
   const endpoint = "https://api.deepseek.com/chat/completions";
@@ -73,8 +71,6 @@ async function callAIScoringAPI(responseText, promptText, taskType) {
     throw new Error("Failed to get a response from the AI service.");
   }
 }
-
-// --- 音频生成函数 (保持不变) ---
 function addPausesToText(text) {
   if (!text) return "";
   let processedText = text;
@@ -181,150 +177,14 @@ const authenticateToken = (req, res, next) => {
 };
 
 // --- API 路由 ---
-app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
-  const { id } = req.params;
-  try {
-    await generateAudioIfNeeded(id);
-    const result = await pool.query(
-      "SELECT lecture_audio_url FROM questions WHERE id = $1",
-      [id]
-    );
-    if (result.rows.length > 0 && result.rows[0].lecture_audio_url) {
-      res.json({
-        message: "Audio generated successfully!",
-        url: result.rows[0].lecture_audio_url,
-      });
-    } else {
-      res
-        .status(404)
-        .json({ message: "Question not found or audio still processing." });
-    }
-  } catch (error) {
-    console.error("Manual audio generation failed:", error);
-    res.status(500).json({ message: "Failed to generate audio." });
-  }
-});
-
-app.get("/api/writing-test", async (req, res) => {
-  try {
-    const sql = `(SELECT * FROM questions WHERE task_type = 'integrated_writing' ORDER BY RANDOM() LIMIT 1) UNION ALL (SELECT * FROM questions WHERE task_type = 'academic_discussion' ORDER BY RANDOM() LIMIT 1);`;
-    const result = await pool.query(sql);
-    if (result.rows.length < 2)
-      return res.status(404).json({
-        message:
-          "Not enough questions in database to start a full writing test.",
-      });
-    const integratedTask = result.rows.find(
-      (q) => q.task_type === "integrated_writing"
-    );
-    if (integratedTask) {
-      generateAudioIfNeeded(integratedTask.id);
-    }
-    res.json(result.rows);
-  } catch (err) {
-    console.error("获取写作考试题目失败:", err);
-    res.status(500).json({ message: "服务器内部错误。" });
-  }
-});
-
-// ======================= 【关键修改】获取题目列表API =======================
-// 注意：我们在这里添加了 authenticateToken 中间件
 app.get("/api/questions", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
-    // 这个新的SQL查询会连接 questions 和 responses 表
-    // 并检查当前用户是否对每个题目都有提交记录
-    const sql = `
-            SELECT 
-                q.id, 
-                q.title, 
-                q.topic, 
-                q.task_type,
-                CASE 
-                    WHEN r.user_id IS NOT NULL THEN TRUE 
-                    ELSE FALSE 
-                END AS has_completed
-            FROM 
-                questions q
-            LEFT JOIN 
-                (SELECT DISTINCT question_id, user_id FROM responses WHERE user_id = $1) r 
-            ON 
-                q.id = r.question_id
-            ORDER BY 
-                q.id;
-        `;
+    const sql = `SELECT q.id, q.title, q.topic, q.task_type, CASE WHEN r.user_id IS NOT NULL THEN TRUE ELSE FALSE END AS has_completed FROM questions q LEFT JOIN (SELECT DISTINCT question_id, user_id FROM responses WHERE user_id = $1) r ON q.id = r.question_id ORDER BY q.id;`;
     const result = await pool.query(sql, [userId]);
     res.json(result.rows);
   } catch (err) {
     console.error("获取题目列表失败:", err);
-    res.status(500).json({ message: "服务器内部错误。" });
-  }
-});
-// =======================================================================
-
-app.get("/api/questions/:id", async (req, res) => {
-  const { id } = req.params;
-  try {
-    generateAudioIfNeeded(id);
-    const sql = `SELECT * FROM questions WHERE id = $1`;
-    const result = await pool.query(sql, [id]);
-    if (result.rows.length === 0)
-      return res.status(404).json({ message: "题目未找到。" });
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(`获取题目详情 ID ${id} 失败:`, err);
-    res.status(500).json({ message: "服务器内部错误。" });
-  }
-});
-
-app.post("/api/auth/register", async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password)
-    return res.status(400).json({ message: "用户名和密码不能为空。" });
-  try {
-    const userCheck = await pool.query(
-      "SELECT * FROM users WHERE username = $1",
-      [username]
-    );
-    if (userCheck.rows.length > 0)
-      return res.status(409).json({ message: "用户名已存在。" });
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-    const sql = `INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username`;
-    const newUser = await pool.query(sql, [username, hashedPassword]);
-    res.status(201).json({ message: "注册成功！", user: newUser.rows[0] });
-  } catch (err) {
-    console.error("注册失败:", err);
-    res.status(500).json({ message: "服务器内部错误。" });
-  }
-});
-
-app.post("/api/auth/login", async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password)
-    return res.status(400).json({ message: "用户名和密码不能为空。" });
-  try {
-    const result = await pool.query("SELECT * FROM users WHERE username = $1", [
-      username,
-    ]);
-    const user = result.rows[0];
-    if (!user) return res.status(401).json({ message: "用户名或密码错误。" });
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch)
-      return res.status(401).json({ message: "用户名或密码错误。" });
-    const payload = { id: user.id, username: user.username };
-    const token = jwt.sign(
-      payload,
-      process.env.JWT_SECRET || "your_default_secret_key",
-      { expiresIn: "1d" }
-    );
-    res.json({
-      message: "登录成功！",
-      token,
-      user: { id: user.id, username: user.username },
-    });
-  } catch (err) {
-    console.error("登录失败:", err);
     res.status(500).json({ message: "服务器内部错误。" });
   }
 });
@@ -333,9 +193,6 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
   const { content, wordCount, questionId, task_type } = req.body;
   const userId = req.user.id;
   const qId = parseInt(questionId, 10);
-  if ((!content && wordCount > 0) || !wordCount || isNaN(qId) || !task_type) {
-    return res.status(400).json({ message: "请求缺少必要信息或格式不正确。" });
-  }
   try {
     const sql = `INSERT INTO responses (content, word_count, question_id, task_type, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING id`;
     const result = await pool.query(sql, [
@@ -384,6 +241,151 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
   }
 });
 
+// ======================= 【新功能API】开始 =======================
+app.get("/api/review-list", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const sql = `SELECT r.id, r.word_count, r.submitted_at, COALESCE(q.title, 'Archived Question') as question_title FROM responses r LEFT JOIN questions q ON r.question_id = q.id WHERE r.user_id = $1 AND r.is_for_review = TRUE ORDER BY r.submitted_at DESC;`;
+    const result = await pool.query(sql, [userId]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("获取复习列表失败:", err);
+    res.status(500).json({ message: "服务器内部错误。" });
+  }
+});
+
+app.post(
+  "/api/responses/:id/toggle-review",
+  authenticateToken,
+  async (req, res) => {
+    const { id } = req.params;
+    const userId = req.user.id;
+    try {
+      const updateQuery = `UPDATE responses SET is_for_review = NOT is_for_review WHERE id = $1 AND user_id = $2;`;
+      await pool.query(updateQuery, [id, userId]);
+      const selectQuery = `SELECT is_for_review FROM responses WHERE id = $1 AND user_id = $2;`;
+      const result = await pool.query(selectQuery, [id, userId]);
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          message: "Response not found or you do not have permission.",
+        });
+      }
+      res.json({ is_for_review: result.rows[0].is_for_review });
+    } catch (err) {
+      console.error(`切换复习状态失败 (Response ID: ${id}):`, err);
+      res.status(500).json({ message: "服务器内部错误。" });
+    }
+  }
+);
+// ======================= 【新功能API】结束 =======================
+
+app.get("/api/history/:id", authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+  const sql = `SELECT r.id, r.content as user_response, r.word_count, r.submitted_at, r.ai_score, r.ai_feedback, r.is_for_review, q.* FROM responses r LEFT JOIN questions q ON r.question_id = q.id WHERE r.id = $1 AND r.user_id = $2;`;
+  try {
+    const result = await pool.query(sql, [id, userId]);
+    if (result.rows.length === 0)
+      return res.status(404).json({ message: "历史记录未找到或无权访问。" });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(`获取历史详情 ID ${id} 失败:`, err);
+    res.status(500).json({ message: "服务器内部错误。" });
+  }
+});
+
+// 其他API路由
+app.get("/api/writing-test", async (req, res) => {
+  try {
+    const sql = `(SELECT * FROM questions WHERE task_type = 'integrated_writing' ORDER BY RANDOM() LIMIT 1) UNION ALL (SELECT * FROM questions WHERE task_type = 'academic_discussion' ORDER BY RANDOM() LIMIT 1);`;
+    const result = await pool.query(sql);
+    if (result.rows.length < 2)
+      return res.status(404).json({
+        message:
+          "Not enough questions in database to start a full writing test.",
+      });
+    const integratedTask = result.rows.find(
+      (q) => q.task_type === "integrated_writing"
+    );
+    if (integratedTask) {
+      generateAudioIfNeeded(integratedTask.id);
+    }
+    res.json(result.rows);
+  } catch (err) {
+    console.error("获取写作考试题目失败:", err);
+    res.status(500).json({ message: "服务器内部错误。" });
+  }
+});
+app.get("/api/questions/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    generateAudioIfNeeded(id);
+    const sql = `SELECT * FROM questions WHERE id = $1`;
+    const result = await pool.query(sql, [id]);
+    if (result.rows.length === 0)
+      return res.status(404).json({ message: "题目未找到。" });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(`获取题目详情 ID ${id} 失败:`, err);
+    res.status(500).json({ message: "服务器内部错误。" });
+  }
+});
+app.post("/api/auth/register", async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ message: "用户名和密码不能为空。" });
+  }
+  try {
+    const userCheck = await pool.query(
+      "SELECT * FROM users WHERE username = $1",
+      [username]
+    );
+    if (userCheck.rows.length > 0) {
+      return res.status(409).json({ message: "用户名已存在。" });
+    }
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    const sql = `INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username`;
+    const newUser = await pool.query(sql, [username, hashedPassword]);
+    res.status(201).json({ message: "注册成功！", user: newUser.rows[0] });
+  } catch (err) {
+    console.error("注册失败:", err);
+    res.status(500).json({ message: "服务器内部错误。" });
+  }
+});
+app.post("/api/auth/login", async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ message: "用户名和密码不能为空。" });
+  }
+  try {
+    const result = await pool.query("SELECT * FROM users WHERE username = $1", [
+      username,
+    ]);
+    const user = result.rows[0];
+    if (!user) {
+      return res.status(401).json({ message: "用户名或密码错误。" });
+    }
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ message: "用户名或密码错误。" });
+    }
+    const payload = { id: user.id, username: user.username };
+    const token = jwt.sign(
+      payload,
+      process.env.JWT_SECRET || "your_default_secret_key",
+      { expiresIn: "1d" }
+    );
+    res.json({
+      message: "登录成功！",
+      token,
+      user: { id: user.id, username: user.username },
+    });
+  } catch (err) {
+    console.error("登录失败:", err);
+    res.status(500).json({ message: "服务器内部错误。" });
+  }
+});
 app.get("/api/history", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
@@ -395,19 +397,27 @@ app.get("/api/history", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "服务器内部错误。" });
   }
 });
-
-app.get("/api/history/:id", authenticateToken, async (req, res) => {
+app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const userId = req.user.id;
-  const sql = `SELECT r.id, r.content as user_response, r.word_count, r.submitted_at, r.ai_score, r.ai_feedback, q.* FROM responses r LEFT JOIN questions q ON r.question_id = q.id WHERE r.id = $1 AND r.user_id = $2;`;
   try {
-    const result = await pool.query(sql, [id, userId]);
-    if (result.rows.length === 0)
-      return res.status(404).json({ message: "历史记录未找到或无权访问。" });
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(`获取历史详情 ID ${id} 失败:`, err);
-    res.status(500).json({ message: "服务器内部错误。" });
+    await generateAudioIfNeeded(id);
+    const result = await pool.query(
+      "SELECT lecture_audio_url FROM questions WHERE id = $1",
+      [id]
+    );
+    if (result.rows.length > 0 && result.rows[0].lecture_audio_url) {
+      res.json({
+        message: "Audio generated successfully!",
+        url: result.rows[0].lecture_audio_url,
+      });
+    } else {
+      res
+        .status(404)
+        .json({ message: "Question not found or audio still processing." });
+    }
+  } catch (error) {
+    console.error("Manual audio generation failed:", error);
+    res.status(500).json({ message: "Failed to generate audio." });
   }
 });
 

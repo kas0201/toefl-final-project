@@ -1,5 +1,4 @@
-﻿<!-- START OF FILE public/history-detail.html (with visualized feedback) -->
-
+﻿<!-- START OF FILE public/history-detail.html (with Review Toggle feature) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -48,16 +47,18 @@
         max-width: 800px;
         margin: 40px auto;
       }
+      .title-container {
+        text-align: center;
+        margin-bottom: 24px;
+      }
       h1 {
         font-size: 36px;
         font-weight: 700;
-        text-align: center;
         margin: 0 0 8px 0;
       }
       .subtitle {
-        text-align: center;
         color: var(--text-secondary);
-        margin-bottom: 40px;
+        margin: 0 0 16px 0;
         font-size: 18px;
       }
       .post,
@@ -98,8 +99,6 @@
         color: var(--text-secondary);
         padding: 40px;
       }
-
-      /* === NEW FEEDBACK STYLES START === */
       #ai-score-card {
         background-color: var(--card-bg);
         border: 1px solid var(--border-color);
@@ -173,7 +172,6 @@
       .rating-badge.needs-improvement {
         background-color: var(--accent-red);
       }
-
       .feedback-item p {
         font-size: 15px;
         line-height: 1.6;
@@ -197,14 +195,70 @@
         text-align: center;
         padding: 20px 0;
       }
-      /* === NEW FEEDBACK STYLES END === */
+
+      /* === NEW BUTTON STYLE === */
+      #review-toggle-btn {
+        background-color: transparent;
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+        padding: 8px 16px;
+        border-radius: 99px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s ease;
+      }
+      #review-toggle-btn:hover {
+        background-color: #e5e5ea;
+        color: var(--text-primary);
+      }
+      #review-toggle-btn.in-review {
+        background-color: var(--accent-yellow);
+        border-color: var(--accent-yellow);
+        color: var(--text-primary);
+      }
     </style>
   </head>
   <body>
     <div class="navbar"></div>
     <div class="main-container">
-      <h1 id="review-title">Reviewing Submission</h1>
-      <p class="subtitle" id="review-subtitle">Loading details...</p>
+      <div class="title-container">
+        <h1 id="review-title">Reviewing Submission</h1>
+        <p class="subtitle" id="review-subtitle">Loading details...</p>
+        <button id="review-toggle-btn" style="display: none">
+          <svg
+            id="review-icon-add"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M12 5v14M5 12h14"></path>
+          </svg>
+          <svg
+            id="review-icon-check"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            style="display: none"
+          >
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          <span id="review-btn-text">Add to Review List</span>
+        </button>
+      </div>
       <div id="review-content"><div class="loading-state">Loading...</div></div>
     </div>
 
@@ -220,6 +274,10 @@
         const reviewTitleEl = document.getElementById("review-title");
         const reviewSubtitleEl = document.getElementById("review-subtitle");
         const reviewContentEl = document.getElementById("review-content");
+        const reviewBtn = document.getElementById("review-toggle-btn");
+        const reviewBtnText = document.getElementById("review-btn-text");
+        const reviewIconAdd = document.getElementById("review-icon-add");
+        const reviewIconCheck = document.getElementById("review-icon-check");
 
         const urlParams = new URLSearchParams(window.location.search);
         const historyId = urlParams.get("id");
@@ -229,11 +287,46 @@
           return;
         }
 
+        // Function to update the button's appearance
+        const updateReviewButton = (isInReview) => {
+          if (isInReview) {
+            reviewBtn.classList.add("in-review");
+            reviewBtnText.textContent = "In Review List";
+            reviewIconAdd.style.display = "none";
+            reviewIconCheck.style.display = "inline";
+          } else {
+            reviewBtn.classList.remove("in-review");
+            reviewBtnText.textContent = "Add to Review List";
+            reviewIconAdd.style.display = "inline";
+            reviewIconCheck.style.display = "none";
+          }
+          reviewBtn.style.display = "inline-flex";
+        };
+
+        // Add click listener for the button
+        reviewBtn.addEventListener("click", async () => {
+          try {
+            const response = await fetch(
+              `/api/responses/${historyId}/toggle-review`,
+              {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
+            if (!response.ok)
+              throw new Error("Failed to update review status.");
+            const result = await response.json();
+            updateReviewButton(result.is_for_review);
+          } catch (error) {
+            console.error("Error toggling review status:", error);
+            alert("Could not update review status. Please try again.");
+          }
+        });
+
         try {
           const response = await fetch(`/api/history/${historyId}`, {
             headers: { Authorization: `Bearer ${token}` },
           });
-
           if (response.status === 401 || response.status === 403) {
             localStorage.removeItem("token");
             localStorage.removeItem("user");
@@ -245,94 +338,56 @@
 
           const data = await response.json();
 
+          updateReviewButton(data.is_for_review);
+
           const submittedDate = new Date(data.submitted_at).toLocaleString(
             "en-US",
             { dateStyle: "long", timeStyle: "short" }
           );
           reviewTitleEl.textContent = data.title || "Practice Response";
           reviewSubtitleEl.textContent = `Submitted on ${submittedDate} • ${data.word_count} words`;
-
           let aiCardHTML = "";
           if (data.ai_score !== null && data.ai_feedback) {
             let feedbackData;
             try {
-              // The feedback from DB is a JSON string, so we need to parse it.
               feedbackData = JSON.parse(data.ai_feedback);
             } catch (e) {
-              // Fallback for old, non-JSON feedback
               feedbackData = null;
             }
-
             if (feedbackData) {
               const createFeedbackItem = (title, feedbackObj) => {
                 const ratingClass = (feedbackObj.rating || "")
                   .toLowerCase()
                   .replace(" ", "-");
-                return `
-                        <div class="feedback-item">
-                            <div class="feedback-item-header">
-                                <h4>${title}</h4>
-                                <span class="rating-badge ${ratingClass}">${feedbackObj.rating}</span>
-                            </div>
-                            <p>${feedbackObj.comment}</p>
-                        </div>
-                    `;
+                return `<div class="feedback-item"><div class="feedback-item-header"><h4>${title}</h4><span class="rating-badge ${ratingClass}">${feedbackObj.rating}</span></div><p>${feedbackObj.comment}</p></div>`;
               };
-
-              aiCardHTML = `
-                <div id="ai-score-card">
-                    <div class="score-display">
-                        <span class="score-value">${data.ai_score}</span>
-                        <span class="score-label">/ 30</span>
-                    </div>
-                    <div class="feedback-details">
-                        <div class="feedback-grid">
-                            ${createFeedbackItem(
-                              "Task Response",
-                              feedbackData.taskResponse
-                            )}
-                            ${createFeedbackItem(
-                              "Organization & Development",
-                              feedbackData.organization
-                            )}
-                            ${createFeedbackItem(
-                              "Language Use",
-                              feedbackData.languageUse
-                            )}
-                        </div>
-                        <div class="general-suggestion">
-                            <p><strong>General Suggestion:</strong> ${
-                              feedbackData.generalSuggestion
-                            }</p>
-                        </div>
-                    </div>
-                </div>`;
+              aiCardHTML = `<div id="ai-score-card"><div class="score-display"><span class="score-value">${
+                data.ai_score
+              }</span><span class="score-label">/ 30</span></div><div class="feedback-details"><div class="feedback-grid">${createFeedbackItem(
+                "Task Response",
+                feedbackData.taskResponse
+              )}${createFeedbackItem(
+                "Organization & Development",
+                feedbackData.organization
+              )}${createFeedbackItem(
+                "Language Use",
+                feedbackData.languageUse
+              )}</div><div class="general-suggestion"><p><strong>General Suggestion:</strong> ${
+                feedbackData.generalSuggestion
+              }</p></div></div></div>`;
             } else {
-              // Fallback to display old, plain-text feedback format
               aiCardHTML = `<div id="ai-score-card"><div class="score-display"><span class="score-value">${data.ai_score}</span><span class="score-label">/ 30</span></div><div class="feedback-details"><p>${data.ai_feedback}</p></div></div>`;
             }
           } else {
             aiCardHTML = `<div id="ai-score-card"><p class="scoring-pending">AI feedback is being generated... Please check back in a moment.</p></div>`;
           }
-
           let promptHTML = "";
           if (data.task_type === "integrated_writing") {
             promptHTML = `<div class="post"><h4>Reading Passage</h4><p class="post-content">${data.reading_passage}</p></div><div class="post"><h4>Lecture Script</h4><p class="post-content">${data.lecture_script}</p></div>`;
           } else {
-            promptHTML = `
-                        <div class="post"><p class="post-author">${data.professor_author}</p><p class="post-content">${data.professor_prompt}</p></div>
-                        <div class="post"><p class="post-author">${data.student1_author}</p><p class="post-content">${data.student1_post}</p></div>
-                        <div class="post"><p class="post-author">${data.student2_author}</p><p class="post-content">${data.student2_post}</p></div>
-                    `;
+            promptHTML = `<div class="post"><p class="post-author">${data.professor_author}</p><p class="post-content">${data.professor_prompt}</p></div><div class="post"><p class="post-author">${data.student1_author}</p><p class="post-content">${data.student1_post}</p></div><div class="post"><p class="post-author">${data.student2_author}</p><p class="post-content">${data.student2_post}</p></div>`;
           }
-
-          reviewContentEl.innerHTML = `
-                    ${aiCardHTML} 
-                    <h2 class="section-header">Your Response</h2>
-                    <div class="user-response-card"><p class="user-response-content">${data.user_response}</p></div>
-                    <h2 class="section-header">Original Prompt</h2>
-                    ${promptHTML}
-                `;
+          reviewContentEl.innerHTML = `${aiCardHTML} <h2 class="section-header">Your Response</h2><div class="user-response-card"><p class="user-response-content">${data.user_response}</p></div><h2 class="section-header">Original Prompt</h2>${promptHTML}`;
         } catch (error) {
           console.error("Error loading submission details:", error);
           reviewContentEl.innerHTML =
