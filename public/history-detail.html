@@ -1,4 +1,4 @@
-﻿<!-- START OF FILE public/history-detail.html (Final Version with All Features Restored) -->
+﻿<!-- START OF FILE public/history-detail.html (Final Version with "No Change" UI) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -311,6 +311,33 @@
         text-decoration: none;
         background-color: rgba(52, 199, 89, 0.2);
         color: #0d6928;
+      }
+      /* --- 【新增样式】: 为 "无需修改" 提示卡片添加样式 --- */
+      .no-change-card {
+        background-color: #e4f8e9;
+        border: 1px solid #a3e9a4;
+        border-radius: 16px;
+        padding: 24px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        color: #216e39;
+      }
+      .no-change-card .icon {
+        flex-shrink: 0;
+        width: 24px;
+        height: 24px;
+        stroke-width: 2.5;
+      }
+      .no-change-card h4 {
+        margin: 0 0 4px 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: #164b29;
+      }
+      .no-change-card p {
+        margin: 0;
+        font-size: 15px;
       }
       .modal {
         display: none;
@@ -688,7 +715,6 @@
               body: JSON.stringify({
                 content,
                 wordCount,
-                // --- 【关键修复】: 使用 pageData.question_id 而不是 pageData.id ---
                 questionId: pageData.question_id,
                 task_type: pageData.task_type,
               }),
@@ -722,21 +748,7 @@
             if (!response.ok) {
               throw new Error(result.message);
             }
-            const diff = Diff.diffSentences(
-              pageData.user_response,
-              result.polishedText
-            );
-            let html = "";
-            diff.forEach((part) => {
-              const value = part.value.replace(/\n/g, "<br>");
-              if (part.added) {
-                html += `<ins>${value}</ins>`;
-              } else if (part.removed) {
-                html += `<del>${value}</del>`;
-              } else {
-                html += value;
-              }
-            });
+
             if (!resultSection) {
               resultSection = document.createElement("div");
               resultSection.id = "polish-section";
@@ -748,8 +760,42 @@
                 );
               }
             }
-            const legendHTML = `<div class="legend"><div class="legend-item"><span class="deleted-color"></span> Original Text</div><div class="legend-item"><span class="added-color"></span> AI Polished Version</div></div>`;
-            resultSection.innerHTML = `<h2 class="section-header">AI Polish Result</h2><div id="polish-result-container">${legendHTML}<div class="diff-result">${html}</div></div>`;
+
+            // --- 【关键修改】: 检查润色前后文本是否相同 ---
+            if (pageData.user_response.trim() === result.polishedText.trim()) {
+              // 如果相同，显示 "无需修改" 提示
+              resultSection.innerHTML = `
+                    <h2 class="section-header">AI Polish Result</h2>
+                    <div class="no-change-card">
+                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div>
+                            <h4>Excellent Writing!</h4>
+                            <p>Our AI reviewed your text and found no necessary corrections. Great job!</p>
+                        </div>
+                    </div>`;
+            } else {
+              // 如果不同，才显示 diff 对比视图
+              const diff = Diff.diffSentences(
+                pageData.user_response,
+                result.polishedText
+              );
+              let html = "";
+              diff.forEach((part) => {
+                const value = part.value.replace(/\n/g, "<br>");
+                if (part.added) {
+                  html += `<ins>${value}</ins>`;
+                } else if (part.removed) {
+                  html += `<del>${value}</del>`;
+                } else {
+                  html += value;
+                }
+              });
+              const legendHTML = `<div class="legend"><div class="legend-item"><span class="deleted-color"></span> Original Text</div><div class="legend-item"><span class="added-color"></span> AI Polished Version</div></div>`;
+              resultSection.innerHTML = `<h2 class="section-header">AI Polish Result</h2><div id="polish-result-container">${legendHTML}<div class="diff-result">${html}</div></div>`;
+            }
+
             resultSection.style.display = "block";
             resultSection.scrollIntoView({
               behavior: "smooth",
