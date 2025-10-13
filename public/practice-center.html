@@ -1,4 +1,4 @@
-﻿<!-- START OF FILE public/practice-center.html (with Tabs navigation) -->
+﻿<!-- START OF FILE public/practice-center.html (with completion tracking) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -82,8 +82,6 @@
         margin-bottom: 40px;
         font-size: 18px;
       }
-
-      /* === NEW TAB STYLES START === */
       .tab-nav {
         display: flex;
         gap: 8px;
@@ -110,13 +108,11 @@
         border-bottom-color: var(--accent-blue);
       }
       .tab-pane {
-        display: none; /* Hide panes by default */
+        display: none;
       }
       .tab-pane.active {
-        display: block; /* Show active pane */
+        display: block;
       }
-      /* === NEW TAB STYLES END === */
-
       .questions-grid {
         display: grid;
         gap: 20px;
@@ -131,6 +127,7 @@
         justify-content: space-between;
         align-items: center;
         transition: transform 0.2s ease, box-shadow 0.2s ease;
+        position: relative; /* Needed for the badge */
       }
       .question-card:hover {
         transform: translateY(-4px);
@@ -151,26 +148,15 @@
         display: flex;
         gap: 8px;
       }
-      .topic-badge,
-      .task-type-badge {
+      .topic-badge {
         display: inline-block;
         padding: 4px 10px;
         border-radius: 999px;
         font-size: 12px;
         font-weight: 500;
         text-transform: uppercase;
-      }
-      .topic-badge {
         background-color: #e5e5ea;
         color: var(--text-secondary);
-      }
-      .task-type-badge.academic {
-        background-color: var(--accent-purple);
-        color: #fff;
-      }
-      .task-type-badge.integrated {
-        background-color: var(--accent-green);
-        color: #fff;
       }
       .start-button {
         background-color: var(--accent-blue);
@@ -196,6 +182,23 @@
         border-radius: 12px;
         border: 1px solid var(--border-color);
       }
+
+      /* === NEW COMPLETED BADGE STYLE === */
+      .completed-badge {
+        position: absolute;
+        top: 16px;
+        left: -8px;
+        background-color: var(--accent-green);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 0 4px 4px 0;
+        font-size: 12px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
     </style>
   </head>
   <body>
@@ -204,7 +207,6 @@
       <h1>Practice Center</h1>
       <p class="subtitle">Choose a topic for targeted practice.</p>
 
-      <!-- === NEW TABS HTML STRUCTURE START === -->
       <div class="tab-nav">
         <button class="tab-btn active" data-target="#academic-content">
           Academic Discussion
@@ -213,7 +215,6 @@
           Integrated Writing
         </button>
       </div>
-
       <div class="tab-content">
         <div id="academic-content" class="tab-pane active">
           <div id="academic-discussion-list" class="questions-grid">
@@ -226,29 +227,20 @@
           </div>
         </div>
       </div>
-
       <div id="empty-state-container" style="display: none">
-        <div class="empty-state">
-          No practice questions found. Please check back later.
-        </div>
+        <div class="empty-state">No practice questions found.</div>
       </div>
-      <!-- === NEW TABS HTML STRUCTURE END === -->
     </div>
 
     <script src="/auth.js"></script>
     <script>
       document.addEventListener("DOMContentLoaded", async () => {
-        // === NEW TAB SWITCHING LOGIC START ===
         const tabButtons = document.querySelectorAll(".tab-btn");
         const tabPanes = document.querySelectorAll(".tab-pane");
-
         tabButtons.forEach((button) => {
           button.addEventListener("click", () => {
-            // Deactivate all buttons and panes
             tabButtons.forEach((btn) => btn.classList.remove("active"));
             tabPanes.forEach((pane) => pane.classList.remove("active"));
-
-            // Activate the clicked button and its corresponding pane
             button.classList.add("active");
             const targetPane = document.querySelector(button.dataset.target);
             if (targetPane) {
@@ -256,9 +248,9 @@
             }
           });
         });
-        // === NEW TAB SWITCHING LOGIC END ===
 
-        if (!localStorage.getItem("token")) {
+        const token = localStorage.getItem("token");
+        if (!token) {
           window.location.href = "/login.html";
           return;
         }
@@ -276,8 +268,18 @@
         const tabContent = document.querySelector(".tab-content");
 
         try {
-          const response = await fetch("/api/questions");
-          if (!response.ok) throw new Error("Failed to fetch questions.");
+          // === KEY CHANGE: Add Authorization header to the request ===
+          const response = await fetch("/api/questions", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          if (!response.ok) {
+            // If token is invalid, redirect to login
+            if (response.status === 401 || response.status === 403) {
+              window.location.href = "/login.html";
+            }
+            throw new Error("Failed to fetch questions.");
+          }
 
           const allQuestions = await response.json();
 
@@ -302,25 +304,30 @@
             const card = document.createElement("div");
             card.className = "question-card";
 
-            let url, taskTypeName, taskTypeClass;
-            if (question.task_type === "integrated_writing") {
-              url = `/integrated-practice.html?id=${question.id}`;
-              taskTypeName = "Integrated";
-              taskTypeClass = "integrated";
-            } else {
-              url = `/practice-page.html?id=${question.id}`;
-              taskTypeName = "Academic Discussion";
-              taskTypeClass = "academic";
-            }
+            const url =
+              question.task_type === "integrated_writing"
+                ? `/integrated-practice.html?id=${question.id}`
+                : `/practice-page.html?id=${question.id}`;
+
+            // === KEY CHANGE: Add the completed badge if has_completed is true ===
+            const completedBadgeHTML = question.has_completed
+              ? `<div class="completed-badge">
+                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                   <span>Practiced</span>
+                 </div>`
+              : "";
 
             card.innerHTML = `
+              ${completedBadgeHTML}
               <div class="card-content">
                 <h2>${question.title}</h2>
                 <div class="badge-group">
                   <span class="topic-badge">${question.topic}</span>
                 </div>
               </div>
-              <a href="${url}" class="start-button">Start Practice</a>
+              <a href="${url}" class="start-button">${
+              question.has_completed ? "Practice Again" : "Start Practice"
+            }</a>
             `;
             return card;
           };
@@ -331,7 +338,7 @@
             );
           } else {
             academicList.innerHTML =
-              '<div class="empty-state" style="padding: 20px;">No Academic Discussion tasks available.</div>';
+              '<div class="empty-state">No Academic Discussion tasks available.</div>';
           }
 
           if (integratedQuestions.length > 0) {
@@ -340,7 +347,7 @@
             );
           } else {
             integratedList.innerHTML =
-              '<div class="empty-state" style="padding: 20px;">No Integrated Writing tasks available.</div>';
+              '<div class="empty-state">No Integrated Writing tasks available.</div>';
           }
         } catch (error) {
           console.error("Error fetching questions:", error);

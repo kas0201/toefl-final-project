@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Strict TOEFL Rubric Scoring) ---
+﻿// --- START OF FILE server.js (with practice tracking) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -18,7 +18,7 @@ cloudinary.config({
   secure: true,
 });
 
-// ======================= 【核心升级】全新AI评分函数 =======================
+// --- AI评分函数 (严格托福标准版，保持不变) ---
 async function callAIScoringAPI(responseText, promptText, taskType) {
   console.log(
     `🤖 AI a commencé à noter (Mode: ${taskType}) avec le mode de pensée deepseek-reasoner...`
@@ -29,49 +29,12 @@ async function callAIScoringAPI(responseText, promptText, taskType) {
     throw new Error("AI service is not configured.");
   }
   const endpoint = "https://api.deepseek.com/chat/completions";
-
-  // === 全新的、严格遵循托福官方评分标准的系统指令 ===
-  const systemPrompt = `You are an expert ETS-trained evaluator for the TOEFL iBT Writing section. Your evaluation must strictly adhere to the official scoring rubrics.
-
-    Your process is as follows:
-    1.  **Identify Task Type**: First, identify the task type from the user prompt ('Integrated Writing' or 'Academic Discussion').
-    2.  **Apply Correct Rubric**: In a <thinking> block, analyze the user's response strictly according to the specific rubric for that task type provided below.
-    3.  **Holistic Scoring**: Based on your rubric-based analysis, determine a holistic overall score from 0-30.
-    4.  **Structured Feedback**: Generate concise, constructive feedback for each category within the official rubric.
-    5.  **Final JSON Output**: After the <thinking> block, provide your final answer ONLY as a single, valid JSON object in the specified format.
-
-    ---
-    ### Integrated Writing Task Rubric ###
-    If the task is 'Integrated Writing', use these criteria:
-    - **Task Response (Selection & Connection)**: How accurately and completely does the response select the important information from the lecture and explain how it challenges or supports the points in the reading passage? A high-scoring response must clearly connect lecture points to reading points.
-    - **Organization & Development**: Is the response well-organized with a clear structure (e.g., introduction, body paragraphs for each point)? Are the ideas logically connected?
-    - **Language Use**: How effectively is language used? Consider grammar, vocabulary, and sentence structure. Minor errors are acceptable if the meaning is clear.
-
-    ### Academic Discussion Task Rubric ###
-    If the task is 'Academic Discussion', use these criteria:
-    - **Task Response (Contribution)**: Does the response make a relevant and clear contribution to the discussion? Does it directly address the professor's question and engage with the other students' ideas?
-    - **Organization & Development**: Is the main idea clearly stated? Is it well-supported with reasons, details, and/or examples? Is the response easy to follow?
-    - **Language Use**: Is the language clear and idiomatic? Does it demonstrate a good range of vocabulary and sentence structures?
-    ---
-
-    **JSON Output Format:**
-    {
-      "overallScore": <integer from 0 to 30>,
-      "feedback": {
-        "taskResponse": { "rating": "<string>", "comment": "<string>" },
-        "organization": { "rating": "<string>", "comment": "<string>" },
-        "languageUse": { "rating": "<string>", "comment": "<string>" },
-        "generalSuggestion": "<string>"
-      }
-    }
-    `;
-
+  const systemPrompt = `You are an expert ETS-trained evaluator for the TOEFL iBT Writing section. Your evaluation must strictly adhere to the official scoring rubrics. Your process is as follows: 1. **Identify Task Type**: First, identify the task type from the user prompt ('Integrated Writing' or 'Academic Discussion'). 2. **Apply Correct Rubric**: In a <thinking> block, analyze the user's response strictly according to the specific rubric for that task type provided below. 3. **Holistic Scoring**: Based on your rubric-based analysis, determine a holistic overall score from 0-30. 4. **Structured Feedback**: Generate concise, constructive feedback for each category within the official rubric. 5. **Final JSON Output**: After the <thinking> block, provide your final answer ONLY as a single, valid JSON object in the specified format. ### Integrated Writing Task Rubric ### If the task is 'Integrated Writing', use these criteria: - **Task Response (Selection & Connection)**: How accurately and completely does the response select the important information from the lecture and explain how it challenges or supports the points in the reading passage? A high-scoring response must clearly connect lecture points to reading points. - **Organization & Development**: Is the response well-organized with a clear structure (e.g., introduction, body paragraphs for each point)? Are the ideas logically connected? - **Language Use**: How effectively is language used? Consider grammar, vocabulary, and sentence structure. Minor errors are acceptable if the meaning is clear. ### Academic Discussion Task Rubric ### If the task is 'Academic Discussion', use these criteria: - **Task Response (Contribution)**: Does the response make a relevant and clear contribution to the discussion? Does it directly address the professor's question and engage with the other students' ideas? - **Organization & Development**: Is the main idea clearly stated? Is it well-supported with reasons, details, and/or examples? Is the response easy to follow? - **Language Use**: Is the language clear and idiomatic? Does it demonstrate a good range of vocabulary and sentence structures? --- **JSON Output Format:** { "overallScore": <integer from 0 to 30>, "feedback": { "taskResponse": { "rating": "<string>", "comment": "<string>" }, "organization": { "rating": "<string>", "comment": "<string>" }, "languageUse": { "rating": "<string>", "comment": "<string>" }, "generalSuggestion": "<string>" } }`;
   const taskTypeName =
     taskType === "integrated_writing"
       ? "Integrated Writing"
       : "Academic Discussion";
   const userPrompt = `## TASK TYPE ##\n${taskTypeName}\n\n## PROMPT ##\n${promptText}\n\n## USER RESPONSE ##\n${responseText}`;
-
   try {
     const response = await axios.post(
       endpoint,
@@ -110,9 +73,8 @@ async function callAIScoringAPI(responseText, promptText, taskType) {
     throw new Error("Failed to get a response from the AI service.");
   }
 }
-// =======================================================================
 
-// --- 增加停顿以控制语速的辅助函数 (保持不变) ---
+// --- 音频生成函数 (保持不变) ---
 function addPausesToText(text) {
   if (!text) return "";
   let processedText = text;
@@ -120,17 +82,13 @@ function addPausesToText(text) {
   processedText = processedText.replace(/\n/g, ". ... ... \n");
   return processedText;
 }
-
-// --- 使用 Cloudflare Aura 的音频生成函数 (保持不变) ---
 async function generateAudioIfNeeded(questionId) {
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
   const apiToken = process.env.CLOUDFLARE_API_TOKEN;
-
   if (!accountId || !apiToken) {
     console.log("🔊 [Cloudflare TTS] 音频生成跳过：环境变量未配置。");
     return;
   }
-
   try {
     const questionQuery = await pool.query(
       "SELECT lecture_script, lecture_audio_url, task_type FROM questions WHERE id = $1",
@@ -145,13 +103,11 @@ async function generateAudioIfNeeded(questionId) {
     ) {
       return;
     }
-
     console.log(
       `🎤 [后台任务 CF-Aura-TTS] 开始为题目 #${questionId} 生成音频...`
     );
     const textWithPauses = addPausesToText(question.lecture_script);
     const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/deepgram/aura-1`;
-
     const ttsResponse = await axios.post(
       endpoint,
       { text: textWithPauses },
@@ -163,12 +119,10 @@ async function generateAudioIfNeeded(questionId) {
         responseType: "arraybuffer",
       }
     );
-
     const audioBuffer = Buffer.from(ttsResponse.data);
     if (!audioBuffer || audioBuffer.length === 0) {
       throw new Error("Cloudflare TTS 生成了空的音频 Buffer。");
     }
-
     const uploadPromise = new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         { resource_type: "video", folder: "toefl_lectures" },
@@ -179,10 +133,8 @@ async function generateAudioIfNeeded(questionId) {
       );
       uploadStream.end(audioBuffer);
     });
-
     const uploadResult = await uploadPromise;
     const audioUrl = uploadResult.secure_url;
-
     await pool.query(
       "UPDATE questions SET lecture_audio_url = $1 WHERE id = $2",
       [audioUrl, questionId]
@@ -209,12 +161,10 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
-
 pool.connect((err) => {
   if (err) return console.error("❌ 数据库连接失败:", err);
   console.log("✅ 成功连接到 PostgreSQL 数据库！");
 });
-
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
@@ -230,9 +180,8 @@ const authenticateToken = (req, res, next) => {
   );
 };
 
-// --- API 路由 (submit-response 路由有微小改动) ---
+// --- API 路由 ---
 app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
-  // ... (保持不变)
   const { id } = req.params;
   try {
     await generateAudioIfNeeded(id);
@@ -257,7 +206,6 @@ app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
 });
 
 app.get("/api/writing-test", async (req, res) => {
-  // ... (保持不变)
   try {
     const sql = `(SELECT * FROM questions WHERE task_type = 'integrated_writing' ORDER BY RANDOM() LIMIT 1) UNION ALL (SELECT * FROM questions WHERE task_type = 'academic_discussion' ORDER BY RANDOM() LIMIT 1);`;
     const result = await pool.query(sql);
@@ -279,20 +227,42 @@ app.get("/api/writing-test", async (req, res) => {
   }
 });
 
-app.get("/api/questions", async (req, res) => {
-  // ... (保持不变)
+// ======================= 【关键修改】获取题目列表API =======================
+// 注意：我们在这里添加了 authenticateToken 中间件
+app.get("/api/questions", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
   try {
-    const sql = `SELECT id, title, topic, task_type FROM questions ORDER BY id`;
-    const result = await pool.query(sql);
+    // 这个新的SQL查询会连接 questions 和 responses 表
+    // 并检查当前用户是否对每个题目都有提交记录
+    const sql = `
+            SELECT 
+                q.id, 
+                q.title, 
+                q.topic, 
+                q.task_type,
+                CASE 
+                    WHEN r.user_id IS NOT NULL THEN TRUE 
+                    ELSE FALSE 
+                END AS has_completed
+            FROM 
+                questions q
+            LEFT JOIN 
+                (SELECT DISTINCT question_id, user_id FROM responses WHERE user_id = $1) r 
+            ON 
+                q.id = r.question_id
+            ORDER BY 
+                q.id;
+        `;
+    const result = await pool.query(sql, [userId]);
     res.json(result.rows);
   } catch (err) {
     console.error("获取题目列表失败:", err);
     res.status(500).json({ message: "服务器内部错误。" });
   }
 });
+// =======================================================================
 
 app.get("/api/questions/:id", async (req, res) => {
-  // ... (保持不变)
   const { id } = req.params;
   try {
     generateAudioIfNeeded(id);
@@ -308,7 +278,6 @@ app.get("/api/questions/:id", async (req, res) => {
 });
 
 app.post("/api/auth/register", async (req, res) => {
-  // ... (保持不变)
   const { username, password } = req.body;
   if (!username || !password)
     return res.status(400).json({ message: "用户名和密码不能为空。" });
@@ -331,7 +300,6 @@ app.post("/api/auth/register", async (req, res) => {
 });
 
 app.post("/api/auth/login", async (req, res) => {
-  // ... (保持不变)
   const { username, password } = req.body;
   if (!username || !password)
     return res.status(400).json({ message: "用户名和密码不能为空。" });
@@ -392,14 +360,11 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
           questionData.task_type === "integrated_writing"
             ? `Reading: ${questionData.reading_passage}\nLecture: ${questionData.lecture_script}`
             : `Prompt: ${questionData.professor_prompt}\nStudent 1: ${questionData.student1_post}\nStudent 2: ${questionData.student2_post}`;
-
-        // === 将 task_type 传递给AI评分函数 ===
         const aiResult = await callAIScoringAPI(
           content || "",
           promptText,
           task_type
         );
-
         const updateSql = `UPDATE responses SET ai_score = $1, ai_feedback = $2 WHERE id = $3`;
         await pool.query(updateSql, [
           aiResult.score,
@@ -420,7 +385,6 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
 });
 
 app.get("/api/history", authenticateToken, async (req, res) => {
-  // ... (保持不变)
   const userId = req.user.id;
   try {
     const sql = `SELECT r.id, r.word_count, r.submitted_at, COALESCE(q.title, 'Archived Question') as question_title FROM responses r LEFT JOIN questions q ON r.question_id = q.id WHERE r.user_id = $1 ORDER BY r.submitted_at DESC;`;
@@ -433,7 +397,6 @@ app.get("/api/history", authenticateToken, async (req, res) => {
 });
 
 app.get("/api/history/:id", authenticateToken, async (req, res) => {
-  // ... (保持不变)
   const { id } = req.params;
   const userId = req.user.id;
   const sql = `SELECT r.id, r.content as user_response, r.word_count, r.submitted_at, r.ai_score, r.ai_feedback, q.* FROM responses r LEFT JOIN questions q ON r.question_id = q.id WHERE r.id = $1 AND r.user_id = $2;`;
