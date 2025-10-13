@@ -1,6 +1,4 @@
-﻿// --- START OF FILE server.js (Absolutely Complete Final Version with Promisify Fix V2) ---
-
-const express = require("express");
+﻿const express = require("express");
 const { Pool } = require("pg");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
@@ -9,7 +7,8 @@ const axios = require("axios");
 const cloudinary = require("cloudinary").v2;
 const fs = require("fs");
 const path = require("path");
-const util = require("util");
+// 【关键修改 1/2】: 引入新的、CJS 兼容的词典包
+const englishWords = require("an-array-of-english-words");
 
 // --- 配置 Cloudinary ---
 cloudinary.config({
@@ -718,15 +717,8 @@ app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
       });
     }
 
-    // 【关键修复】: 使用 util.promisify 和正确的异步加载流程
-    const dictionaryModule = await import("dictionary-en");
-    // 直接从默认导出获取函数
-    const loadDictionaryCallback = dictionaryModule.default;
-    // 使用 promisify 转换
-    const loadDictionary = util.promisify(loadDictionaryCallback);
-
-    const dict = await loadDictionary();
-    const wordSet = new Set(dict.words);
+    // 【关键修复】: 使用新的、稳定的 CJS 词典包
+    const wordSet = new Set(englishWords);
     const checkWord = (word) => wordSet.has(word);
 
     const stopWords = new Set([
