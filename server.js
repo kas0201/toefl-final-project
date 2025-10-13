@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Absolutely Complete Final Version) ---
+﻿// --- START OF FILE server.js (Absolutely Complete Final Version with Dashboard Fix) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -415,78 +415,79 @@ app.get("/api/history", authenticateToken, async (req, res) => {
   }
 });
 
-// --- 【新增】Dashboard - User Stats Route ---
+// --- 【修复版】Dashboard - User Stats Route ---
 app.get("/api/user/stats", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
+    // 【关键修复】: 增加了对 ai_feedback 的有效性检查，防止因数据格式错误导致查询失败
     const sql = `
-      WITH UserResponses AS (
+      WITH ValidResponses AS (
         SELECT
-          *,
-          (ai_feedback::jsonb -> 'taskResponse' ->> 'rating') AS task_response_rating,
-          (ai_feedback::jsonb -> 'organization' ->> 'rating') AS organization_rating,
-          (ai_feedback::jsonb -> 'languageUse' ->> 'rating') AS language_use_rating,
-          DATE(submitted_at) AS submission_date
+          *
         FROM responses
-        WHERE user_id = $1 AND ai_score IS NOT NULL
+        WHERE
+          user_id = $1
+          AND ai_score IS NOT NULL
+          AND ai_feedback IS NOT NULL
+          AND ai_feedback LIKE '{%}' -- 确保字段内容是类 JSON 字符串，防止转换错误
       ),
       RatingMapping AS (
         SELECT
           *,
-          CASE task_response_rating
+          DATE(submitted_at) AS submission_date,
+          CASE (ai_feedback::jsonb -> 'taskResponse' ->> 'rating')
             WHEN 'Excellent' THEN 4
             WHEN 'Good' THEN 3
             WHEN 'Fair' THEN 2
-            ELSE 1
+            WHEN 'Needs Improvement' THEN 1
+            ELSE 0
           END AS task_response_score,
-          CASE organization_rating
+          CASE (ai_feedback::jsonb -> 'organization' ->> 'rating')
             WHEN 'Excellent' THEN 4
             WHEN 'Good' THEN 3
             WHEN 'Fair' THEN 2
-            ELSE 1
+            WHEN 'Needs Improvement' THEN 1
+            ELSE 0
           END AS organization_score,
-          CASE language_use_rating
+          CASE (ai_feedback::jsonb -> 'languageUse' ->> 'rating')
             WHEN 'Excellent' THEN 4
             WHEN 'Good' THEN 3
             WHEN 'Fair' THEN 2
-            ELSE 1
+            WHEN 'Needs Improvement' THEN 1
+            ELSE 0
           END AS language_use_score
-        FROM UserResponses
+        FROM ValidResponses
       )
       SELECT
-        -- 1. Overall Stats (KPIs)
         (SELECT json_build_object(
           'total', COUNT(*),
           'average', ROUND(AVG(ai_score), 1)
-        ) FROM UserResponses) AS "overallStats",
+        ) FROM ValidResponses) AS "overallStats",
 
-        -- 2. Stats by Task Type
         (SELECT json_agg(stats) FROM (
           SELECT
             task_type,
             COUNT(*) AS count,
             ROUND(AVG(ai_score), 1) AS average
-          FROM UserResponses
+          FROM ValidResponses
           GROUP BY task_type
         ) AS stats) AS "byType",
 
-        -- 3. Score Trend (Last 30 days)
         (SELECT json_agg(trends) FROM (
           SELECT
             submission_date,
             ROUND(AVG(ai_score), 1) AS average_score
-          FROM UserResponses
+          FROM RatingMapping
           WHERE submitted_at >= NOW() - INTERVAL '30 days'
           GROUP BY submission_date
           ORDER BY submission_date
         ) AS trends) AS "scoreTrend",
 
-        -- 4. Feedback Breakdown (Skill Profile)
         (SELECT json_build_object(
           'taskResponse', ROUND(AVG(task_response_score), 2),
           'organization', ROUND(AVG(organization_score), 2),
           'languageUse', ROUND(AVG(language_use_score), 2)
-        ) FROM RatingMapping) AS "feedbackBreakdown";
+        ) FROM RatingMapping WHERE task_response_score > 0) AS "feedbackBreakdown";
     `;
 
     const result = await pool.query(sql, [userId]);
