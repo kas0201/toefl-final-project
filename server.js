@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Truly, Absolutely, 100% Complete Final Version) ---
+﻿// --- START OF FILE server.js (Truly, Absolutely, 100% Complete Final Version with Fixes) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -149,7 +149,7 @@ async function callAIScoringAPI(responseText, promptText, taskType) {
   }
 }
 
-// --- AI 总结常犯错误的函数 ---
+// --- 【新增】AI 总结常犯错误的函数 ---
 async function callAIAnalysisAPI(feedbacks) {
   console.log("🤖 AI a commencé l'analyse des erreurs communes...");
   const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -553,18 +553,6 @@ app.get("/api/history", authenticateToken, async (req, res) => {
   }
 });
 
-app.get("/api/user/stats", authenticateToken, async (req, res) => {
-  const userId = req.user.id;
-  try {
-    const sql = `WITH ValidResponses AS (SELECT * FROM responses WHERE user_id = $1 AND ai_score IS NOT NULL AND ai_feedback IS NOT NULL AND ai_feedback LIKE '{%}'), RatingMapping AS (SELECT *, DATE(submitted_at) AS submission_date, CASE (ai_feedback::jsonb -> 'taskResponse' ->> 'rating') WHEN 'Excellent' THEN 4 WHEN 'Good' THEN 3 WHEN 'Fair' THEN 2 WHEN 'Needs Improvement' THEN 1 ELSE 0 END AS task_response_score, CASE (ai_feedback::jsonb -> 'organization' ->> 'rating') WHEN 'Excellent' THEN 4 WHEN 'Good' THEN 3 WHEN 'Fair' THEN 2 WHEN 'Needs Improvement' THEN 1 ELSE 0 END AS organization_score, CASE (ai_feedback::jsonb -> 'languageUse' ->> 'rating') WHEN 'Excellent' THEN 4 WHEN 'Good' THEN 3 WHEN 'Fair' THEN 2 WHEN 'Needs Improvement' THEN 1 ELSE 0 END AS language_use_score FROM ValidResponses) SELECT (SELECT json_build_object('total', COUNT(*), 'average', ROUND(AVG(ai_score), 1)) FROM ValidResponses) AS "overallStats", (SELECT json_agg(stats) FROM (SELECT task_type, COUNT(*) AS count, ROUND(AVG(ai_score), 1) AS average FROM ValidResponses GROUP BY task_type) AS stats) AS "byType", (SELECT json_agg(trends) FROM (SELECT submission_date, ROUND(AVG(ai_score), 1) AS average_score FROM RatingMapping WHERE submitted_at >= NOW() - INTERVAL '30 days' GROUP BY submission_date ORDER BY submission_date) AS trends) AS "scoreTrend", (SELECT json_build_object('taskResponse', ROUND(AVG(task_response_score), 2), 'organization', ROUND(AVG(organization_score), 2), 'languageUse', ROUND(AVG(language_use_score), 2)) FROM RatingMapping WHERE task_response_score > 0) AS "feedbackBreakdown";`;
-    const result = await pool.query(sql, [userId]);
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error("获取用户统计数据失败:", err);
-    res.status(500).json({ message: "服务器内部错误。" });
-  }
-});
-
 app.get("/api/user/achievements", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
@@ -577,19 +565,25 @@ app.get("/api/user/achievements", authenticateToken, async (req, res) => {
   }
 });
 
+// --- 【关键修复】: 新增写作分析API路由 ---
 app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
+    // 1. 获取用户所有有效的练习记录
     const responsesQuery = await pool.query(
       "SELECT content, ai_feedback FROM responses WHERE user_id = $1 AND content IS NOT NULL AND content != '' AND ai_feedback IS NOT NULL AND ai_feedback LIKE '{%}'",
       [userId]
     );
+
+    // 2. 检查是否有足够的的数据进行分析
     if (responsesQuery.rows.length < 3) {
       return res.status(404).json({
         message:
           "Not enough practice data for a meaningful analysis. Please complete at least 3 practices.",
       });
     }
+
+    // 3. 计算高频词云
     const stopWords = new Set([
       "a",
       "an",
@@ -625,24 +619,34 @@ app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
       "do",
       "does",
       "did",
+      "from",
+      "by",
+      "about",
+      "can",
+      "will",
     ]);
     const wordCounts = {};
     responsesQuery.rows.forEach((row) => {
       const words = row.content.toLowerCase().match(/\b\w+\b/g) || [];
       words.forEach((word) => {
         if (!stopWords.has(word) && isNaN(word)) {
+          // 排除停用词和纯数字
           wordCounts[word] = (wordCounts[word] || 0) + 1;
         }
       });
     });
     const wordCloudData = Object.entries(wordCounts)
       .sort(([, a], [, b]) => b - a)
-      .slice(0, 50)
+      .slice(0, 50) // 取前50个高频词
       .map(([text, value]) => ({ text, value }));
+
+    // 4. 调用AI分析常见错误
     const feedbacks = responsesQuery.rows.map((row) =>
       JSON.parse(row.ai_feedback)
     );
     const aiAnalysis = await callAIAnalysisAPI(feedbacks);
+
+    // 5. 返回结果
     res.json({ wordCloud: wordCloudData, commonMistakes: aiAnalysis.analysis });
   } catch (err) {
     console.error("获取写作分析数据失败:", err);

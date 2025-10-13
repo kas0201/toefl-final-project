@@ -246,14 +246,14 @@
           renderCurrentScreen();
         });
       }
-      // 【修改】: 将函数变为 async 并在开始时重新获取题目数据
+      // 【关键修复】: 将函数变为 async 并在开始时重新获取题目数据
       async function renderIntegratedLecture(task) {
         phaseTitleEl.textContent = "Task 1: Integrated Writing (Lecture)";
         mainContainer.style.gridTemplateColumns = "1fr";
         mainContainer.innerHTML = `<div class="content-panel" style="display:flex; flex-direction:column; align-items:center; justify-content:center;"><p style="font-size: 18px;">Loading lecture...</p></div>`;
 
         try {
-          // 重新获取题目数据以确保获得最新的 audio_url
+          // 在播放前重新获取题目数据，以确保获得最新的 audio_url
           const response = await fetch(`/api/questions/${task.id}`);
           if (response.ok) {
             const updatedTask = await response.json();
@@ -275,6 +275,7 @@
             renderCurrentScreen();
           };
           audioEl.onerror = () => {
+            // 后备方案
             mainContainer.innerHTML = `<div class="content-panel"><h2>Lecture Script (Audio Failed)</h2><p>${task.lecture_script}</p></div>`;
             startTimer(120, () => {
               currentIntegratedPhase++;
@@ -282,6 +283,7 @@
             });
           };
         } else {
+          // 无音频URL的后备方案
           mainContainer.innerHTML = `<div class="content-panel"><h2>Lecture Script</h2><p>${task.lecture_script}</p></div>`;
           startTimer(120, () => {
             currentIntegratedPhase++;

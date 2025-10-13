@@ -597,11 +597,12 @@
         const rewriteTimerEl = document.getElementById("rewrite-timer");
         const submitRewriteBtn = document.getElementById("submit-rewrite-btn");
 
-        // --- 【恢复】: “定时重写”模态框的全部功能函数 ---
+        // --- 【关键修复】: 恢复“定时重写”模态框的全部功能函数 ---
         const openRewriteModal = () => {
           if (!pageData) return;
-          rewriteReferenceEl.innerHTML = "";
+          rewriteReferenceEl.innerHTML = ""; // 清空参考资料
 
+          // 动态创建并填充参考内容
           const promptContainer = document.createElement("div");
           let promptHTML = "<h3>Original Prompt</h3>";
           if (pageData.task_type === "integrated_writing") {
@@ -632,13 +633,15 @@
             rewriteReferenceEl.appendChild(aiContainer);
           }
 
+          // 根据任务类型设置计时器
           const timeLimit =
-            pageData.task_type === "integrated_writing" ? 1200 : 600;
+            pageData.task_type === "integrated_writing" ? 1200 : 600; // 20分钟或10分钟
           startTimer(timeLimit, rewriteTimerEl, () => {
             alert("Time's up! Submitting your rewrite.");
             submitRewrite();
           });
-          modal.style.display = "block";
+
+          modal.style.display = "block"; // 显示模态框
         };
 
         const closeRewriteModal = () => {
@@ -647,26 +650,26 @@
           rewriteWordCountEl.textContent = "Words: 0";
           modal.style.display = "none";
           const refContainer = document.getElementById("reference-container");
-          if (refContainer) refContainer.removeAttribute("open");
+          if (refContainer) refContainer.removeAttribute("open"); // 关闭details标签
         };
 
         const startTimer = (duration, display, onComplete) => {
           clearInterval(rewriteTimer);
-          let timer = duration,
-            minutes,
-            seconds;
+          let timer = duration;
           const update = () => {
-            minutes = parseInt(timer / 60, 10);
-            seconds = parseInt(timer % 60, 10);
-            minutes = minutes < 10 ? "0" + minutes : minutes;
-            seconds = seconds < 10 ? "0" + seconds : seconds;
+            const minutes = parseInt(timer / 60, 10)
+              .toString()
+              .padStart(2, "0");
+            const seconds = parseInt(timer % 60, 10)
+              .toString()
+              .padStart(2, "0");
             display.textContent = minutes + ":" + seconds;
             if (--timer < 0) {
               clearInterval(rewriteTimer);
-              onComplete();
+              if (onComplete) onComplete();
             }
           };
-          update();
+          update(); // Initial call
           rewriteTimer = setInterval(update, 1000);
         };
 
@@ -675,12 +678,14 @@
           submitRewriteBtn.textContent = "Submitting...";
           const content = rewriteTextarea.value;
           const wordCount = content.trim().match(/\S+/g)?.length || 0;
+
           if (wordCount === 0) {
             alert("Cannot submit an empty rewrite.");
             submitRewriteBtn.disabled = false;
             submitRewriteBtn.textContent = "Submit Rewrite";
             return;
           }
+
           try {
             const response = await fetch("/api/submit-response", {
               method: "POST",
@@ -691,13 +696,16 @@
               body: JSON.stringify({
                 content,
                 wordCount,
-                questionId: pageData.id,
+                questionId: pageData.question_id, // 使用 question_id
                 task_type: pageData.task_type,
               }),
             });
+
             const result = await response.json();
             if (!response.ok)
               throw new Error(result.message || "Submission failed.");
+
+            // 跳转到新的提交成功页面
             window.location.href = `/submission-success.html?id=${result.id}`;
           } catch (error) {
             alert(`Error: ${error.message}`);
@@ -705,8 +713,6 @@
             submitRewriteBtn.textContent = "Submit Rewrite";
           }
         };
-
-        // ... (其他函数定义保持不变) ...
 
         const handleAIPolish = async () => {
           polishBtn.disabled = true;
@@ -890,7 +896,7 @@
         // --- 绑定事件监听器 ---
         polishBtn.addEventListener("click", handleAIPolish);
         reviewBtn.addEventListener("click", handleToggleReview);
-        rewriteBtn.addEventListener("click", openRewriteModal); // 【关键修复】
+        rewriteBtn.addEventListener("click", openRewriteModal);
         cancelBtn.addEventListener("click", closeRewriteModal);
         submitRewriteBtn.addEventListener("click", submitRewrite);
         rewriteTextarea.addEventListener("input", (e) => {

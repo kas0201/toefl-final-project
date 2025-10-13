@@ -167,14 +167,10 @@
         const viewButton = document.getElementById("view-submission-btn");
 
         if (submissionId) {
-          // --- 【关键修正】: 添加点击事件监听器 ---
-          viewButton.addEventListener("click", (event) => {
-            // 1. 阻止 <a> 标签的默认跳转行为 (即跳转到 "#")
-            event.preventDefault();
-            // 2. 手动执行正确的页面跳转
-            window.location.href = `/history-detail.html?id=${submissionId}`;
-          });
+          // --- 【关键修正】: 动态设置href属性，确保链接正确 ---
+          viewButton.href = `/history-detail.html?id=${submissionId}`;
         } else {
+          // 如果没有ID，隐藏按钮
           viewButton.style.display = "none";
         }
       });

@@ -174,17 +174,17 @@
         startTimer(180, renderLecturePhase);
       }
 
-      // 【修改】: 将函数变为 async 并在开始时重新获取题目数据
+      // 【关键修复】: 将函数变为 async 并在开始时重新获取题目数据
       async function renderLecturePhase() {
         phaseTitleEl.textContent = "Phase 2: Lecture";
         mainContainer.style.gridTemplateColumns = "1fr"; // Single column for focus
         mainContainer.innerHTML = `<div class="content-panel" style="display:flex; flex-direction:column; align-items:center; justify-content:center;"><p style="font-size: 18px;">Loading lecture...</p></div>`;
 
         try {
-          // 重新获取题目数据以确保获得最新的 audio_url
+          // 在播放前重新获取题目数据，以确保获得最新的 audio_url
           const response = await fetch(`/api/questions/${currentQuestion.id}`);
           if (response.ok) {
-            currentQuestion = await response.json();
+            currentQuestion = await response.json(); // 更新全局的题目数据
           } else {
             console.error("Failed to re-fetch question data for lecture.");
           }
@@ -198,7 +198,7 @@
           phaseTimerEl.textContent = "Playing...";
           audioEl.onended = renderWritingPhase;
           audioEl.onerror = () => {
-            // 如果音频加载失败，则显示文本
+            // 如果音频加载失败，则显示文本作为后备
             mainContainer.innerHTML = `<div class="content-panel"><h2>Lecture Script (Audio Failed)</h2><p>${currentQuestion.lecture_script}</p></div>`;
             startTimer(120, renderWritingPhase); // Fallback to a timer
           };
