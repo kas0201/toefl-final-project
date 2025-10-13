@@ -1,4 +1,4 @@
-﻿<!-- START OF FILE public/history-detail.html (with styled Review Toggle button) -->
+﻿<!-- START OF FILE public/history-detail.html (with loading animation) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -188,15 +188,6 @@
       .general-suggestion p {
         color: #0052cc;
       }
-      .scoring-pending {
-        font-style: italic;
-        color: var(--text-secondary);
-        width: 100%;
-        text-align: center;
-        padding: 20px 0;
-      }
-
-      /* === NEW BUTTON STYLES START === */
       #review-toggle-btn {
         background-color: transparent;
         border: 2px solid var(--accent-blue);
@@ -223,7 +214,44 @@
       #review-toggle-btn.in-review:hover {
         opacity: 0.8;
       }
-      /* === NEW BUTTON STYLES END === */
+
+      /* === NEW SPINNER STYLES START === */
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+      .scoring-pending {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        padding: 32px 0;
+        text-align: center;
+      }
+      .spinner {
+        width: 32px;
+        height: 32px;
+        border: 4px solid rgba(0, 0, 0, 0.1);
+        border-left-color: var(--accent-blue);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      .scoring-pending .main-text {
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--text-primary);
+      }
+      .scoring-pending .sub-text {
+        font-size: 14px;
+        color: var(--text-secondary);
+      }
+      /* === NEW SPINNER STYLES END === */
     </style>
   </head>
   <body>
@@ -269,12 +297,12 @@
     <script src="/auth.js"></script>
     <script>
       document.addEventListener("DOMContentLoaded", async () => {
+        // ... (JavaScript logic remains the same)
         const token = localStorage.getItem("token");
         if (!token) {
           window.location.href = "/login.html";
           return;
         }
-
         const reviewTitleEl = document.getElementById("review-title");
         const reviewSubtitleEl = document.getElementById("review-subtitle");
         const reviewContentEl = document.getElementById("review-content");
@@ -282,7 +310,6 @@
         const reviewBtnText = document.getElementById("review-btn-text");
         const reviewIconAdd = document.getElementById("review-icon-add");
         const reviewIconCheck = document.getElementById("review-icon-check");
-
         const urlParams = new URLSearchParams(window.location.search);
         const historyId = urlParams.get("id");
         if (!historyId) {
@@ -290,7 +317,6 @@
             '<div class="loading-state">Error: No submission ID provided.</div>';
           return;
         }
-
         const updateReviewButton = (isInReview) => {
           if (isInReview) {
             reviewBtn.classList.add("in-review");
@@ -305,16 +331,12 @@
           }
           reviewBtn.style.display = "inline-flex";
         };
-
         reviewBtn.addEventListener("click", async () => {
-          reviewBtn.disabled = true; // Prevent multiple clicks
+          reviewBtn.disabled = true;
           try {
             const response = await fetch(
               `/api/responses/${historyId}/toggle-review`,
-              {
-                method: "POST",
-                headers: { Authorization: `Bearer ${token}` },
-              }
+              { method: "POST", headers: { Authorization: `Bearer ${token}` } }
             );
             if (!response.ok)
               throw new Error("Failed to update review status.");
@@ -327,7 +349,6 @@
             reviewBtn.disabled = false;
           }
         });
-
         try {
           const response = await fetch(`/api/history/${historyId}`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -340,11 +361,8 @@
           }
           if (!response.ok)
             throw new Error("Failed to fetch submission details.");
-
           const data = await response.json();
-
           updateReviewButton(data.is_for_review);
-
           const submittedDate = new Date(data.submitted_at).toLocaleString(
             "en-US",
             { dateStyle: "long", timeStyle: "short" }
@@ -384,7 +402,14 @@
               aiCardHTML = `<div id="ai-score-card"><div class="score-display"><span class="score-value">${data.ai_score}</span><span class="score-label">/ 30</span></div><div class="feedback-details"><p>${data.ai_feedback}</p></div></div>`;
             }
           } else {
-            aiCardHTML = `<div id="ai-score-card"><p class="scoring-pending">AI feedback is being generated... Please check back in a moment.</p></div>`;
+            // === NEW LOADING ANIMATION HTML ===
+            aiCardHTML = `<div id="ai-score-card">
+                            <div class="scoring-pending">
+                                <div class="spinner"></div>
+                                <div class="main-text">AI Feedback is being generated...</div>
+                                <div class="sub-text">This may take up to 30 seconds. Feel free to refresh the page.</div>
+                            </div>
+                          </div>`;
           }
           let promptHTML = "";
           if (data.task_type === "integrated_writing") {
