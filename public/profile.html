@@ -1,4 +1,4 @@
-<!-- START OF FILE public/profile.html (Calendar Fixed & Beautified) -->
+<!-- START OF FILE public/profile.html (Calendar Final Fix & Polish) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -15,10 +15,10 @@
         --accent-blue: #007aff;
         --border-color: #d2d2d7;
         --heatmap-color-0: #ebedf0;
-        --heatmap-color-1: #c6e48b;
-        --heatmap-color-2: #7bc96f;
-        --heatmap-color-3: #239a3b;
-        --heatmap-color-4: #196127;
+        --heatmap-color-1: #9be9a8;
+        --heatmap-color-2: #40c463;
+        --heatmap-color-3: #30a14e;
+        --heatmap-color-4: #216e39;
       }
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -73,36 +73,20 @@
         overflow-x: auto;
       }
       .calendar-container {
-        display: inline-block;
-      }
-      .months-grid {
-        display: grid;
-        grid-auto-flow: column;
-        gap: 18px; /* Roughly 4 weeks + gap */
-        margin-left: 30px;
-        margin-bottom: 5px;
-        font-size: 12px;
-        color: var(--text-secondary);
-      }
-      .calendar-body {
-        display: flex;
-        gap: 15px;
-      }
-      .days-of-week {
-        display: grid;
-        grid-template-rows: repeat(7, 1fr);
-        font-size: 12px;
-        color: var(--text-secondary);
-        align-items: center;
-      }
-      .days-of-week > div:nth-child(odd) {
-        visibility: hidden;
+        position: relative;
       }
       .calendar-grid {
         display: grid;
-        grid-template-rows: repeat(7, 1fr);
         grid-auto-flow: column;
+        grid-template-rows: repeat(7, auto);
+        grid-template-columns: repeat(53, auto);
         gap: 4px;
+      }
+      .month-label {
+        position: absolute;
+        top: -20px;
+        font-size: 12px;
+        color: var(--text-secondary);
       }
       .day {
         width: 14px;
@@ -110,17 +94,29 @@
         background-color: var(--heatmap-color-0);
         border-radius: 3px;
       }
-      .day.active {
+      .day[data-level="1"] {
+        background-color: var(--heatmap-color-1);
+      }
+      .day[data-level="2"] {
         background-color: var(--heatmap-color-2);
       }
-      .day.active-strong {
+      .day[data-level="3"] {
+        background-color: var(--heatmap-color-3);
+      }
+      .day[data-level="4"] {
         background-color: var(--heatmap-color-4);
       }
-      .day:empty {
-        background-color: transparent;
+      .calendar-legend {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 5px;
+        margin-top: 10px;
+        font-size: 12px;
+        color: var(--text-secondary);
       }
 
-      /* Achievements Styles (无变动) */
+      /* Achievements Styles */
       .achievements-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -194,7 +190,7 @@
         const calendarWrapper = document.getElementById("calendar-wrapper");
         const achievementsGrid = document.getElementById("achievements-grid");
 
-        // --- 【关键变更】: 全新的日历渲染函数 ---
+        // --- 【关键变更】: 最终版日历渲染函数 ---
         const renderCalendar = async () => {
           try {
             const response = await fetch("/api/user/practice-calendar", {
@@ -202,33 +198,43 @@
             });
             if (!response.ok) throw new Error("Failed to load calendar data");
             const practiceDates = await response.json();
-            const practiceDateSet = new Set(
-              practiceDates.map((d) => d.split("T")[0])
-            );
+
+            const practiceCounts = practiceDates.reduce((acc, date) => {
+              const dateString = date.split("T")[0];
+              acc[dateString] = (acc[dateString] || 0) + 1;
+              return acc;
+            }, {});
 
             calendarWrapper.innerHTML = `
-                        <div class="calendar-container">
-                            <div class="months-grid" id="months-grid"></div>
-                            <div class="calendar-body">
-                                <div class="days-of-week"><div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div></div>
-                                <div class="calendar-grid" id="calendar-grid"></div>
-                            </div>
-                        </div>`;
+                        <div class="calendar-container" id="calendar-container">
+                            <div class="calendar-grid" id="calendar-grid"></div>
+                        </div>
+                        <div class="calendar-legend">
+                            Less &nbsp;
+                            <div class="day" style="background-color: var(--heatmap-color-0)"></div>
+                            <div class="day" style="background-color: var(--heatmap-color-1)"></div>
+                            <div class="day" style="background-color: var(--heatmap-color-2)"></div>
+                            <div class="day" style="background-color: var(--heatmap-color-3)"></div>
+                            <div class="day" style="background-color: var(--heatmap-color-4)"></div>
+                            &nbsp; More
+                        </div>
+                    `;
 
+            const container = document.getElementById("calendar-container");
             const grid = document.getElementById("calendar-grid");
-            const monthsGrid = document.getElementById("months-grid");
             const today = new Date();
+            const daysInYear = 365 + 7; // show 53 weeks
             const startDate = new Date();
-            startDate.setDate(today.getDate() - 364);
+            startDate.setDate(today.getDate() - daysInYear + 1);
 
-            // 1. 填充日历开头的空白天数
-            const startDay = startDate.getDay(); // 0 = Sunday
-            for (let i = 0; i < startDay; i++) {
-              grid.appendChild(document.createElement("div"));
+            const days = [];
+            for (let i = 0; i < daysInYear; i++) {
+              const d = new Date(startDate);
+              d.setDate(d.getDate() + i);
+              days.push(d);
             }
 
-            // 2. 填充日期格子并生成月份标签
-            const monthNames = [
+            const monthLabels = [
               "Jan",
               "Feb",
               "Mar",
@@ -242,28 +248,47 @@
               "Nov",
               "Dec",
             ];
-            let lastMonth = -1;
-            for (
-              let d = new Date(startDate);
-              d <= today;
-              d.setDate(d.getDate() + 1)
-            ) {
+            const monthPositions = {};
+
+            days.forEach((d, i) => {
+              const weekIndex = Math.floor(i / 7);
+              const dayOfWeek = i % 7;
+
+              if (dayOfWeek === 0 && d.getDate() <= 7) {
+                const monthIndex = d.getMonth();
+                if (!monthPositions[monthIndex]) {
+                  monthPositions[monthIndex] = weekIndex;
+                }
+              }
+
               const dayEl = document.createElement("div");
               dayEl.className = "day";
-              const dateString = d.toISOString().split("T")[0];
-              if (practiceDateSet.has(dateString)) {
-                dayEl.classList.add("active"); // 可以根据练习次数添加不同 class
-              }
-              dayEl.title = d.toLocaleDateString();
-              grid.appendChild(dayEl);
+              dayEl.style.gridColumnStart = weekIndex + 1;
+              dayEl.style.gridRowStart = dayOfWeek + 1;
 
-              // Add month label when a new month starts
-              if (d.getMonth() !== lastMonth) {
-                lastMonth = d.getMonth();
-                const monthEl = document.createElement("div");
-                monthEl.textContent = monthNames[lastMonth];
-                monthsGrid.appendChild(monthEl);
+              const dateString = d.toISOString().split("T")[0];
+              const count = practiceCounts[dateString] || 0;
+              let level = 0;
+              if (count > 0) level = 1;
+              if (count >= 2) level = 2;
+              if (count >= 4) level = 3;
+              if (count >= 6) level = 4;
+
+              if (level > 0) {
+                dayEl.dataset.level = level;
               }
+              dayEl.title = `${count} practices on ${d.toLocaleDateString()}`;
+              grid.appendChild(dayEl);
+            });
+
+            // Add month labels
+            for (const monthIndex in monthPositions) {
+              const weekIndex = monthPositions[monthIndex];
+              const monthLabel = document.createElement("div");
+              monthLabel.className = "month-label";
+              monthLabel.textContent = monthLabels[monthIndex];
+              monthLabel.style.left = `${weekIndex * 18}px`; // 14px width + 4px gap
+              container.appendChild(monthLabel);
             }
           } catch (error) {
             calendarWrapper.innerHTML = `<div class="empty-state">${error.message}</div>`;
@@ -277,13 +302,11 @@
             });
             if (!response.ok) throw new Error("Failed to load achievements");
             const achievements = await response.json();
-
             achievementsGrid.innerHTML = "";
             if (achievements.length === 0) {
               achievementsGrid.innerHTML = `<div class="empty-state">No achievements available yet.</div>`;
               return;
             }
-
             achievements.forEach((ach) => {
               const card = document.createElement("div");
               card.className = `achievement-card ${
@@ -292,14 +315,7 @@
               const iconSVG = ach.unlocked
                 ? `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`
                 : `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`;
-
-              card.innerHTML = `
-                            <div class="achievement-icon">${iconSVG}</div>
-                            <div class="achievement-details">
-                                <h3>${ach.name}</h3>
-                                <p>${ach.description}</p>
-                            </div>
-                        `;
+              card.innerHTML = `<div class="achievement-icon">${iconSVG}</div><div class="achievement-details"><h3>${ach.name}</h3><p>${ach.description}</p></div>`;
               achievementsGrid.appendChild(card);
             });
           } catch (error) {
