@@ -415,6 +415,88 @@ app.get("/api/history", authenticateToken, async (req, res) => {
   }
 });
 
+// --- 【新增】Dashboard - User Stats Route ---
+app.get("/api/user/stats", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const sql = `
+      WITH UserResponses AS (
+        SELECT
+          *,
+          (ai_feedback::jsonb -> 'taskResponse' ->> 'rating') AS task_response_rating,
+          (ai_feedback::jsonb -> 'organization' ->> 'rating') AS organization_rating,
+          (ai_feedback::jsonb -> 'languageUse' ->> 'rating') AS language_use_rating,
+          DATE(submitted_at) AS submission_date
+        FROM responses
+        WHERE user_id = $1 AND ai_score IS NOT NULL
+      ),
+      RatingMapping AS (
+        SELECT
+          *,
+          CASE task_response_rating
+            WHEN 'Excellent' THEN 4
+            WHEN 'Good' THEN 3
+            WHEN 'Fair' THEN 2
+            ELSE 1
+          END AS task_response_score,
+          CASE organization_rating
+            WHEN 'Excellent' THEN 4
+            WHEN 'Good' THEN 3
+            WHEN 'Fair' THEN 2
+            ELSE 1
+          END AS organization_score,
+          CASE language_use_rating
+            WHEN 'Excellent' THEN 4
+            WHEN 'Good' THEN 3
+            WHEN 'Fair' THEN 2
+            ELSE 1
+          END AS language_use_score
+        FROM UserResponses
+      )
+      SELECT
+        -- 1. Overall Stats (KPIs)
+        (SELECT json_build_object(
+          'total', COUNT(*),
+          'average', ROUND(AVG(ai_score), 1)
+        ) FROM UserResponses) AS "overallStats",
+
+        -- 2. Stats by Task Type
+        (SELECT json_agg(stats) FROM (
+          SELECT
+            task_type,
+            COUNT(*) AS count,
+            ROUND(AVG(ai_score), 1) AS average
+          FROM UserResponses
+          GROUP BY task_type
+        ) AS stats) AS "byType",
+
+        -- 3. Score Trend (Last 30 days)
+        (SELECT json_agg(trends) FROM (
+          SELECT
+            submission_date,
+            ROUND(AVG(ai_score), 1) AS average_score
+          FROM UserResponses
+          WHERE submitted_at >= NOW() - INTERVAL '30 days'
+          GROUP BY submission_date
+          ORDER BY submission_date
+        ) AS trends) AS "scoreTrend",
+
+        -- 4. Feedback Breakdown (Skill Profile)
+        (SELECT json_build_object(
+          'taskResponse', ROUND(AVG(task_response_score), 2),
+          'organization', ROUND(AVG(organization_score), 2),
+          'languageUse', ROUND(AVG(language_use_score), 2)
+        ) FROM RatingMapping) AS "feedbackBreakdown";
+    `;
+
+    const result = await pool.query(sql, [userId]);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("获取用户统计数据失败:", err);
+    res.status(500).json({ message: "服务器内部错误。" });
+  }
+});
+
 app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
   try {

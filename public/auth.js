@@ -1,4 +1,4 @@
-// --- START OF FILE public/auth.js (with Review Center link) ---
+// --- START OF FILE public/auth.js (with Dashboard and Review Center link) ---
 document.addEventListener("DOMContentLoaded", () => {
   const navbar = document.querySelector(".navbar");
   if (!navbar) return;
@@ -11,6 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <a href="/practice-center.html" class="nav-link" style="margin-left: 20px;">Practice Center</a>
       </div>
       <div class="nav-right">
+        <a href="/dashboard.html" class="nav-link">Dashboard</a>
         <a href="/history.html" class="nav-link">History</a>
         <a href="/review-center.html" class="nav-link">Review Center</a>
         <span class="nav-user">Hi, ${user.username}</span>
