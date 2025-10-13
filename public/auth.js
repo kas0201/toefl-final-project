@@ -1,23 +1,45 @@
-// --- START OF FILE public/auth.js (with Profile link) ---
+// START OF FILE public/auth.js (Final Version with Navbar Layout Fix)
+
 document.addEventListener("DOMContentLoaded", () => {
   const navbar = document.querySelector(".navbar");
-  if (!navbar) return;
-  const userString = localStorage.getItem("user");
-  if (userString) {
-    const user = JSON.parse(userString);
-    navbar.innerHTML = `
-      <div>
-        <a href="/" class="nav-link">Writing Test</a>
-        <a href="/practice-center.html" class="nav-link" style="margin-left: 20px;">Practice Center</a>
-      </div>
-      <div class="nav-right">
-        <a href="/dashboard.html" class="nav-link">Dashboard</a>
-        <a href="/history.html" class="nav-link">History</a>
-        <a href="/review-center.html" class="nav-link">Review Center</a>
-        <a href="/profile.html" class="nav-link" style="font-weight: 600;">Hi, ${user.username}</a>
-        <a href="#" id="logout-btn" class="nav-link" style="color: var(--accent-red);">Logout</a>
-      </div>`;
-    // 我把用户名做成了个人中心的链接，并去掉了独立的 "Hi, ..." 文本
+  const user = JSON.parse(localStorage.getItem("user"));
+  const token = localStorage.getItem("token");
+
+  if (navbar) {
+    // 【关键修复】: 构建完整的 navbar 结构，包含 nav-left 和 nav-right
+    let navHTML = `
+            <div class="nav-left">
+                <a href="/writing-test.html" class="nav-link">Writing Test</a>
+                <a href="/practice-center.html" class="nav-link">Practice Center</a>
+            </div>
+            <div class="nav-right">
+        `;
+
+    if (user && token) {
+      // 已登录用户的右侧链接
+      navHTML += `
+                <a href="/dashboard.html" class="nav-link">Dashboard</a>
+                <a href="/history.html" class="nav-link">History</a>
+                <a href="/review-center.html" class="nav-link">Review Center</a>
+                <a href="/mistake-book.html" class="nav-link">Mistake Book</a>
+                <a href="/profile.html" class="nav-link">Hi, ${user.username}</a>
+                <a href="#" id="logout-btn" class="nav-link">Logout</a>
+            `;
+    } else {
+      // 未登录用户的右侧链接
+      navHTML += `
+                <a href="/login.html" class="nav-link">Login</a>
+                <a href="/register.html" class="nav-link">Sign Up</a>
+            `;
+    }
+
+    // 闭合 nav-right div
+    navHTML += `</div>`;
+
+    // 将完整的 HTML 结构注入 navbar
+    navbar.innerHTML = navHTML;
+
+    // 登出按钮的事件监听器保持不变
     const logoutBtn = document.getElementById("logout-btn");
     if (logoutBtn) {
       logoutBtn.addEventListener("click", (e) => {
@@ -27,14 +49,5 @@ document.addEventListener("DOMContentLoaded", () => {
         window.location.href = "/login.html";
       });
     }
-  } else {
-    navbar.innerHTML = `
-      <div>
-        <a href="/" class="nav-link">Writing Test</a>
-        <a href="/practice-center.html" class="nav-link" style="margin-left: 20px;">Practice Center</a>
-      </div>
-      <div class="nav-right">
-        <a href="/login.html" class="nav-link">Log In</a>
-      </div>`;
   }
 });
