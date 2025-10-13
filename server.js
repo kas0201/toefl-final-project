@@ -20,7 +20,7 @@ cloudinary.config({
 
 // --- AI 文本润色函数 ---
 async function callAIPolishAPI(responseText) {
-  console.log("🤖 AI a commencé le polissage avec deepseek-coder...");
+  console.log("🤖 AI a commencé le polissage avec deepseek-reasoner...");
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
     console.error("❌ Erreur: DEEPSEEK_API_KEY non configuré.");
@@ -33,7 +33,7 @@ async function callAIPolishAPI(responseText) {
     const response = await axios.post(
       endpoint,
       {
-        model: "deepseek-coder",
+        model: "deepseek-reasoner",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: responseText },
