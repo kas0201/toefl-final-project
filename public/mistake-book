@@ -1,0 +1,296 @@
+<!-- START OF FILE public/mistake-book.html -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Mistake Book - TOEFL® Practice</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+      :root {
+        --bg-color: #f5f5f7;
+        --card-bg: #fff;
+        --text-primary: #1d1d1f;
+        --text-secondary: #6e6e73;
+        --accent-blue: #007aff;
+        --border-color: #d2d2d7;
+        --accent-red: #ff3b30;
+        --accent-green: #34c759;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background-color: var(--bg-color);
+        margin: 0;
+        padding: 24px;
+      }
+      .navbar {
+        max-width: 900px;
+        margin: 20px auto 0;
+        padding: 0 10px;
+      }
+      .main-container {
+        max-width: 900px;
+        margin: 40px auto;
+      }
+      h1 {
+        font-size: 36px;
+        font-weight: 700;
+        text-align: center;
+        margin: 0 0 8px 0;
+      }
+      .subtitle {
+        text-align: center;
+        color: var(--text-secondary);
+        margin-bottom: 40px;
+        font-size: 18px;
+      }
+      .filter-controls {
+        margin-bottom: 24px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .filter-controls label {
+        font-weight: 500;
+        color: var(--text-secondary);
+      }
+      .filter-controls select {
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        font-size: 15px;
+      }
+      .mistake-list {
+        display: grid;
+        gap: 16px;
+      }
+      .mistake-card {
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 20px;
+        display: none; /* Initially hidden, shown by JS */
+      }
+      .mistake-card.visible {
+        display: block;
+      }
+      .mistake-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 12px;
+        margin-bottom: 16px;
+      }
+      .mistake-type-badge {
+        font-size: 12px;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 99px;
+        text-transform: capitalize;
+        color: #fff;
+      }
+      .mistake-type-badge.grammar {
+        background-color: #5856d6;
+      }
+      .mistake-type-badge.spelling {
+        background-color: #ff9500;
+      }
+      .mistake-type-badge.punctuation {
+        background-color: #ff2d55;
+      }
+      .mistake-type-badge.vocabulary {
+        background-color: #34c759;
+      }
+      .mistake-type-badge.style {
+        background-color: #007aff;
+      }
+      .mistake-date {
+        font-size: 14px;
+        color: var(--text-secondary);
+      }
+      .mistake-body .original {
+        color: var(--accent-red);
+        text-decoration: line-through;
+        font-size: 16px;
+      }
+      .mistake-body .corrected {
+        color: var(--accent-green);
+        font-weight: 500;
+        font-size: 16px;
+        margin-left: 8px;
+      }
+      .mistake-explanation {
+        background-color: #f5f5f7;
+        padding: 12px;
+        border-radius: 8px;
+        margin-top: 16px;
+        font-size: 15px;
+        color: var(--text-secondary);
+        line-height: 1.6;
+      }
+      .mistake-explanation strong {
+        color: var(--text-primary);
+      }
+      .context-link {
+        font-size: 14px;
+        color: var(--accent-blue);
+        text-decoration: none;
+        font-weight: 500;
+        margin-top: 16px;
+        display: inline-block;
+      }
+      .loading-state,
+      .empty-state {
+        text-align: center;
+        padding: 60px;
+        font-size: 18px;
+        color: var(--text-secondary);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="navbar"></div>
+    <div class="main-container">
+      <h1>My Mistake Book</h1>
+      <p class="subtitle">
+        A personalized log of your writing mistakes for targeted review.
+      </p>
+
+      <div class="filter-controls">
+        <label for="type-filter">Filter by type:</label>
+        <select id="type-filter">
+          <option value="all">All Types</option>
+          <option value="grammar">Grammar</option>
+          <option value="spelling">Spelling</option>
+          <option value="punctuation">Punctuation</option>
+          <option value="vocabulary">Vocabulary</option>
+          <option value="style">Style</option>
+        </select>
+      </div>
+
+      <div class="mistake-list" id="mistake-list">
+        <div class="loading-state">Loading your mistake book...</div>
+      </div>
+    </div>
+
+    <script src="/auth.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", async () => {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          window.location.href = "/login.html";
+          return;
+        }
+
+        const listContainer = document.getElementById("mistake-list");
+        const typeFilter = document.getElementById("type-filter");
+        let allMistakes = [];
+
+        const renderMistakes = () => {
+          const filterValue = typeFilter.value;
+          listContainer.innerHTML = "";
+
+          const filteredMistakes = allMistakes.filter(
+            (m) => filterValue === "all" || m.type === filterValue
+          );
+
+          if (filteredMistakes.length === 0) {
+            const message =
+              filterValue === "all"
+                ? "No mistakes found yet. Keep practicing!"
+                : `No mistakes of type "${filterValue}" found.`;
+            listContainer.innerHTML = `<div class="empty-state">${message}</div>`;
+            return;
+          }
+
+          filteredMistakes.forEach((mistake) => {
+            const card = document.createElement("div");
+            card.className = "mistake-card visible";
+            card.dataset.type = mistake.type;
+
+            const date = new Date(mistake.created_at).toLocaleDateString(
+              "en-US",
+              {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              }
+            );
+
+            card.innerHTML = `
+                    <div class="mistake-header">
+                        <span class="mistake-type-badge ${mistake.type}">${
+              mistake.type
+            }</span>
+                        <span class="mistake-date">${date}</span>
+                    </div>
+                    <div class="mistake-body">
+                        <span class="original">${mistake.original_text}</span>
+                        <span class="corrected">${mistake.corrected_text}</span>
+                    </div>
+                    <div class="mistake-explanation">
+                        <strong>Explanation:</strong> ${
+                          mistake.explanation || "N/A"
+                        }
+                    </div>
+                    <a href="/history-detail.html?id=${
+                      mistake.response_id
+                    }" class="context-link">
+                        View in original context (${
+                          mistake.question_title
+                        }) &rarr;
+                    </a>
+                `;
+            listContainer.appendChild(card);
+          });
+        };
+
+        try {
+          const response = await fetch("/api/mistakes", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!response.ok) throw new Error("Failed to load mistakes.");
+
+          allMistakes = await response.json();
+          renderMistakes();
+
+          typeFilter.addEventListener("change", renderMistakes);
+        } catch (error) {
+          console.error("Error loading mistake book:", error);
+          listContainer.innerHTML = `<div class="empty-state">Error loading your data. Please try again later.</div>`;
+        }
+      });
+    </script>
+  </body>
+</html>
+``` --- ### **第4步：更新导航栏 (`auth.js`)**
+最后一步，在所有页面的导航栏中添加一个指向我们新创建的错题本页面的链接。 **更新
+`public/auth.js` 文件**: ```javascript // START OF FILE public/auth.js
+document.addEventListener("DOMContentLoaded", () => { const navbar =
+document.querySelector('.navbar'); const user =
+JSON.parse(localStorage.getItem('user')); const token =
+localStorage.getItem('token'); if (navbar) { let navLinks = `
+<div class="nav-left">
+  <a href="/writing-test.html" class="nav-link">Writing Test</a>
+  <a href="/practice-center.html" class="nav-link">Practice Center</a>
+</div>
+<div class="nav-right">
+  `; if (user && token) { navLinks += `
+  <a href="/dashboard.html" class="nav-link">Dashboard</a>
+  <a href="/history.html" class="nav-link">History</a>
+  <a href="/review-center.html" class="nav-link">Review Center</a>
+  <!-- 【新增】: 错题本链接 -->
+  <a href="/mistake-book.html" class="nav-link">Mistake Book</a>
+  <a href="/profile.html" class="nav-link">Hi, ${user.username}</a>
+  <a href="#" id="logout-btn" class="nav-link">Logout</a>
+  `; } else { navLinks += `
+  <a href="/login.html" class="nav-link">Login</a>
+  <a href="/register.html" class="nav-link">Sign Up</a>
+  `; } navLinks += `
+</div>
+`; navbar.innerHTML = navLinks; const logoutBtn =
+document.getElementById('logout-btn'); if (logoutBtn) {
+logoutBtn.addEventListener('click', (e) => { e.preventDefault();
+localStorage.removeItem('token'); localStorage.removeItem('user');
+window.location.href = '/login.html'; }); } } });

@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Absolutely Complete Final Version) ---
+﻿// --- START OF FILE server.js (Absolutely Complete Final Version with ESM Fix) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -9,7 +9,9 @@ const axios = require("axios");
 const cloudinary = require("cloudinary").v2;
 const fs = require("fs");
 const path = require("path");
-const dictionary = require("dictionary-en");
+
+// 【注意】: 我们不再在文件顶部同步加载 'dictionary-en'
+// const dictionary = require('dictionary-en');
 
 // --- 配置 Cloudinary ---
 cloudinary.config({
@@ -710,24 +712,29 @@ app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
       "SELECT content, ai_feedback FROM responses WHERE user_id = $1 AND content IS NOT NULL AND content != '' AND ai_feedback IS NOT NULL AND ai_feedback LIKE '{%}'",
       [userId]
     );
+
     if (responsesQuery.rows.length < 3) {
       return res.status(404).json({
         message:
           "Not enough practice data for a meaningful analysis. Please complete at least 3 practices.",
       });
     }
+
+    const dictionaryModule = await import("dictionary-en");
+    const dictionary = dictionaryModule.default;
+
     const checkWord = await new Promise((resolve) => {
-      dictionary(onReady);
-      function onReady(err, dict) {
+      dictionary((err, dict) => {
         if (err) {
-          console.error("Failed to load dictionary:", err);
+          console.error("Failed to load dictionary data:", err);
           resolve(() => false);
           return;
         }
         const wordSet = new Set(dict.words);
         resolve((word) => wordSet.has(word));
-      }
+      });
     });
+
     const stopWords = new Set([
       "a",
       "an",
@@ -782,14 +789,23 @@ app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
       .sort(([, a], [, b]) => b - a)
       .slice(0, 50)
       .map(([text, value]) => ({ text, value }));
+
     const feedbacks = responsesQuery.rows.map((row) =>
       JSON.parse(row.ai_feedback)
     );
     const aiAnalysis = await callAIAnalysisAPI(feedbacks);
+
     res.json({ wordCloud: wordCloudData, commonMistakes: aiAnalysis.analysis });
   } catch (err) {
     console.error("Failed to get writing analysis data:", err);
-    res.status(500).json({ message: "Internal server error." });
+    if (err.code === "ERR_MODULE_NOT_FOUND") {
+      res.status(500).json({
+        message:
+          "Internal server error: A required module for analysis could not be found.",
+      });
+    } else {
+      res.status(500).json({ message: "Internal server error." });
+    }
   }
 });
 
