@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (用于测试英文声音) ---
+﻿// --- START OF FILE server.js (使用 Cloudflare Workers AI TTS) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -8,7 +8,7 @@ const jwt = require("jsonwebtoken");
 const axios = require("axios");
 const cloudinary = require("cloudinary").v2;
 
-// --- 配置 Cloudinary ---
+// --- 配置 Cloudinary (保持不变) ---
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -18,6 +18,7 @@ cloudinary.config({
 
 // ----------------- AI 评分函数 (保持不变) -----------------
 async function callAIScoringAPI(responseText, promptText) {
+  // ... (此函数无需任何修改)
   console.log(
     "🤖 AI a commencé à noter avec le mode de pensée `deepseek-reasoner`..."
   );
@@ -66,13 +67,17 @@ async function callAIScoringAPI(responseText, promptText) {
   }
 }
 // -------------------------------------------------------------------------------------
-// ======================= 后台音频生成函数 =======================
+
+// ======================= 【新】后台音频生成函数 (使用Cloudflare) =======================
 async function generateAudioIfNeeded(questionId) {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) {
-    console.log("🔊 音频生成跳过：DeepSeek API key 未配置。");
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN;
+
+  if (!accountId || !apiToken) {
+    console.log("🔊 [Cloudflare] 音频生成跳过：环境变量未配置。");
     return;
   }
+
   try {
     const questionQuery = await pool.query(
       "SELECT lecture_script, lecture_audio_url, task_type FROM questions WHERE id = $1",
@@ -87,25 +92,30 @@ async function generateAudioIfNeeded(questionId) {
     ) {
       return;
     }
-    console.log(`🎤 [后台任务] 开始为题目 #${questionId} 生成音频...`);
-    const script = question.lecture_script;
+
+    console.log(`🎤 [后台任务 CF-TTS] 开始为题目 #${questionId} 生成音频...`);
+
+    const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/microsoft/speecht5-tts`;
+
     const ttsResponse = await axios.post(
-      "https://api.deepseek.com/audio/speech",
-      {
-        model: "deepseek-speech",
-        input: script,
-        // 【终极测试】: 使用一个基础的英文声音模型
-        voice: "en-Nick",
-      },
+      endpoint,
+      { text: question.lecture_script },
       {
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${apiToken}`,
           "Content-Type": "application/json",
         },
-        responseType: "arraybuffer",
+        responseType: "arraybuffer", // 接收音频文件流
       }
     );
+
     const audioBuffer = Buffer.from(ttsResponse.data);
+
+    if (!audioBuffer || audioBuffer.length === 0) {
+      throw new Error("Cloudflare TTS 生成了空的音频 Buffer。");
+    }
+
+    // --- 后续上传到 Cloudinary 的逻辑保持不变 ---
     const uploadPromise = new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         { resource_type: "video", folder: "toefl_lectures" },
@@ -119,6 +129,7 @@ async function generateAudioIfNeeded(questionId) {
       );
       uploadStream.end(audioBuffer);
     });
+
     const uploadResult = await uploadPromise;
     const audioUrl = uploadResult.secure_url;
     await pool.query(
@@ -126,26 +137,20 @@ async function generateAudioIfNeeded(questionId) {
       [audioUrl, questionId]
     );
     console.log(
-      `✅ [后台任务] 题目 #${questionId} 的音频已生成并保存: ${audioUrl}`
+      `✅ [后台任务 CF-TTS] 题目 #${questionId} 的音频已生成并保存: ${audioUrl}`
     );
   } catch (error) {
-    let errorDetails = error.message;
-    if (error.response && error.response.data) {
-      if (Buffer.isBuffer(error.response.data)) {
-        errorDetails = error.response.data.toString("utf-8");
-      } else {
-        errorDetails = JSON.stringify(error.response.data);
-      }
-    }
+    const errorDetails = error.response
+      ? new TextDecoder().decode(error.response.data)
+      : error.message;
     console.error(
-      `❌ [后台任务] 为题目 #${questionId} 生成音频时出错:`,
+      `❌ [后台任务 CF-TTS] 为题目 #${questionId} 生成音频时出错:`,
       errorDetails
     );
   }
 }
 // =======================================================================
 
-// --- 省略其余不变的代码 ---
 const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(cors());
@@ -175,67 +180,29 @@ const authenticateToken = (req, res, next) => {
   );
 };
 
-// ======================= API 接口 (其余部分保持不变) =======================
+// ======================= API 接口 (其余代码保持不变) =======================
 
 // --- 生成音频的管理接口 ---
 app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey)
-    return res
-      .status(500)
-      .json({ message: "DeepSeek API key is not configured." });
   try {
-    const questionQuery = await pool.query(
-      "SELECT lecture_script FROM questions WHERE id = $1 AND task_type = 'integrated_writing'",
+    await generateAudioIfNeeded(id);
+    const result = await pool.query(
+      "SELECT lecture_audio_url FROM questions WHERE id = $1",
       [id]
     );
-    const script = questionQuery.rows[0]?.lecture_script;
-    if (!script)
-      return res.status(404).json({
-        message: "Integrated writing question not found or script is empty.",
+    if (result.rows.length > 0 && result.rows[0].lecture_audio_url) {
+      res.json({
+        message: "Audio generated successfully!",
+        url: result.rows[0].lecture_audio_url,
       });
-    console.log(`🎤 Generating audio for question ${id} using DeepSeek TTS...`);
-    const ttsResponse = await axios.post(
-      "https://api.deepseek.com/audio/speech",
-      {
-        model: "deepseek-speech",
-        input: script,
-        voice: "en-Nick",
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        responseType: "arraybuffer",
-      }
-    );
-    const audioBuffer = Buffer.from(ttsResponse.data);
-    const uploadStream = cloudinary.uploader.upload_stream(
-      { resource_type: "video", folder: "toefl_lectures" },
-      async (error, result) => {
-        if (error) {
-          console.error("Cloudinary upload error:", error);
-          return res.status(500).json({ message: "Failed to upload audio." });
-        }
-        const audioUrl = result.secure_url;
-        await pool.query(
-          "UPDATE questions SET lecture_audio_url = $1 WHERE id = $2",
-          [audioUrl, id]
-        );
-        console.log(
-          `✅ Audio for question ${id} generated and saved: ${audioUrl}`
-        );
-        res.json({ message: "Audio generated successfully!", url: audioUrl });
-      }
-    );
-    uploadStream.end(audioBuffer);
+    } else {
+      res
+        .status(404)
+        .json({ message: "Question not found or audio still processing." });
+    }
   } catch (error) {
-    console.error(
-      "Audio generation failed:",
-      error.response ? error.response.data.toString() : error.message
-    );
+    console.error("Manual audio generation failed:", error);
     res.status(500).json({ message: "Failed to generate audio." });
   }
 });
