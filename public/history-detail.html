@@ -1,4 +1,4 @@
-﻿<!-- START OF FILE public/history-detail.html (with Review Toggle feature) -->
+﻿<!-- START OF FILE public/history-detail.html (with styled Review Toggle button) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -196,30 +196,34 @@
         padding: 20px 0;
       }
 
-      /* === NEW BUTTON STYLE === */
+      /* === NEW BUTTON STYLES START === */
       #review-toggle-btn {
         background-color: transparent;
-        border: 1px solid var(--border-color);
-        color: var(--text-secondary);
-        padding: 8px 16px;
+        border: 2px solid var(--accent-blue);
+        color: var(--accent-blue);
+        padding: 8px 20px;
         border-radius: 99px;
-        font-size: 14px;
-        font-weight: 500;
+        font-size: 15px;
+        font-weight: 600;
         cursor: pointer;
         display: inline-flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
         transition: all 0.2s ease;
       }
       #review-toggle-btn:hover {
-        background-color: #e5e5ea;
-        color: var(--text-primary);
+        background-color: var(--accent-blue);
+        color: white;
       }
       #review-toggle-btn.in-review {
         background-color: var(--accent-yellow);
         border-color: var(--accent-yellow);
         color: var(--text-primary);
       }
+      #review-toggle-btn.in-review:hover {
+        opacity: 0.8;
+      }
+      /* === NEW BUTTON STYLES END === */
     </style>
   </head>
   <body>
@@ -236,7 +240,7 @@
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            stroke-width="2"
+            stroke-width="2.5"
             stroke-linecap="round"
             stroke-linejoin="round"
           >
@@ -249,7 +253,7 @@
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            stroke-width="2"
+            stroke-width="3"
             stroke-linecap="round"
             stroke-linejoin="round"
             style="display: none"
@@ -287,7 +291,6 @@
           return;
         }
 
-        // Function to update the button's appearance
         const updateReviewButton = (isInReview) => {
           if (isInReview) {
             reviewBtn.classList.add("in-review");
@@ -303,8 +306,8 @@
           reviewBtn.style.display = "inline-flex";
         };
 
-        // Add click listener for the button
         reviewBtn.addEventListener("click", async () => {
+          reviewBtn.disabled = true; // Prevent multiple clicks
           try {
             const response = await fetch(
               `/api/responses/${historyId}/toggle-review`,
@@ -320,6 +323,8 @@
           } catch (error) {
             console.error("Error toggling review status:", error);
             alert("Could not update review status. Please try again.");
+          } finally {
+            reviewBtn.disabled = false;
           }
         });
 
