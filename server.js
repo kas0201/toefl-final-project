@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Absolutely Complete Final Version with Enhanced Logging & Polishing Prompt) ---
+﻿// --- START OF FILE server.js (Final Version with Data Validation for TTS) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -75,8 +75,6 @@ async function callAIPolishAPI(responseText) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error("AI service is not configured.");
   const endpoint = "https://api.deepseek.com/chat/completions";
-
-  // --- 【关键修改】: 替换为更严格、更保守的系统指令 ---
   const systemPrompt = `You are an expert academic English proofreader, not a rewriter. Your task is to polish the user's TOEFL essay by making only the most necessary corrections and refinements, following these four strict rules:
 
 1.  **Rule #1: Preserve Original Meaning and Voice.** This is the most critical rule. Do NOT alter the user's arguments, ideas, or overall tone. The final text must be recognizably the user's own work.
@@ -96,7 +94,7 @@ async function callAIPolishAPI(responseText) {
           { role: "system", content: systemPrompt },
           { role: "user", content: responseText },
         ],
-        temperature: 0.3, // 降低 temperature 让输出更稳定、更保守
+        temperature: 0.3,
       },
       {
         headers: {
@@ -240,14 +238,19 @@ async function generateAudioIfNeeded(questionId) {
       [questionId]
     );
     const question = questionQuery.rows[0];
+
+    // --- 【关键修改】: 增加对 lecture_script 是否为空或只有空格的检查 ---
     if (
       !question ||
       question.task_type !== "integrated_writing" ||
       question.lecture_audio_url ||
-      !question.lecture_script
+      !question.lecture_script ||
+      question.lecture_script.trim() === "" // 新增的检查
     ) {
+      // 如果没有听力稿或不满足其他条件，直接静默退出，不再尝试生成
       return;
     }
+
     console.log(
       `🎤 [Backend Task CF-Aura-TTS] Starting audio generation for question #${questionId}...`
     );
@@ -793,7 +796,6 @@ app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
     );
     const aiAnalysis = await callAIAnalysisAPI(feedbacks);
 
-    // 【关键修改 2/2】: 在发送前添加详细日志
     const responseData = {
       wordCloud: wordCloudData,
       commonMistakes: aiAnalysis.analysis,
