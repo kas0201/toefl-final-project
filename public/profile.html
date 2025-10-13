@@ -28,13 +28,25 @@
         max-width: 1000px;
         margin: 20px auto 0;
         padding: 0 10px;
-        /* --- 【关键修复】: 移除下面3行冲突的 flex 布局样式 --- */
-        /* 
+        /* --- 【关键修复】: 恢复 flex 布局以正确排列导航栏 --- */
         display: flex;
         justify-content: space-between;
         align-items: center;
-        */
       }
+
+      /* --- 【新增样式】: 确保左右两边的链接正确对齐 --- */
+      .nav-left,
+      .nav-right {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+      .nav-link {
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-weight: 500;
+      }
+
       .main-container {
         max-width: 1000px;
         margin: 40px auto;
