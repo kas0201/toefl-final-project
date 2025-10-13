@@ -160,20 +160,29 @@ async function callAIAnalysisAPI(feedbacks) {
   const systemPrompt = `You are an expert writing coach. Based on the provided list of feedback JSON objects from a user's past TOEFL essays, identify and summarize the top 3-5 recurring weaknesses or common mistakes. For each point, provide a concise description of the issue and a concrete suggestion for improvement. Present your analysis in a clear, easy-to-read markdown format. Focus on patterns in 'Language Use', 'Organization & Development', and 'Task Response'.`;
   const feedbackText = feedbacks.map((f) => JSON.stringify(f)).join("\n---\n");
   try {
-    const response = await axios.post(endpoint, {
-      model: "deepseek-coder",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: feedbackText },
-      ],
-      temperature: 0.5,
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+    const response = await axios.post(
+      endpoint,
+      {
+        model: "deepseek-coder",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: feedbackText },
+        ],
+        temperature: 0.5,
       },
-    });
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
     return { analysis: response.data.choices[0].message.content };
   } catch (error) {
+    console.error(
+      "AI Analysis API Error:",
+      error.response ? error.response.data : error.message
+    );
     throw new Error("Failed to get a response from the AI analysis service.");
   }
 }
@@ -186,8 +195,6 @@ function addPausesToText(text) {
   processedText = processedText.replace(/\n/g, ". ... ... \n");
   return processedText;
 }
-
-// --- 【完整版】: 音频生成函数 ---
 async function generateAudioIfNeeded(questionId) {
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
   const apiToken = process.env.CLOUDFLARE_API_TOKEN;
@@ -661,7 +668,7 @@ app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
         .status(404)
         .json({ message: "Question not found or audio still processing." });
     }
-  } catch (err) {
+  } catch (error) {
     console.error("Manual audio generation failed:", error);
     res.status(500).json({ message: "Failed to generate audio." });
   }
