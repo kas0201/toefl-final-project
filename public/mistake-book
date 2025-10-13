@@ -264,33 +264,3 @@
     </script>
   </body>
 </html>
-``` --- ### **第4步：更新导航栏 (`auth.js`)**
-最后一步，在所有页面的导航栏中添加一个指向我们新创建的错题本页面的链接。 **更新
-`public/auth.js` 文件**: ```javascript // START OF FILE public/auth.js
-document.addEventListener("DOMContentLoaded", () => { const navbar =
-document.querySelector('.navbar'); const user =
-JSON.parse(localStorage.getItem('user')); const token =
-localStorage.getItem('token'); if (navbar) { let navLinks = `
-<div class="nav-left">
-  <a href="/writing-test.html" class="nav-link">Writing Test</a>
-  <a href="/practice-center.html" class="nav-link">Practice Center</a>
-</div>
-<div class="nav-right">
-  `; if (user && token) { navLinks += `
-  <a href="/dashboard.html" class="nav-link">Dashboard</a>
-  <a href="/history.html" class="nav-link">History</a>
-  <a href="/review-center.html" class="nav-link">Review Center</a>
-  <!-- 【新增】: 错题本链接 -->
-  <a href="/mistake-book.html" class="nav-link">Mistake Book</a>
-  <a href="/profile.html" class="nav-link">Hi, ${user.username}</a>
-  <a href="#" id="logout-btn" class="nav-link">Logout</a>
-  `; } else { navLinks += `
-  <a href="/login.html" class="nav-link">Login</a>
-  <a href="/register.html" class="nav-link">Sign Up</a>
-  `; } navLinks += `
-</div>
-`; navbar.innerHTML = navLinks; const logoutBtn =
-document.getElementById('logout-btn'); if (logoutBtn) {
-logoutBtn.addEventListener('click', (e) => { e.preventDefault();
-localStorage.removeItem('token'); localStorage.removeItem('user');
-window.location.href = '/login.html'; }); } } });
