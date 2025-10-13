@@ -1,6 +1,4 @@
-﻿// --- START OF FILE server.js (Final Version with historyId fix) ---
-
-const express = require("express");
+﻿const express = require("express");
 const { Pool } = require("pg");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
@@ -446,7 +444,6 @@ app.post("/api/responses/:id/polish", authenticateToken, async (req, res) => {
 app.get("/api/history/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
-  // --- 【关键修复】: 在 SELECT 列表中添加 r.question_id ---
   const sql = `SELECT r.id, r.question_id, r.content as user_response, r.word_count, r.submitted_at, r.ai_score, r.ai_feedback, r.is_for_review, q.* FROM responses r LEFT JOIN questions q ON r.question_id = q.id WHERE r.id = $1 AND r.user_id = $2;`;
   try {
     const result = await pool.query(sql, [id, userId]);
@@ -570,6 +567,59 @@ app.get("/api/history", authenticateToken, async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error("Failed to get writing history:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+// --- 【关键修复】: 新增 Dashboard API 路由 ---
+app.get("/api/user/stats", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const sql = `
+      WITH ValidResponses AS (
+        -- Select only responses that have a score and a valid JSON feedback
+        SELECT * FROM responses 
+        WHERE user_id = $1 AND ai_score IS NOT NULL AND ai_feedback IS NOT NULL AND ai_feedback LIKE '{%}'
+      ), 
+      RatingMapping AS (
+        -- Map text ratings to numeric scores for calculation
+        SELECT *, 
+          DATE(submitted_at) AS submission_date,
+          CASE (ai_feedback::jsonb -> 'taskResponse' ->> 'rating')
+            WHEN 'Excellent' THEN 4
+            WHEN 'Good' THEN 3
+            WHEN 'Fair' THEN 2
+            WHEN 'Needs Improvement' THEN 1
+            ELSE 0
+          END AS task_response_score,
+          CASE (ai_feedback::jsonb -> 'organization' ->> 'rating')
+            WHEN 'Excellent' THEN 4
+            WHEN 'Good' THEN 3
+            WHEN 'Fair' THEN 2
+            WHEN 'Needs Improvement' THEN 1
+            ELSE 0
+          END AS organization_score,
+          CASE (ai_feedback::jsonb -> 'languageUse' ->> 'rating')
+            WHEN 'Excellent' THEN 4
+            WHEN 'Good' THEN 3
+            WHEN 'Fair' THEN 2
+            WHEN 'Needs Improvement' THEN 1
+            ELSE 0
+          END AS language_use_score
+        FROM ValidResponses
+      )
+      -- Final aggregation into a single JSON object
+      SELECT 
+        (SELECT json_build_object('total', COUNT(*), 'average', ROUND(AVG(ai_score), 1)) FROM ValidResponses) AS "overallStats",
+        (SELECT json_agg(stats) FROM (SELECT task_type, COUNT(*) AS count, ROUND(AVG(ai_score), 1) AS average FROM ValidResponses GROUP BY task_type) AS stats) AS "byType",
+        (SELECT json_agg(trends) FROM (SELECT submission_date, ROUND(AVG(ai_score), 1) AS average_score FROM RatingMapping WHERE submitted_at >= NOW() - INTERVAL '30 days' GROUP BY submission_date ORDER BY submission_date) AS trends) AS "scoreTrend",
+        (SELECT json_build_object('taskResponse', ROUND(AVG(task_response_score), 2), 'organization', ROUND(AVG(organization_score), 2), 'languageUse', ROUND(AVG(language_use_score), 2)) FROM RatingMapping WHERE task_response_score > 0) AS "feedbackBreakdown";
+    `;
+    const result = await pool.query(sql, [userId]);
+    // The query is designed to always return one row, even if stats are null
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Failed to get user stats data:", err);
     res.status(500).json({ message: "Internal server error." });
   }
 });
