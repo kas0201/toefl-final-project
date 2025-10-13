@@ -66,7 +66,7 @@ async function callAIScoringAPI(responseText, promptText) {
   }
 }
 // -------------------------------------------------------------------------------------
-// ======================= 新增：后台音频生成函数 =======================
+// ======================= 后台音频生成函数 =======================
 async function generateAudioIfNeeded(questionId) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
@@ -85,7 +85,6 @@ async function generateAudioIfNeeded(questionId) {
       question.lecture_audio_url ||
       !question.lecture_script
     ) {
-      // 如果题目不存在、不是综合写作、已有音频URL或没有听力稿，则直接返回
       return;
     }
     console.log(`🎤 [后台任务] 开始为题目 #${questionId} 生成音频...`);
@@ -95,7 +94,8 @@ async function generateAudioIfNeeded(questionId) {
       {
         model: "deepseek-speech",
         input: script,
-        voice: "zh-CN-Xiaoyao-Male",
+        // 【关键修正】: 使用一个有效的中文男声
+        voice: "zh-CN-Yuxuan-Male",
       },
       {
         headers: {
@@ -129,9 +129,12 @@ async function generateAudioIfNeeded(questionId) {
       `✅ [后台任务] 题目 #${questionId} 的音频已生成并保存: ${audioUrl}`
     );
   } catch (error) {
+    const errorData = error.response
+      ? JSON.stringify(error.response.data)
+      : error.message;
     console.error(
       `❌ [后台任务] 为题目 #${questionId} 生成音频时出错:`,
-      error.response ? error.response.data.toString() : error.message
+      errorData
     );
   }
 }
@@ -189,7 +192,12 @@ app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
     console.log(`🎤 Generating audio for question ${id} using DeepSeek TTS...`);
     const ttsResponse = await axios.post(
       "https://api.deepseek.com/audio/speech",
-      { model: "deepseek-speech", input: script, voice: "zh-CN-Xiaoyao-Male" },
+      {
+        model: "deepseek-speech",
+        input: script,
+        // 【关键修正】: 使用一个有效的中文男声
+        voice: "zh-CN-Yuxuan-Male",
+      },
       {
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -237,15 +245,12 @@ app.get("/api/writing-test", async (req, res) => {
         message:
           "Not enough questions in database to start a full writing test.",
       });
-
-    // 【修改】: 触发综合写作题的后台音频生成
     const integratedTask = result.rows.find(
       (q) => q.task_type === "integrated_writing"
     );
     if (integratedTask) {
-      generateAudioIfNeeded(integratedTask.id); // 无需 await
+      generateAudioIfNeeded(integratedTask.id);
     }
-
     res.json(result.rows);
   } catch (err) {
     console.error("获取写作考试题目失败:", err);
@@ -269,9 +274,7 @@ app.get("/api/questions", async (req, res) => {
 app.get("/api/questions/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    // 【修改】: 在返回数据前，触发后台音频生成
-    generateAudioIfNeeded(id); // 无需 await
-
+    generateAudioIfNeeded(id);
     const sql = `SELECT * FROM questions WHERE id = $1`;
     const result = await pool.query(sql, [id]);
     if (result.rows.length === 0)
