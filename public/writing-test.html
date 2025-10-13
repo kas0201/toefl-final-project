@@ -1,6 +1,4 @@
-﻿<!-- START OF FILE public/writing-test.html -->
-
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -248,16 +246,40 @@
           renderCurrentScreen();
         });
       }
-      function renderIntegratedLecture(task) {
+      // 【修改】: 将函数变为 async 并在开始时重新获取题目数据
+      async function renderIntegratedLecture(task) {
         phaseTitleEl.textContent = "Task 1: Integrated Writing (Lecture)";
         mainContainer.style.gridTemplateColumns = "1fr";
+        mainContainer.innerHTML = `<div class="content-panel" style="display:flex; flex-direction:column; align-items:center; justify-content:center;"><p style="font-size: 18px;">Loading lecture...</p></div>`;
+
+        try {
+          // 重新获取题目数据以确保获得最新的 audio_url
+          const response = await fetch(`/api/questions/${task.id}`);
+          if (response.ok) {
+            const updatedTask = await response.json();
+            writingTasks[0] = updatedTask; // 更新任务数组中的数据
+            task = updatedTask; // 更新当前函数的任务变量
+          } else {
+            console.error("Failed to re-fetch task data for lecture.");
+          }
+        } catch (error) {
+          console.error("Error re-fetching task:", error);
+        }
+
         if (task.lecture_audio_url) {
-          mainContainer.innerHTML = `<div class="content-panel" style="display:flex; flex-direction:column; align-items:center; justify-content:center;"><p style="font-size: 18px;">Listen carefully to the lecture.</p><audio id="lecture-audio" src="${task.lecture_audio_url}" controls></audio></div>`;
+          mainContainer.innerHTML = `<div class="content-panel" style="display:flex; flex-direction:column; align-items:center; justify-content:center;"><p style="font-size: 18px;">Listen carefully to the lecture.</p><audio id="lecture-audio" src="${task.lecture_audio_url}" controls autoplay></audio></div>`;
           const audioEl = document.getElementById("lecture-audio");
           phaseTimerEl.textContent = "Playing...";
           audioEl.onended = () => {
             currentIntegratedPhase++;
             renderCurrentScreen();
+          };
+          audioEl.onerror = () => {
+            mainContainer.innerHTML = `<div class="content-panel"><h2>Lecture Script (Audio Failed)</h2><p>${task.lecture_script}</p></div>`;
+            startTimer(120, () => {
+              currentIntegratedPhase++;
+              renderCurrentScreen();
+            });
           };
         } else {
           mainContainer.innerHTML = `<div class="content-panel"><h2>Lecture Script</h2><p>${task.lecture_script}</p></div>`;
@@ -320,7 +342,7 @@
         mainContainer.style.gridTemplateColumns = "1fr";
         mainContainer.innerHTML = `<div class="instruction-screen">
                 <div style="width: 80px; height: 80px; background-color: var(--accent-green); border-radius: 50%; margin: 0 auto 24px; display: flex; align-items: center; justify-content: center;">
-                    <svg style="width: 40px; height: 40px; stroke: white; stroke-width: 5; stroke-linecap: round; fill: none;" xmlns="http://www.w.3.org/2000/svg" viewBox="0 0 52 52"><path d="M14.1 27.2l7.1 7.2 16.7-16.8"/></svg>
+                    <svg style="width: 40px; height: 40px; stroke: white; stroke-width: 5; stroke-linecap: round; fill: none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52"><path d="M14.1 27.2l7.1 7.2 16.7-16.8"/></svg>
                 </div>
                 <h2>Congratulations!</h2><p>You have completed the Writing Test. Your submissions have been saved, and AI feedback will be available shortly.</p>
                 <div style="display: flex; gap: 12px; margin-top: 24px;">

@@ -66,6 +66,76 @@ async function callAIScoringAPI(responseText, promptText) {
   }
 }
 // -------------------------------------------------------------------------------------
+// ======================= 新增：后台音频生成函数 =======================
+async function generateAudioIfNeeded(questionId) {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) {
+    console.log("🔊 音频生成跳过：DeepSeek API key 未配置。");
+    return;
+  }
+  try {
+    const questionQuery = await pool.query(
+      "SELECT lecture_script, lecture_audio_url, task_type FROM questions WHERE id = $1",
+      [questionId]
+    );
+    const question = questionQuery.rows[0];
+    if (
+      !question ||
+      question.task_type !== "integrated_writing" ||
+      question.lecture_audio_url ||
+      !question.lecture_script
+    ) {
+      // 如果题目不存在、不是综合写作、已有音频URL或没有听力稿，则直接返回
+      return;
+    }
+    console.log(`🎤 [后台任务] 开始为题目 #${questionId} 生成音频...`);
+    const script = question.lecture_script;
+    const ttsResponse = await axios.post(
+      "https://api.deepseek.com/audio/speech",
+      {
+        model: "deepseek-speech",
+        input: script,
+        voice: "zh-CN-Xiaoyao-Male",
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        responseType: "arraybuffer",
+      }
+    );
+    const audioBuffer = Buffer.from(ttsResponse.data);
+    const uploadPromise = new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        { resource_type: "video", folder: "toefl_lectures" },
+        (error, result) => {
+          if (error) {
+            console.error("❌ [后台任务] Cloudinary 上传失败:", error);
+            return reject(error);
+          }
+          resolve(result);
+        }
+      );
+      uploadStream.end(audioBuffer);
+    });
+    const uploadResult = await uploadPromise;
+    const audioUrl = uploadResult.secure_url;
+    await pool.query(
+      "UPDATE questions SET lecture_audio_url = $1 WHERE id = $2",
+      [audioUrl, questionId]
+    );
+    console.log(
+      `✅ [后台任务] 题目 #${questionId} 的音频已生成并保存: ${audioUrl}`
+    );
+  } catch (error) {
+    console.error(
+      `❌ [后台任务] 为题目 #${questionId} 生成音频时出错:`,
+      error.response ? error.response.data.toString() : error.message
+    );
+  }
+}
+// =======================================================================
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -98,7 +168,7 @@ const authenticateToken = (req, res, next) => {
 
 // ======================= API 接口 =======================
 
-// --- 生成音频的管理接口 ---
+// --- 生成音频的管理接口 (保留，用于手动触发) ---
 app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
   const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -116,7 +186,6 @@ app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
       return res.status(404).json({
         message: "Integrated writing question not found or script is empty.",
       });
-
     console.log(`🎤 Generating audio for question ${id} using DeepSeek TTS...`);
     const ttsResponse = await axios.post(
       "https://api.deepseek.com/audio/speech",
@@ -168,6 +237,15 @@ app.get("/api/writing-test", async (req, res) => {
         message:
           "Not enough questions in database to start a full writing test.",
       });
+
+    // 【修改】: 触发综合写作题的后台音频生成
+    const integratedTask = result.rows.find(
+      (q) => q.task_type === "integrated_writing"
+    );
+    if (integratedTask) {
+      generateAudioIfNeeded(integratedTask.id); // 无需 await
+    }
+
     res.json(result.rows);
   } catch (err) {
     console.error("获取写作考试题目失败:", err);
@@ -191,6 +269,9 @@ app.get("/api/questions", async (req, res) => {
 app.get("/api/questions/:id", async (req, res) => {
   const { id } = req.params;
   try {
+    // 【修改】: 在返回数据前，触发后台音频生成
+    generateAudioIfNeeded(id); // 无需 await
+
     const sql = `SELECT * FROM questions WHERE id = $1`;
     const result = await pool.query(sql, [id]);
     if (result.rows.length === 0)
