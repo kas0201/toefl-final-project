@@ -1,4 +1,4 @@
-﻿<!-- START OF FILE public/history-detail.html (with loading animation) -->
+﻿<!-- START OF FILE public/history-detail.html (with auto-refreshing feedback) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Writing Review - TOEFL® Practice</title>
     <style>
+      /* CSS styles are identical to the previous version, no changes needed */
       @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
       :root {
         --bg-color: #f5f5f7;
@@ -214,8 +215,6 @@
       #review-toggle-btn.in-review:hover {
         opacity: 0.8;
       }
-
-      /* === NEW SPINNER STYLES START === */
       @keyframes spin {
         0% {
           transform: rotate(0deg);
@@ -251,7 +250,6 @@
         font-size: 14px;
         color: var(--text-secondary);
       }
-      /* === NEW SPINNER STYLES END === */
     </style>
   </head>
   <body>
@@ -296,13 +294,13 @@
 
     <script src="/auth.js"></script>
     <script>
-      document.addEventListener("DOMContentLoaded", async () => {
-        // ... (JavaScript logic remains the same)
+      document.addEventListener("DOMContentLoaded", () => {
         const token = localStorage.getItem("token");
         if (!token) {
           window.location.href = "/login.html";
           return;
         }
+
         const reviewTitleEl = document.getElementById("review-title");
         const reviewSubtitleEl = document.getElementById("review-subtitle");
         const reviewContentEl = document.getElementById("review-content");
@@ -310,6 +308,7 @@
         const reviewBtnText = document.getElementById("review-btn-text");
         const reviewIconAdd = document.getElementById("review-icon-add");
         const reviewIconCheck = document.getElementById("review-icon-check");
+
         const urlParams = new URLSearchParams(window.location.search);
         const historyId = urlParams.get("id");
         if (!historyId) {
@@ -317,6 +316,126 @@
             '<div class="loading-state">Error: No submission ID provided.</div>';
           return;
         }
+
+        // ======================= 【新功能逻辑】开始 =======================
+
+        let pollingInterval = null; // Variable to hold our timer
+        let initialLoad = true; // A flag to render static content only once
+
+        // This function will fetch data and render the page content
+        const fetchAndRenderDetails = async () => {
+          try {
+            console.log("Checking for feedback...");
+            const response = await fetch(`/api/history/${historyId}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+
+            if (response.status === 401 || response.status === 403) {
+              clearInterval(pollingInterval);
+              window.location.href = "/login.html";
+              return;
+            }
+            if (!response.ok)
+              throw new Error("Failed to fetch submission details.");
+
+            const data = await response.json();
+
+            // On the first successful load, render the static parts of the page
+            if (initialLoad) {
+              const submittedDate = new Date(data.submitted_at).toLocaleString(
+                "en-US",
+                { dateStyle: "long", timeStyle: "short" }
+              );
+              reviewTitleEl.textContent = data.title || "Practice Response";
+              reviewSubtitleEl.textContent = `Submitted on ${submittedDate} • ${data.word_count} words`;
+              updateReviewButton(data.is_for_review);
+
+              let promptHTML = "";
+              if (data.task_type === "integrated_writing") {
+                promptHTML = `<div class="post"><h4>Reading Passage</h4><p class="post-content">${data.reading_passage}</p></div><div class="post"><h4>Lecture Script</h4><p class="post-content">${data.lecture_script}</p></div>`;
+              } else {
+                promptHTML = `<div class="post"><p class="post-author">${data.professor_author}</p><p class="post-content">${data.professor_prompt}</p></div><div class="post"><p class="post-author">${data.student1_author}</p><p class="post-content">${data.student1_post}</p></div><div class="post"><p class="post-author">${data.student2_author}</p><p class="post-content">${data.student2_post}</p></div>`;
+              }
+
+              reviewContentEl.innerHTML = `
+                        <div id="ai-card-placeholder"></div>
+                        <h2 class="section-header">Your Response</h2>
+                        <div class="user-response-card"><p class="user-response-content">${data.user_response}</p></div>
+                        <h2 class="section-header">Original Prompt</h2>
+                        ${promptHTML}
+                    `;
+              initialLoad = false;
+            }
+
+            const aiCardPlaceholder = document.getElementById(
+              "ai-card-placeholder"
+            );
+
+            // CORE LOGIC: Check if feedback is ready
+            if (data.ai_score !== null && data.ai_feedback) {
+              // If feedback is ready, stop polling
+              if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+                console.log("Feedback received, polling stopped.");
+              }
+
+              // Render the final feedback card
+              let feedbackData;
+              try {
+                feedbackData = JSON.parse(data.ai_feedback);
+              } catch (e) {
+                feedbackData = null;
+              }
+
+              let aiCardHTML = "";
+              if (feedbackData) {
+                const createFeedbackItem = (title, feedbackObj) => {
+                  const ratingClass = (feedbackObj.rating || "")
+                    .toLowerCase()
+                    .replace(" ", "-");
+                  return `<div class="feedback-item"><div class="feedback-item-header"><h4>${title}</h4><span class="rating-badge ${ratingClass}">${feedbackObj.rating}</span></div><p>${feedbackObj.comment}</p></div>`;
+                };
+                aiCardHTML = `<div id="ai-score-card"><div class="score-display"><span class="score-value">${
+                  data.ai_score
+                }</span><span class="score-label">/ 30</span></div><div class="feedback-details"><div class="feedback-grid">${createFeedbackItem(
+                  "Task Response",
+                  feedbackData.taskResponse
+                )}${createFeedbackItem(
+                  "Organization & Development",
+                  feedbackData.organization
+                )}${createFeedbackItem(
+                  "Language Use",
+                  feedbackData.languageUse
+                )}</div><div class="general-suggestion"><p><strong>General Suggestion:</strong> ${
+                  feedbackData.generalSuggestion
+                }</p></div></div></div>`;
+              } else {
+                aiCardHTML = `<div id="ai-score-card"><div class="score-display"><span class="score-value">${data.ai_score}</span><span class="score-label">/ 30</span></div><div class="feedback-details"><p>${data.ai_feedback}</p></div></div>`;
+              }
+              aiCardPlaceholder.innerHTML = aiCardHTML;
+            } else {
+              // If feedback is NOT ready, show spinner and start polling if not already started
+              aiCardPlaceholder.innerHTML = `<div id="ai-score-card"><div class="scoring-pending"><div class="spinner"></div><div class="main-text">AI Feedback is being generated...</div><div class="sub-text">This may take up to 30 seconds. The page will update automatically.</div></div></div>`;
+
+              if (!pollingInterval) {
+                console.log("Feedback not ready, starting to poll...");
+                pollingInterval = setInterval(fetchAndRenderDetails, 5000); // Poll every 5 seconds
+              }
+            }
+          } catch (error) {
+            console.error("Error loading submission details:", error);
+            if (pollingInterval) clearInterval(pollingInterval);
+            reviewContentEl.innerHTML =
+              '<div class="loading-state">An error occurred while loading. Please try again.</div>';
+          }
+        };
+
+        // Initial call to start the whole process
+        fetchAndRenderDetails();
+
+        // ======================= 【新功能逻辑】结束 =======================
+
         const updateReviewButton = (isInReview) => {
           if (isInReview) {
             reviewBtn.classList.add("in-review");
@@ -331,6 +450,7 @@
           }
           reviewBtn.style.display = "inline-flex";
         };
+
         reviewBtn.addEventListener("click", async () => {
           reviewBtn.disabled = true;
           try {
@@ -349,80 +469,6 @@
             reviewBtn.disabled = false;
           }
         });
-        try {
-          const response = await fetch(`/api/history/${historyId}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (response.status === 401 || response.status === 403) {
-            localStorage.removeItem("token");
-            localStorage.removeItem("user");
-            window.location.href = "/login.html";
-            return;
-          }
-          if (!response.ok)
-            throw new Error("Failed to fetch submission details.");
-          const data = await response.json();
-          updateReviewButton(data.is_for_review);
-          const submittedDate = new Date(data.submitted_at).toLocaleString(
-            "en-US",
-            { dateStyle: "long", timeStyle: "short" }
-          );
-          reviewTitleEl.textContent = data.title || "Practice Response";
-          reviewSubtitleEl.textContent = `Submitted on ${submittedDate} • ${data.word_count} words`;
-          let aiCardHTML = "";
-          if (data.ai_score !== null && data.ai_feedback) {
-            let feedbackData;
-            try {
-              feedbackData = JSON.parse(data.ai_feedback);
-            } catch (e) {
-              feedbackData = null;
-            }
-            if (feedbackData) {
-              const createFeedbackItem = (title, feedbackObj) => {
-                const ratingClass = (feedbackObj.rating || "")
-                  .toLowerCase()
-                  .replace(" ", "-");
-                return `<div class="feedback-item"><div class="feedback-item-header"><h4>${title}</h4><span class="rating-badge ${ratingClass}">${feedbackObj.rating}</span></div><p>${feedbackObj.comment}</p></div>`;
-              };
-              aiCardHTML = `<div id="ai-score-card"><div class="score-display"><span class="score-value">${
-                data.ai_score
-              }</span><span class="score-label">/ 30</span></div><div class="feedback-details"><div class="feedback-grid">${createFeedbackItem(
-                "Task Response",
-                feedbackData.taskResponse
-              )}${createFeedbackItem(
-                "Organization & Development",
-                feedbackData.organization
-              )}${createFeedbackItem(
-                "Language Use",
-                feedbackData.languageUse
-              )}</div><div class="general-suggestion"><p><strong>General Suggestion:</strong> ${
-                feedbackData.generalSuggestion
-              }</p></div></div></div>`;
-            } else {
-              aiCardHTML = `<div id="ai-score-card"><div class="score-display"><span class="score-value">${data.ai_score}</span><span class="score-label">/ 30</span></div><div class="feedback-details"><p>${data.ai_feedback}</p></div></div>`;
-            }
-          } else {
-            // === NEW LOADING ANIMATION HTML ===
-            aiCardHTML = `<div id="ai-score-card">
-                            <div class="scoring-pending">
-                                <div class="spinner"></div>
-                                <div class="main-text">AI Feedback is being generated...</div>
-                                <div class="sub-text">This may take up to 30 seconds. Feel free to refresh the page.</div>
-                            </div>
-                          </div>`;
-          }
-          let promptHTML = "";
-          if (data.task_type === "integrated_writing") {
-            promptHTML = `<div class="post"><h4>Reading Passage</h4><p class="post-content">${data.reading_passage}</p></div><div class="post"><h4>Lecture Script</h4><p class="post-content">${data.lecture_script}</p></div>`;
-          } else {
-            promptHTML = `<div class="post"><p class="post-author">${data.professor_author}</p><p class="post-content">${data.professor_prompt}</p></div><div class="post"><p class="post-author">${data.student1_author}</p><p class="post-content">${data.student1_post}</p></div><div class="post"><p class="post-author">${data.student2_author}</p><p class="post-content">${data.student2_post}</p></div>`;
-          }
-          reviewContentEl.innerHTML = `${aiCardHTML} <h2 class="section-header">Your Response</h2><div class="user-response-card"><p class="user-response-content">${data.user_response}</p></div><h2 class="section-header">Original Prompt</h2>${promptHTML}`;
-        } catch (error) {
-          console.error("Error loading submission details:", error);
-          reviewContentEl.innerHTML =
-            '<div class="loading-state">An error occurred. Please try again.</div>';
-        }
       });
     </script>
   </body>
