@@ -1,4 +1,6 @@
-﻿const express = require("express");
+﻿// --- START OF FILE server.js (Absolutely Complete Final Version) ---
+
+const express = require("express");
 const { Pool } = require("pg");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
@@ -7,6 +9,7 @@ const axios = require("axios");
 const cloudinary = require("cloudinary").v2;
 const fs = require("fs");
 const path = require("path");
+const dictionary = require("dictionary-en");
 
 // --- 配置 Cloudinary ---
 cloudinary.config({
@@ -16,7 +19,8 @@ cloudinary.config({
   secure: true,
 });
 
-// --- 检查并授予成就的函数 ---
+// --- 辅助函数 ---
+
 async function checkAndAwardAchievements(userId, responseId) {
   console.log(`🏆 [Achievement] Checking for user #${userId}...`);
   try {
@@ -65,13 +69,10 @@ async function checkAndAwardAchievements(userId, responseId) {
   }
 }
 
-// --- AI 文本润色函数 ---
 async function callAIPolishAPI(responseText) {
-  console.log("🤖 AI a commencé le polissage avec un prompt amélioré...");
+  console.log("🤖 AI polishing started...");
   const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) {
-    throw new Error("AI service is not configured.");
-  }
+  if (!apiKey) throw new Error("AI service is not configured.");
   const endpoint = "https://api.deepseek.com/chat/completions";
   const systemPrompt = `You are an expert academic English editor specializing in refining TOEFL essays. Your task is to revise the user's text to elevate its linguistic quality to that of a high-scoring response (28-30), following these strict principles:\n\n1.  **Preserve Meaning Above All:** This is the most important rule. Strictly preserve the author's original meaning, arguments, and ideas. Do NOT add new information, change their core message, or alter their logical flow.\n\n2.  **Prioritize Natural Language:** Improve vocabulary, sentence structure, and grammar, but always prioritize natural, idiomatic phrasing that a native speaker would use. Avoid replacing words with more 'advanced' synonyms if it creates an awkward, "thesaurus-like" sentence. The goal is fluency and clarity, not just complexity.\n\n3.  **Ensure Accuracy:** Before providing the final output, double-check your revision to ensure you have not introduced any new grammatical, spelling, or logical errors.\n\nYour final output must be ONLY the fully revised text. Do not include any commentary, headings, or explanations before or after the text.`;
   try {
@@ -98,17 +99,39 @@ async function callAIPolishAPI(responseText) {
   }
 }
 
-// --- AI 评分函数 ---
 async function callAIScoringAPI(responseText, promptText, taskType) {
   console.log(
-    `🤖 AI a commencé à noter (Mode: ${taskType}) avec le mode de pensée deepseek-reasoner...`
+    `🤖 AI scoring started (Task: ${taskType}) with mistake extraction...`
   );
   const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) {
-    throw new Error("AI service is not configured.");
-  }
+  if (!apiKey) throw new Error("AI service is not configured.");
   const endpoint = "https://api.deepseek.com/chat/completions";
-  const systemPrompt = `You are an expert ETS-trained evaluator for the TOEFL iBT Writing section. Your evaluation must strictly adhere to the official scoring rubrics. Your process is as follows: 1. **Identify Task Type**: First, identify the task type from the user prompt ('Integrated Writing' or 'Academic Discussion'). 2. **Apply Correct Rubric**: In a <thinking> block, analyze the user's response strictly according to the specific rubric for that task type provided below. 3. **Holistic Scoring**: Based on your rubric-based analysis, determine a holistic overall score from 0-30. 4. **Structured Feedback**: Generate concise, constructive feedback for each category within the official rubric. 5. **Final JSON Output**: After the <thinking> block, provide your final answer ONLY as a single, valid JSON object in the specified format. ### Integrated Writing Task Rubric ### If the task is 'Integrated Writing', use these criteria: - **Task Response (Selection & Connection)**: How accurately and completely does the response select the important information from the lecture and explain how it challenges or supports the points in the reading passage? A high-scoring response must simply connect lecture points to reading points. - **Organization & Development**: Is the response well-organized with a clear structure (e.g., introduction, body paragraphs for each point)? Are the ideas logically connected? - **Language Use**: How effectively is language used? Consider grammar, vocabulary, and sentence structure. Minor errors are acceptable if the meaning is clear. ### Academic Discussion Task Rubric ### If the task is 'Academic Discussion', use these criteria: - **Task Response (Contribution)**: Does the response make a relevant and clear contribution to the discussion? Does it directly address the professor's question and engage with the other students' ideas? - **Organization & Development**: Is the main idea clearly stated? Is it well-supported with reasons, details, and/or examples? Is the response easy to follow? - **Language Use**: Is the language clear and idiomatic? Does it demonstrate a good range of vocabulary and sentence structures? --- **JSON Output Format:** { "overallScore": <integer from 0 to 30>, "feedback": { "taskResponse": { "rating": "<string>", "comment": "<string>" }, "organization": { "rating": "<string>", "comment": "<string>" }, "languageUse": { "rating": "<string>", "comment": "<string>" }, "generalSuggestion": "<string>" } }`;
+  const systemPrompt = `You are an expert ETS-trained evaluator for the TOEFL iBT Writing section. Your task is twofold:
+1.  **Provide Holistic Feedback**: Evaluate the user's response based on official rubrics and provide a score and structured feedback.
+2.  **Extract Specific Mistakes**: Identify and list individual grammar, spelling, punctuation, and vocabulary errors.
+
+Follow these steps precisely:
+1.  In a <thinking> block, analyze the user's response against the relevant rubric (Integrated or Academic Discussion).
+2.  After your analysis, provide your final answer ONLY as a single, valid JSON object. Do not include any text before or after the JSON block.
+
+**JSON Output Format:**
+{
+  "overallScore": <integer from 0 to 30>,
+  "feedback": {
+    "taskResponse": { "rating": "<string>", "comment": "<string>" },
+    "organization": { "rating": "<string>", "comment": "<string>" },
+    "languageUse": { "rating": "<string>", "comment": "<string>" },
+    "generalSuggestion": "<string>"
+  },
+  "mistakes": [
+    {
+      "type": "<'grammar'|'spelling'|'punctuation'|'vocabulary'|'style'>",
+      "original": "<The exact incorrect phrase from user's text>",
+      "corrected": "<The suggested correct phrase>",
+      "explanation": "<A brief, clear explanation of the error>"
+    }
+  ]
+}`;
   const taskTypeName =
     taskType === "integrated_writing"
       ? "Integrated Writing"
@@ -132,28 +155,28 @@ async function callAIScoringAPI(responseText, promptText, taskType) {
         },
       }
     );
-    let aiResultContent = response.data.choices[0].message.content;
+    const aiResultContent = response.data.choices[0].message.content;
     const jsonMatch = aiResultContent.match(/{[\s\S]*}/);
-    if (!jsonMatch) {
-      throw new Error("AI did not return a valid JSON object.");
-    }
+    if (!jsonMatch) throw new Error("AI did not return a valid JSON object.");
     const result = JSON.parse(jsonMatch[0]);
     return {
       score: result.overallScore,
       feedback: JSON.stringify(result.feedback),
+      mistakes: result.mistakes || [],
     };
   } catch (error) {
+    console.error(
+      "AI Scoring API Error:",
+      error.response ? error.response.data : error.message
+    );
     throw new Error("Failed to get a response from the AI service.");
   }
 }
 
-// --- AI 总结常犯错误的函数 ---
 async function callAIAnalysisAPI(feedbacks) {
-  console.log("🤖 AI a commencé l'analyse des erreurs communes...");
+  console.log("🤖 AI common mistakes analysis started...");
   const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) {
-    throw new Error("AI service is not configured.");
-  }
+  if (!apiKey) throw new Error("AI service is not configured.");
   const endpoint = "https://api.deepseek.com/chat/completions";
   const systemPrompt = `You are an expert writing coach. Based on the provided list of feedback JSON objects from a user's past TOEFL essays, identify and summarize the top 3-5 recurring weaknesses or common mistakes. For each point, provide a concise description of the issue and a concrete suggestion for improvement. Present your analysis in a clear, easy-to-read markdown format. Focus on patterns in 'Language Use', 'Organization & Development', and 'Task Response'.`;
   const feedbackText = feedbacks.map((f) => JSON.stringify(f)).join("\n---\n");
@@ -185,7 +208,6 @@ async function callAIAnalysisAPI(feedbacks) {
   }
 }
 
-// --- 音频生成函数 ---
 function processTextForTTS(text) {
   if (!text) return "";
   return text;
@@ -217,9 +239,7 @@ async function generateAudioIfNeeded(questionId) {
     console.log(
       `🎤 [Backend Task CF-Aura-TTS] Starting audio generation for question #${questionId}...`
     );
-
     const textForTTS = processTextForTTS(question.lecture_script);
-
     const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/deepgram/aura-1`;
     const ttsResponse = await axios.post(
       endpoint,
@@ -299,201 +319,6 @@ const authenticateToken = (req, res, next) => {
 };
 
 // --- API 路由 ---
-app.get("/api/questions", authenticateToken, async (req, res) => {
-  const userId = req.user.id;
-  try {
-    const sql = `SELECT q.id, q.title, q.topic, q.task_type, CASE WHEN r.user_id IS NOT NULL THEN TRUE ELSE FALSE END AS has_completed FROM questions q LEFT JOIN (SELECT DISTINCT question_id, user_id FROM responses WHERE user_id = $1) r ON q.id = r.question_id ORDER BY q.id;`;
-    const result = await pool.query(sql, [userId]);
-    res.json(result.rows);
-  } catch (err) {
-    console.error("Failed to get question list:", err);
-    res.status(500).json({ message: "Internal server error." });
-  }
-});
-
-app.post("/api/submit-response", authenticateToken, async (req, res) => {
-  const { content, wordCount, questionId, task_type } = req.body;
-  const userId = req.user.id;
-  const qId = parseInt(questionId, 10);
-  if ((!content && wordCount > 0) || !wordCount || isNaN(qId) || !task_type) {
-    return res.status(400).json({
-      message: "Request is missing required information or is malformed.",
-    });
-  }
-  try {
-    const sql = `INSERT INTO responses (content, word_count, question_id, task_type, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING id`;
-    const result = await pool.query(sql, [
-      content || "",
-      wordCount,
-      qId,
-      task_type,
-      userId,
-    ]);
-    const newResponseId = result.rows[0].id;
-    res
-      .status(201)
-      .json({ message: "Submission successful!", id: newResponseId });
-    (async () => {
-      try {
-        const questionRes = await pool.query(
-          "SELECT * FROM questions WHERE id = $1",
-          [qId]
-        );
-        if (questionRes.rows.length === 0) {
-          throw new Error(`Question with ID ${qId} not found.`);
-        }
-        const questionData = questionRes.rows[0];
-        let promptText = "";
-        if (questionData.task_type === "integrated_writing") {
-          promptText = `Reading: ${questionData.reading_passage}\nLecture: ${questionData.lecture_script}`;
-        } else {
-          promptText = `Professor's Prompt: ${questionData.professor_prompt}\n${questionData.student1_author}'s Post: ${questionData.student1_post}\n${questionData.student2_author}'s Post: ${questionData.student2_post}`;
-        }
-        const aiResult = await callAIScoringAPI(
-          content || "",
-          promptText,
-          questionData.task_type
-        );
-        await pool.query(
-          `UPDATE responses SET ai_score = $1, ai_feedback = $2 WHERE id = $3`,
-          [aiResult.score, aiResult.feedback, newResponseId]
-        );
-        await checkAndAwardAchievements(userId, newResponseId);
-      } catch (aiError) {
-        console.error(
-          `❌ AI background task failed (Response ID: ${newResponseId}):`,
-          aiError
-        );
-      }
-    })();
-  } catch (err) {
-    console.error("Database insertion failed:", err);
-    res.status(500).json({ message: "Internal server error." });
-  }
-});
-
-app.get("/api/review-list", authenticateToken, async (req, res) => {
-  const userId = req.user.id;
-  try {
-    const sql = `SELECT r.id, r.word_count, r.submitted_at, COALESCE(q.title, 'Archived Question') as question_title FROM responses r LEFT JOIN questions q ON r.question_id = q.id WHERE r.user_id = $1 AND r.is_for_review = TRUE ORDER BY r.submitted_at DESC;`;
-    const result = await pool.query(sql, [userId]);
-    res.json(result.rows);
-  } catch (err) {
-    console.error("Failed to get review list:", err);
-    res.status(500).json({ message: "Internal server error." });
-  }
-});
-
-app.post(
-  "/api/responses/:id/toggle-review",
-  authenticateToken,
-  async (req, res) => {
-    const { id } = req.params;
-    const userId = req.user.id;
-    try {
-      await pool.query(
-        `UPDATE responses SET is_for_review = NOT is_for_review WHERE id = $1 AND user_id = $2;`,
-        [id, userId]
-      );
-      const result = await pool.query(
-        `SELECT is_for_review FROM responses WHERE id = $1 AND user_id = $2;`,
-        [id, userId]
-      );
-      if (result.rows.length === 0) {
-        return res.status(404).json({
-          message: "Response not found or you do not have permission.",
-        });
-      }
-      res.json({ is_for_review: result.rows[0].is_for_review });
-    } catch (err) {
-      console.error(
-        `Failed to toggle review status (Response ID: ${id}):`,
-        err
-      );
-      res.status(500).json({ message: "Internal server error." });
-    }
-  }
-);
-
-app.post("/api/responses/:id/polish", authenticateToken, async (req, res) => {
-  const { id } = req.params;
-  const userId = req.user.id;
-  try {
-    const responseQuery = await pool.query(
-      "SELECT content FROM responses WHERE id = $1 AND user_id = $2",
-      [id, userId]
-    );
-    if (responseQuery.rows.length === 0) {
-      return res.status(404).json({ message: "Response not found." });
-    }
-    const originalText = responseQuery.rows[0].content;
-    if (!originalText || originalText.trim().split(/\s+/).length < 20) {
-      return res.status(400).json({
-        message:
-          "Your text is too short for a meaningful revision. Please write at least 20 words.",
-      });
-    }
-    const aiResult = await callAIPolishAPI(originalText);
-    res.json({ polishedText: aiResult.polishedText });
-  } catch (err) {
-    console.error(`AI polish failed (Response ID: ${id}):`, err);
-    res.status(500).json({ message: "Failed to get AI polish suggestion." });
-  }
-});
-
-app.get("/api/history/:id", authenticateToken, async (req, res) => {
-  const { id } = req.params;
-  const userId = req.user.id;
-  const sql = `SELECT r.id, r.question_id, r.content as user_response, r.word_count, r.submitted_at, r.ai_score, r.ai_feedback, r.is_for_review, q.* FROM responses r LEFT JOIN questions q ON r.question_id = q.id WHERE r.id = $1 AND r.user_id = $2;`;
-  try {
-    const result = await pool.query(sql, [id, userId]);
-    if (result.rows.length === 0)
-      return res
-        .status(404)
-        .json({ message: "History record not found or permission denied." });
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(`Failed to get history detail ID ${id}:`, err);
-    res.status(500).json({ message: "Internal server error." });
-  }
-});
-
-app.get("/api/writing-test", async (req, res) => {
-  try {
-    const sql = `(SELECT * FROM questions WHERE task_type = 'integrated_writing' ORDER BY RANDOM() LIMIT 1) UNION ALL (SELECT * FROM questions WHERE task_type = 'academic_discussion' ORDER BY RANDOM() LIMIT 1);`;
-    const result = await pool.query(sql);
-    if (result.rows.length < 2)
-      return res.status(404).json({
-        message:
-          "Not enough questions in database to start a full writing test.",
-      });
-    const integratedTask = result.rows.find(
-      (q) => q.task_type === "integrated_writing"
-    );
-    if (integratedTask) {
-      generateAudioIfNeeded(integratedTask.id);
-    }
-    res.json(result.rows);
-  } catch (err) {
-    console.error("Failed to get writing test questions:", err);
-    res.status(500).json({ message: "Internal server error." });
-  }
-});
-
-app.get("/api/questions/:id", async (req, res) => {
-  const { id } = req.params;
-  try {
-    generateAudioIfNeeded(id);
-    const sql = `SELECT * FROM questions WHERE id = $1`;
-    const result = await pool.query(sql, [id]);
-    if (result.rows.length === 0)
-      return res.status(404).json({ message: "Question not found." });
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error(`Failed to get question detail ID ${id}:`, err);
-    res.status(500).json({ message: "Internal server error." });
-  }
-});
 
 app.post("/api/auth/register", async (req, res) => {
   const { username, password } = req.body;
@@ -559,6 +384,157 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
+app.get("/api/questions", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const sql = `SELECT q.id, q.title, q.topic, q.task_type, CASE WHEN r.user_id IS NOT NULL THEN TRUE ELSE FALSE END AS has_completed FROM questions q LEFT JOIN (SELECT DISTINCT question_id, user_id FROM responses WHERE user_id = $1) r ON q.id = r.question_id ORDER BY q.id;`;
+    const result = await pool.query(sql, [userId]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Failed to get question list:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+app.get("/api/questions/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    generateAudioIfNeeded(id);
+    const sql = `SELECT * FROM questions WHERE id = $1`;
+    const result = await pool.query(sql, [id]);
+    if (result.rows.length === 0)
+      return res.status(404).json({ message: "Question not found." });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(`Failed to get question detail ID ${id}:`, err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+app.get("/api/writing-test", async (req, res) => {
+  try {
+    const sql = `(SELECT * FROM questions WHERE task_type = 'integrated_writing' ORDER BY RANDOM() LIMIT 1) UNION ALL (SELECT * FROM questions WHERE task_type = 'academic_discussion' ORDER BY RANDOM() LIMIT 1);`;
+    const result = await pool.query(sql);
+    if (result.rows.length < 2)
+      return res.status(404).json({
+        message:
+          "Not enough questions in database to start a full writing test.",
+      });
+    const integratedTask = result.rows.find(
+      (q) => q.task_type === "integrated_writing"
+    );
+    if (integratedTask) {
+      generateAudioIfNeeded(integratedTask.id);
+    }
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Failed to get writing test questions:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+app.post("/api/submit-response", authenticateToken, async (req, res) => {
+  const { content, wordCount, questionId, task_type } = req.body;
+  const userId = req.user.id;
+  const qId = parseInt(questionId, 10);
+  if ((!content && wordCount > 0) || !wordCount || isNaN(qId) || !task_type) {
+    return res.status(400).json({
+      message: "Request is missing required information or is malformed.",
+    });
+  }
+
+  try {
+    const responseSql = `INSERT INTO responses (content, word_count, question_id, task_type, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING id`;
+    const responseResult = await pool.query(responseSql, [
+      content || "",
+      wordCount,
+      qId,
+      task_type,
+      userId,
+    ]);
+    const newResponseId = responseResult.rows[0].id;
+
+    res
+      .status(201)
+      .json({ message: "Submission successful!", id: newResponseId });
+
+    (async () => {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const questionRes = await client.query(
+          "SELECT * FROM questions WHERE id = $1",
+          [qId]
+        );
+        if (questionRes.rows.length === 0)
+          throw new Error(`Question with ID ${qId} not found.`);
+        const questionData = questionRes.rows[0];
+
+        let promptText =
+          task_type === "integrated_writing"
+            ? `Reading: ${questionData.reading_passage}\nLecture: ${questionData.lecture_script}`
+            : `Professor's Prompt: ${questionData.professor_prompt}\n${questionData.student1_author}'s Post: ${questionData.student1_post}\n${questionData.student2_author}'s Post: ${questionData.student2_post}`;
+
+        const aiResult = await callAIScoringAPI(
+          content || "",
+          promptText,
+          task_type
+        );
+
+        await client.query(
+          `UPDATE responses SET ai_score = $1, ai_feedback = $2 WHERE id = $3`,
+          [aiResult.score, aiResult.feedback, newResponseId]
+        );
+
+        if (aiResult.mistakes && aiResult.mistakes.length > 0) {
+          const mistakeInsertPromises = aiResult.mistakes.map((mistake) => {
+            const mistakeSql = `INSERT INTO mistakes (user_id, response_id, type, original_text, corrected_text, explanation) VALUES ($1, $2, $3, $4, $5, $6)`;
+            const validTypes = [
+              "grammar",
+              "spelling",
+              "style",
+              "vocabulary",
+              "punctuation",
+            ];
+            const mistakeType = validTypes.includes(
+              String(mistake.type).toLowerCase()
+            )
+              ? String(mistake.type).toLowerCase()
+              : "style";
+
+            return client.query(mistakeSql, [
+              userId,
+              newResponseId,
+              mistakeType,
+              mistake.original,
+              mistake.corrected,
+              mistake.explanation,
+            ]);
+          });
+          await Promise.all(mistakeInsertPromises);
+          console.log(
+            `✅ Saved ${aiResult.mistakes.length} mistakes for response #${newResponseId}`
+          );
+        }
+
+        await client.query("COMMIT");
+
+        await checkAndAwardAchievements(userId, newResponseId);
+      } catch (aiError) {
+        await client.query("ROLLBACK");
+        console.error(
+          `❌ AI background task failed (Response ID: ${newResponseId}):`,
+          aiError
+        );
+      } finally {
+        client.release();
+      }
+    })();
+  } catch (err) {
+    console.error("Database insertion failed:", err);
+  }
+});
+
 app.get("/api/history", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
@@ -571,44 +547,136 @@ app.get("/api/history", authenticateToken, async (req, res) => {
   }
 });
 
-// --- 【关键修复】: 新增 Dashboard API 路由 ---
+app.get("/api/history/:id", authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+  const sql = `SELECT r.id, r.question_id, r.content as user_response, r.word_count, r.submitted_at, r.ai_score, r.ai_feedback, r.is_for_review, q.* FROM responses r LEFT JOIN questions q ON r.question_id = q.id WHERE r.id = $1 AND r.user_id = $2;`;
+  try {
+    const result = await pool.query(sql, [id, userId]);
+    if (result.rows.length === 0)
+      return res
+        .status(404)
+        .json({ message: "History record not found or permission denied." });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(`Failed to get history detail ID ${id}:`, err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+app.post(
+  "/api/responses/:id/toggle-review",
+  authenticateToken,
+  async (req, res) => {
+    const { id } = req.params;
+    const userId = req.user.id;
+    try {
+      await pool.query(
+        `UPDATE responses SET is_for_review = NOT is_for_review WHERE id = $1 AND user_id = $2;`,
+        [id, userId]
+      );
+      const result = await pool.query(
+        `SELECT is_for_review FROM responses WHERE id = $1 AND user_id = $2;`,
+        [id, userId]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          message: "Response not found or you do not have permission.",
+        });
+      }
+      res.json({ is_for_review: result.rows[0].is_for_review });
+    } catch (err) {
+      console.error(
+        `Failed to toggle review status (Response ID: ${id}):`,
+        err
+      );
+      res.status(500).json({ message: "Internal server error." });
+    }
+  }
+);
+
+app.post("/api/responses/:id/polish", authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+  try {
+    const responseQuery = await pool.query(
+      "SELECT content FROM responses WHERE id = $1 AND user_id = $2",
+      [id, userId]
+    );
+    if (responseQuery.rows.length === 0) {
+      return res.status(404).json({ message: "Response not found." });
+    }
+    const originalText = responseQuery.rows[0].content;
+    if (!originalText || originalText.trim().split(/\s+/).length < 20) {
+      return res.status(400).json({
+        message:
+          "Your text is too short for a meaningful revision. Please write at least 20 words.",
+      });
+    }
+    const aiResult = await callAIPolishAPI(originalText);
+    res.json({ polishedText: aiResult.polishedText });
+  } catch (err) {
+    console.error(`AI polish failed (Response ID: ${id}):`, err);
+    res.status(500).json({ message: "Failed to get AI polish suggestion." });
+  }
+});
+
+app.get("/api/review-list", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const sql = `SELECT r.id, r.word_count, r.submitted_at, COALESCE(q.title, 'Archived Question') as question_title FROM responses r LEFT JOIN questions q ON r.question_id = q.id WHERE r.user_id = $1 AND r.is_for_review = TRUE ORDER BY r.submitted_at DESC;`;
+    const result = await pool.query(sql, [userId]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Failed to get review list:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+app.get("/api/mistakes", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const sql = `
+      SELECT m.id, m.type, m.original_text, m.corrected_text, m.explanation, m.created_at, m.response_id, q.title as question_title
+      FROM mistakes m
+      JOIN responses r ON m.response_id = r.id
+      JOIN questions q ON r.question_id = q.id
+      WHERE m.user_id = $1
+      ORDER BY m.created_at DESC;
+    `;
+    const result = await pool.query(sql, [userId]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Failed to get mistakes:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
 app.get("/api/user/stats", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
     const sql = `
       WITH ValidResponses AS (
-        -- Select only responses that have a score and a valid JSON feedback
         SELECT * FROM responses 
         WHERE user_id = $1 AND ai_score IS NOT NULL AND ai_feedback IS NOT NULL AND ai_feedback LIKE '{%}'
       ), 
       RatingMapping AS (
-        -- Map text ratings to numeric scores for calculation
         SELECT *, 
           DATE(submitted_at) AS submission_date,
           CASE (ai_feedback::jsonb -> 'taskResponse' ->> 'rating')
-            WHEN 'Excellent' THEN 4
-            WHEN 'Good' THEN 3
-            WHEN 'Fair' THEN 2
-            WHEN 'Needs Improvement' THEN 1
+            WHEN 'Excellent' THEN 4 WHEN 'Good' THEN 3 WHEN 'Fair' THEN 2 WHEN 'Needs Improvement' THEN 1
             ELSE 0
           END AS task_response_score,
           CASE (ai_feedback::jsonb -> 'organization' ->> 'rating')
-            WHEN 'Excellent' THEN 4
-            WHEN 'Good' THEN 3
-            WHEN 'Fair' THEN 2
-            WHEN 'Needs Improvement' THEN 1
+            WHEN 'Excellent' THEN 4 WHEN 'Good' THEN 3 WHEN 'Fair' THEN 2 WHEN 'Needs Improvement' THEN 1
             ELSE 0
           END AS organization_score,
           CASE (ai_feedback::jsonb -> 'languageUse' ->> 'rating')
-            WHEN 'Excellent' THEN 4
-            WHEN 'Good' THEN 3
-            WHEN 'Fair' THEN 2
-            WHEN 'Needs Improvement' THEN 1
+            WHEN 'Excellent' THEN 4 WHEN 'Good' THEN 3 WHEN 'Fair' THEN 2 WHEN 'Needs Improvement' THEN 1
             ELSE 0
           END AS language_use_score
         FROM ValidResponses
       )
-      -- Final aggregation into a single JSON object
       SELECT 
         (SELECT json_build_object('total', COUNT(*), 'average', ROUND(AVG(ai_score), 1)) FROM ValidResponses) AS "overallStats",
         (SELECT json_agg(stats) FROM (SELECT task_type, COUNT(*) AS count, ROUND(AVG(ai_score), 1) AS average FROM ValidResponses GROUP BY task_type) AS stats) AS "byType",
@@ -616,7 +684,6 @@ app.get("/api/user/stats", authenticateToken, async (req, res) => {
         (SELECT json_build_object('taskResponse', ROUND(AVG(task_response_score), 2), 'organization', ROUND(AVG(organization_score), 2), 'languageUse', ROUND(AVG(language_use_score), 2)) FROM RatingMapping WHERE task_response_score > 0) AS "feedbackBreakdown";
     `;
     const result = await pool.query(sql, [userId]);
-    // The query is designed to always return one row, even if stats are null
     res.json(result.rows[0]);
   } catch (err) {
     console.error("Failed to get user stats data:", err);
@@ -649,6 +716,18 @@ app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
           "Not enough practice data for a meaningful analysis. Please complete at least 3 practices.",
       });
     }
+    const checkWord = await new Promise((resolve) => {
+      dictionary(onReady);
+      function onReady(err, dict) {
+        if (err) {
+          console.error("Failed to load dictionary:", err);
+          resolve(() => false);
+          return;
+        }
+        const wordSet = new Set(dict.words);
+        resolve((word) => wordSet.has(word));
+      }
+    });
     const stopWords = new Set([
       "a",
       "an",
@@ -692,9 +771,9 @@ app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
     ]);
     const wordCounts = {};
     responsesQuery.rows.forEach((row) => {
-      const words = row.content.toLowerCase().match(/\b\w+\b/g) || [];
+      const words = row.content.toLowerCase().match(/\b[a-z]{3,}\b/g) || [];
       words.forEach((word) => {
-        if (!stopWords.has(word) && isNaN(word)) {
+        if (!stopWords.has(word) && checkWord(word)) {
           wordCounts[word] = (wordCounts[word] || 0) + 1;
         }
       });
