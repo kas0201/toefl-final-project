@@ -1,4 +1,4 @@
-﻿<!-- START OF FILE public/history-detail.html (Focus Mode Rewrite) -->
+﻿<!-- START OF FILE public/history-detail.html (Focus Mode Rewrite v2) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -260,7 +260,7 @@
         color: var(--text-secondary);
       }
 
-      /* === NEW FOCUS MODE MODAL STYLES START === */
+      /* === FOCUS MODE MODAL STYLES V2 START === */
       .modal {
         display: none;
         position: fixed;
@@ -276,11 +276,11 @@
       }
       .modal-content {
         background-color: var(--card-bg);
-        margin: 2% auto; /* More top margin */
+        margin: 2% auto;
         padding: 0;
         border: none;
         width: 95%;
-        max-width: 900px; /* Optimal width for reading/writing */
+        max-width: 900px;
         border-radius: 20px;
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
         display: flex;
@@ -296,16 +296,27 @@
         position: relative;
         flex-shrink: 0;
       }
+      /* --【样式新增】: 取消按钮 -- */
+      .cancel-btn {
+        background: none;
+        border: none;
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--accent-blue);
+        cursor: pointer;
+        padding: 4px 0;
+      }
+      .cancel-btn:hover {
+        text-decoration: underline;
+      }
       .modal-header h2 {
         font-size: 17px;
         font-weight: 600;
         margin: 0;
         color: var(--text-primary);
-      }
-      .header-controls {
-        display: flex;
-        align-items: center;
-        gap: 20px;
+        position: absolute; /* Center the title */
+        left: 50%;
+        transform: translateX(-50%);
       }
       .modal-header .timer {
         font-family: "Roboto Mono", monospace;
@@ -313,26 +324,6 @@
         color: var(--text-secondary);
         font-weight: 500;
       }
-      .close-btn {
-        color: var(--text-secondary);
-        font-size: 24px;
-        font-weight: 400;
-        cursor: pointer;
-        background: #e5e5ea;
-        border-radius: 50%;
-        width: 28px;
-        height: 28px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        line-height: 1;
-        transition: background-color 0.2s ease, color 0.2s ease;
-      }
-      .close-btn:hover {
-        background: #dcdce1;
-        color: var(--text-primary);
-      }
-      /* Main content area for writing and reference */
       .rewrite-main-content {
         flex-grow: 1;
         overflow-y: auto;
@@ -361,10 +352,14 @@
         line-height: 1.7;
         padding: 0;
       }
+      /* --【样式新增】: 优化占位符字体 -- */
+      #rewrite-textarea::placeholder {
+        color: #c4c4c6;
+        font-style: italic;
+      }
       #rewrite-textarea:focus {
         outline: none;
       }
-      /* Collapsible reference section */
       #reference-container {
         width: 85%;
         margin: 40px auto 0;
@@ -376,7 +371,7 @@
         font-weight: 600;
         color: var(--text-primary);
         cursor: pointer;
-        list-style: none; /* Hide default arrow */
+        list-style: none;
         display: flex;
         align-items: center;
         gap: 8px;
@@ -397,6 +392,10 @@
         background-color: #f5f5f7;
         padding: 20px;
         border-radius: 12px;
+      }
+      /* --【样式新增】: 确保参考资料中的 post 样式正确 -- */
+      #rewrite-reference .post {
+        background-color: #fff; /* White background for posts inside reference */
       }
       .modal-footer {
         border-top: 1px solid var(--border-color);
@@ -432,7 +431,7 @@
         cursor: not-allowed;
         transform: none;
       }
-      /* === NEW FOCUS MODE MODAL STYLES END === */
+      /* === FOCUS MODE MODAL STYLES V2 END === */
     </style>
   </head>
   <body>
@@ -482,11 +481,10 @@
     <div id="rewrite-modal" class="modal">
       <div class="modal-content">
         <div class="modal-header">
+          <!-- 【关键变更】: 替换为 Cancel 按钮 -->
+          <button class="cancel-btn" id="cancel-rewrite-btn">Cancel</button>
           <h2>Timed Rewrite</h2>
-          <div class="header-controls">
-            <div class="timer" id="rewrite-timer">--:--</div>
-            <span class="close-btn">&times;</span>
-          </div>
+          <div class="timer" id="rewrite-timer">--:--</div>
         </div>
         <div class="rewrite-main-content">
           <textarea
@@ -509,7 +507,6 @@
     <script src="/auth.js"></script>
     <script>
       document.addEventListener("DOMContentLoaded", () => {
-        // --- JavaScript logic remains the same ---
         const token = localStorage.getItem("token");
         if (!token) {
           window.location.href = "/login.html";
@@ -528,7 +525,8 @@
         const reviewIconCheck = document.getElementById("review-icon-check");
         const rewriteBtn = document.getElementById("rewrite-btn");
         const modal = document.getElementById("rewrite-modal");
-        const closeBtn = document.querySelector(".close-btn");
+        // 【关键变更】: 选择新的 Cancel 按钮
+        const cancelBtn = document.getElementById("cancel-rewrite-btn");
         const rewriteReferenceEl = document.getElementById("rewrite-reference");
         const rewriteTextarea = document.getElementById("rewrite-textarea");
         const rewriteWordCountEl =
@@ -582,17 +580,43 @@
 
         const openRewriteModal = () => {
           if (!pageData) return;
-          const aiCard = document
-            .getElementById("ai-score-card")
-            ?.cloneNode(true);
+
+          // --- 【关键变更】: 动态生成所有参考资料，包括原题 ---
+          rewriteReferenceEl.innerHTML = ""; // Clear previous content
+
+          // 1. 生成原题
+          const promptContainer = document.createElement("div");
+          let promptHTML = "<h3>Original Prompt</h3>";
+          if (pageData.task_type === "integrated_writing") {
+            promptHTML += `<div class="post"><h4>Reading Passage</h4><p class="post-content">${pageData.reading_passage}</p></div><div class="post"><h4>Lecture Script</h4><p class="post-content">${pageData.lecture_script}</p></div>`;
+          } else {
+            promptHTML += `<div class="post"><p class="post-author">${pageData.professor_author}</p><p class="post-content">${pageData.professor_prompt}</p></div><div class="post"><p class="post-author">${pageData.student1_author}</p><p class="post-content">${pageData.student1_post}</p></div><div class="post"><p class="post-author">${pageData.student2_author}</p><p class="post-content">${pageData.student2_post}</p></div>`;
+          }
+          promptContainer.innerHTML = promptHTML;
+          rewriteReferenceEl.appendChild(promptContainer);
+
+          // 2. 复制你的上一次回答
           const originalResponseCard = document
             .querySelector(".user-response-card")
             ?.cloneNode(true);
+          if (originalResponseCard) {
+            const responseContainer = document.createElement("div");
+            responseContainer.innerHTML = "<h3>Your Previous Response</h3>";
+            responseContainer.appendChild(originalResponseCard);
+            rewriteReferenceEl.appendChild(responseContainer);
+          }
 
-          rewriteReferenceEl.innerHTML = ``; // Clear previous content
-          if (aiCard) rewriteReferenceEl.appendChild(aiCard);
-          if (originalResponseCard)
-            rewriteReferenceEl.appendChild(originalResponseCard);
+          // 3. 复制AI反馈
+          const aiCard = document
+            .getElementById("ai-score-card")
+            ?.cloneNode(true);
+          if (aiCard) {
+            const aiContainer = document.createElement("div");
+            aiContainer.innerHTML = "<h3>AI Feedback</h3>";
+            aiContainer.appendChild(aiCard);
+            rewriteReferenceEl.appendChild(aiContainer);
+          }
+          // --- 结束 ---
 
           const timeLimit =
             pageData.task_type === "integrated_writing" ? 1200 : 600;
@@ -608,7 +632,6 @@
           rewriteTextarea.value = "";
           rewriteWordCountEl.textContent = "Words: 0";
           modal.style.display = "none";
-          // Close the details/summary element if it's open
           const refContainer = document.getElementById("reference-container");
           if (refContainer) refContainer.removeAttribute("open");
         };
@@ -634,7 +657,8 @@
         };
 
         rewriteBtn.addEventListener("click", openRewriteModal);
-        closeBtn.addEventListener("click", closeRewriteModal);
+        // 【关键变更】: 事件监听器绑定到新的 Cancel 按钮
+        cancelBtn.addEventListener("click", closeRewriteModal);
         window.addEventListener("click", (event) => {
           if (event.target == modal) closeRewriteModal();
         });
