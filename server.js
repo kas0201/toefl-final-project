@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (with structured AI feedback) ---
+﻿// --- START OF FILE server.js (Strict TOEFL Rubric Scoring) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -18,10 +18,10 @@ cloudinary.config({
   secure: true,
 });
 
-// ======================= 【关键修改】更新AI评分函数 =======================
-async function callAIScoringAPI(responseText, promptText) {
+// ======================= 【核心升级】全新AI评分函数 =======================
+async function callAIScoringAPI(responseText, promptText, taskType) {
   console.log(
-    "🤖 AI a commencé à noter avec le mode de pensée `deepseek-reasoner`..."
+    `🤖 AI a commencé à noter (Mode: ${taskType}) avec le mode de pensée deepseek-reasoner...`
   );
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
@@ -30,42 +30,47 @@ async function callAIScoringAPI(responseText, promptText) {
   }
   const endpoint = "https://api.deepseek.com/chat/completions";
 
-  // === 新的、更结构化的系统指令 ===
-  const systemPrompt = `You are an expert TOEFL writing evaluator. Your goal is to score an essay out of 30 and provide structured feedback.
+  // === 全新的、严格遵循托福官方评分标准的系统指令 ===
+  const systemPrompt = `You are an expert ETS-trained evaluator for the TOEFL iBT Writing section. Your evaluation must strictly adhere to the official scoring rubrics.
 
-    Follow this process strictly:
-    1.  **Think Step-by-Step**: In a <thinking> block, analyze the user's response based on these criteria:
-        *   **Task Response**: How well does the response address the prompt? Is the main idea clear and well-supported?
-        *   **Organization & Development**: Is the essay well-structured with clear paragraphs and logical transitions? Are ideas well-developed with sufficient examples?
-        *   **Language Use**: How is the vocabulary, sentence structure, and grammar?
+    Your process is as follows:
+    1.  **Identify Task Type**: First, identify the task type from the user prompt ('Integrated Writing' or 'Academic Discussion').
+    2.  **Apply Correct Rubric**: In a <thinking> block, analyze the user's response strictly according to the specific rubric for that task type provided below.
+    3.  **Holistic Scoring**: Based on your rubric-based analysis, determine a holistic overall score from 0-30.
+    4.  **Structured Feedback**: Generate concise, constructive feedback for each category within the official rubric.
+    5.  **Final JSON Output**: After the <thinking> block, provide your final answer ONLY as a single, valid JSON object in the specified format.
 
-    2.  **Determine Scores**: Based on your analysis, assign a sub-score (e.g., "Good", "Fair", "Excellent") and a final overall score out of 30.
+    ---
+    ### Integrated Writing Task Rubric ###
+    If the task is 'Integrated Writing', use these criteria:
+    - **Task Response (Selection & Connection)**: How accurately and completely does the response select the important information from the lecture and explain how it challenges or supports the points in the reading passage? A high-scoring response must clearly connect lecture points to reading points.
+    - **Organization & Development**: Is the response well-organized with a clear structure (e.g., introduction, body paragraphs for each point)? Are the ideas logically connected?
+    - **Language Use**: How effectively is language used? Consider grammar, vocabulary, and sentence structure. Minor errors are acceptable if the meaning is clear.
 
-    3.  **Generate Feedback**: Synthesize your analysis into concise, constructive feedback for each category. Also provide one overall "General Suggestion" for improvement.
+    ### Academic Discussion Task Rubric ###
+    If the task is 'Academic Discussion', use these criteria:
+    - **Task Response (Contribution)**: Does the response make a relevant and clear contribution to the discussion? Does it directly address the professor's question and engage with the other students' ideas?
+    - **Organization & Development**: Is the main idea clearly stated? Is it well-supported with reasons, details, and/or examples? Is the response easy to follow?
+    - **Language Use**: Is the language clear and idiomatic? Does it demonstrate a good range of vocabulary and sentence structures?
+    ---
 
-    4.  **Final JSON Output**: After the <thinking> block, provide your final answer ONLY as a single, valid JSON object in the following format. Do not include any other text or markdown formatting.
-
-        {
-          "overallScore": <integer from 0 to 30>,
-          "feedback": {
-            "taskResponse": {
-              "rating": "<string, e.g., 'Excellent', 'Good', 'Fair', 'Needs Improvement'>",
-              "comment": "<string, detailed feedback for this category>"
-            },
-            "organization": {
-              "rating": "<string, e.g., 'Excellent', 'Good', 'Fair', 'Needs Improvement'>",
-              "comment": "<string, detailed feedback for this category>"
-            },
-            "languageUse": {
-              "rating": "<string, e.g., 'Excellent', 'Good', 'Fair', 'Needs Improvement'>",
-              "comment": "<string, detailed feedback for this category>"
-            },
-            "generalSuggestion": "<string, one key takeaway for the user to focus on next time>"
-          }
-        }
+    **JSON Output Format:**
+    {
+      "overallScore": <integer from 0 to 30>,
+      "feedback": {
+        "taskResponse": { "rating": "<string>", "comment": "<string>" },
+        "organization": { "rating": "<string>", "comment": "<string>" },
+        "languageUse": { "rating": "<string>", "comment": "<string>" },
+        "generalSuggestion": "<string>"
+      }
+    }
     `;
 
-  const userPrompt = `## PROMPT ##\n${promptText}\n\n## USER RESPONSE ##\n${responseText}`;
+  const taskTypeName =
+    taskType === "integrated_writing"
+      ? "Integrated Writing"
+      : "Academic Discussion";
+  const userPrompt = `## TASK TYPE ##\n${taskTypeName}\n\n## PROMPT ##\n${promptText}\n\n## USER RESPONSE ##\n${responseText}`;
 
   try {
     const response = await axios.post(
@@ -91,9 +96,8 @@ async function callAIScoringAPI(responseText, promptText) {
       throw new Error("AI did not return a valid JSON object.");
     }
     const jsonString = jsonMatch[0];
-    const result = JSON.parse(jsonString); // The entire result is now the structured JSON
-    console.log("✅ Notation DeepSeek AI (Reasoner) terminée !");
-    // We will now store the score and the stringified feedback JSON in the database
+    const result = JSON.parse(jsonString);
+    console.log("✅ Notation DeepSeek AI (Rubric-based) terminée !");
     return {
       score: result.overallScore,
       feedback: JSON.stringify(result.feedback),
@@ -226,8 +230,9 @@ const authenticateToken = (req, res, next) => {
   );
 };
 
-// --- API 路由 (保持不变) ---
+// --- API 路由 (submit-response 路由有微小改动) ---
 app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
+  // ... (保持不变)
   const { id } = req.params;
   try {
     await generateAudioIfNeeded(id);
@@ -252,6 +257,7 @@ app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
 });
 
 app.get("/api/writing-test", async (req, res) => {
+  // ... (保持不变)
   try {
     const sql = `(SELECT * FROM questions WHERE task_type = 'integrated_writing' ORDER BY RANDOM() LIMIT 1) UNION ALL (SELECT * FROM questions WHERE task_type = 'academic_discussion' ORDER BY RANDOM() LIMIT 1);`;
     const result = await pool.query(sql);
@@ -274,6 +280,7 @@ app.get("/api/writing-test", async (req, res) => {
 });
 
 app.get("/api/questions", async (req, res) => {
+  // ... (保持不变)
   try {
     const sql = `SELECT id, title, topic, task_type FROM questions ORDER BY id`;
     const result = await pool.query(sql);
@@ -285,6 +292,7 @@ app.get("/api/questions", async (req, res) => {
 });
 
 app.get("/api/questions/:id", async (req, res) => {
+  // ... (保持不变)
   const { id } = req.params;
   try {
     generateAudioIfNeeded(id);
@@ -300,6 +308,7 @@ app.get("/api/questions/:id", async (req, res) => {
 });
 
 app.post("/api/auth/register", async (req, res) => {
+  // ... (保持不变)
   const { username, password } = req.body;
   if (!username || !password)
     return res.status(400).json({ message: "用户名和密码不能为空。" });
@@ -322,6 +331,7 @@ app.post("/api/auth/register", async (req, res) => {
 });
 
 app.post("/api/auth/login", async (req, res) => {
+  // ... (保持不变)
   const { username, password } = req.body;
   if (!username || !password)
     return res.status(400).json({ message: "用户名和密码不能为空。" });
@@ -382,7 +392,14 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
           questionData.task_type === "integrated_writing"
             ? `Reading: ${questionData.reading_passage}\nLecture: ${questionData.lecture_script}`
             : `Prompt: ${questionData.professor_prompt}\nStudent 1: ${questionData.student1_post}\nStudent 2: ${questionData.student2_post}`;
-        const aiResult = await callAIScoringAPI(content || "", promptText);
+
+        // === 将 task_type 传递给AI评分函数 ===
+        const aiResult = await callAIScoringAPI(
+          content || "",
+          promptText,
+          task_type
+        );
+
         const updateSql = `UPDATE responses SET ai_score = $1, ai_feedback = $2 WHERE id = $3`;
         await pool.query(updateSql, [
           aiResult.score,
@@ -403,6 +420,7 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
 });
 
 app.get("/api/history", authenticateToken, async (req, res) => {
+  // ... (保持不变)
   const userId = req.user.id;
   try {
     const sql = `SELECT r.id, r.word_count, r.submitted_at, COALESCE(q.title, 'Archived Question') as question_title FROM responses r LEFT JOIN questions q ON r.question_id = q.id WHERE r.user_id = $1 ORDER BY r.submitted_at DESC;`;
@@ -415,6 +433,7 @@ app.get("/api/history", authenticateToken, async (req, res) => {
 });
 
 app.get("/api/history/:id", authenticateToken, async (req, res) => {
+  // ... (保持不变)
   const { id } = req.params;
   const userId = req.user.id;
   const sql = `SELECT r.id, r.content as user_response, r.word_count, r.submitted_at, r.ai_score, r.ai_feedback, q.* FROM responses r LEFT JOIN questions q ON r.question_id = q.id WHERE r.id = $1 AND r.user_id = $2;`;
