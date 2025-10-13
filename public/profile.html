@@ -1,4 +1,4 @@
-<!-- START OF FILE public/profile.html -->
+<!-- START OF FILE public/profile.html (Calendar Fixed & Beautified) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -14,11 +14,11 @@
         --text-secondary: #6e6e73;
         --accent-blue: #007aff;
         --border-color: #d2d2d7;
-        --heatmap-color-1: #ebedf0;
-        --heatmap-color-2: #9be9a8;
-        --heatmap-color-3: #40c463;
-        --heatmap-color-4: #30a14e;
-        --heatmap-color-5: #216e39;
+        --heatmap-color-0: #ebedf0;
+        --heatmap-color-1: #c6e48b;
+        --heatmap-color-2: #7bc96f;
+        --heatmap-color-3: #239a3b;
+        --heatmap-color-4: #196127;
       }
       body {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -64,30 +64,63 @@
         padding: 40px;
       }
 
-      /* Calendar Heatmap Styles */
-      .calendar-container {
+      /* --- 【关键变更】: 全新的日历样式 --- */
+      .calendar-wrapper {
         background-color: var(--card-bg);
         border: 1px solid var(--border-color);
         border-radius: 16px;
         padding: 24px;
+        overflow-x: auto;
+      }
+      .calendar-container {
+        display: inline-block;
+      }
+      .months-grid {
+        display: grid;
+        grid-auto-flow: column;
+        gap: 18px; /* Roughly 4 weeks + gap */
+        margin-left: 30px;
+        margin-bottom: 5px;
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      .calendar-body {
+        display: flex;
+        gap: 15px;
+      }
+      .days-of-week {
+        display: grid;
+        grid-template-rows: repeat(7, 1fr);
+        font-size: 12px;
+        color: var(--text-secondary);
+        align-items: center;
+      }
+      .days-of-week > div:nth-child(odd) {
+        visibility: hidden;
       }
       .calendar-grid {
         display: grid;
         grid-template-rows: repeat(7, 1fr);
         grid-auto-flow: column;
-        gap: 3px;
+        gap: 4px;
       }
       .day {
-        width: 15px;
-        height: 15px;
-        background-color: var(--heatmap-color-1);
+        width: 14px;
+        height: 14px;
+        background-color: var(--heatmap-color-0);
         border-radius: 3px;
       }
       .day.active {
+        background-color: var(--heatmap-color-2);
+      }
+      .day.active-strong {
         background-color: var(--heatmap-color-4);
       }
+      .day:empty {
+        background-color: transparent;
+      }
 
-      /* Achievements Styles */
+      /* Achievements Styles (无变动) */
       .achievements-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -121,7 +154,7 @@
       }
       .achievement-card.unlocked .achievement-icon {
         background-color: #e4f8e9;
-        color: var(--heatmap-color-5);
+        color: var(--heatmap-color-4);
       }
       .achievement-details h3 {
         font-size: 18px;
@@ -139,7 +172,7 @@
     <div class="navbar"></div>
     <div class="main-container">
       <h2 class="section-header">Practice Calendar</h2>
-      <div class="calendar-container" id="calendar-container">
+      <div class="calendar-wrapper" id="calendar-wrapper">
         <div class="loading-state">Loading calendar...</div>
       </div>
 
@@ -158,10 +191,10 @@
           return;
         }
 
-        const calendarContainer = document.getElementById("calendar-container");
+        const calendarWrapper = document.getElementById("calendar-wrapper");
         const achievementsGrid = document.getElementById("achievements-grid");
 
-        // --- Function to render Calendar Heatmap ---
+        // --- 【关键变更】: 全新的日历渲染函数 ---
         const renderCalendar = async () => {
           try {
             const response = await fetch("/api/user/practice-calendar", {
@@ -173,13 +206,43 @@
               practiceDates.map((d) => d.split("T")[0])
             );
 
-            calendarContainer.innerHTML =
-              '<div class="calendar-grid" id="calendar-grid"></div>';
+            calendarWrapper.innerHTML = `
+                        <div class="calendar-container">
+                            <div class="months-grid" id="months-grid"></div>
+                            <div class="calendar-body">
+                                <div class="days-of-week"><div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div></div>
+                                <div class="calendar-grid" id="calendar-grid"></div>
+                            </div>
+                        </div>`;
+
             const grid = document.getElementById("calendar-grid");
+            const monthsGrid = document.getElementById("months-grid");
             const today = new Date();
             const startDate = new Date();
             startDate.setDate(today.getDate() - 364);
 
+            // 1. 填充日历开头的空白天数
+            const startDay = startDate.getDay(); // 0 = Sunday
+            for (let i = 0; i < startDay; i++) {
+              grid.appendChild(document.createElement("div"));
+            }
+
+            // 2. 填充日期格子并生成月份标签
+            const monthNames = [
+              "Jan",
+              "Feb",
+              "Mar",
+              "Apr",
+              "May",
+              "Jun",
+              "Jul",
+              "Aug",
+              "Sep",
+              "Oct",
+              "Nov",
+              "Dec",
+            ];
+            let lastMonth = -1;
             for (
               let d = new Date(startDate);
               d <= today;
@@ -189,17 +252,24 @@
               dayEl.className = "day";
               const dateString = d.toISOString().split("T")[0];
               if (practiceDateSet.has(dateString)) {
-                dayEl.classList.add("active");
+                dayEl.classList.add("active"); // 可以根据练习次数添加不同 class
               }
               dayEl.title = d.toLocaleDateString();
               grid.appendChild(dayEl);
+
+              // Add month label when a new month starts
+              if (d.getMonth() !== lastMonth) {
+                lastMonth = d.getMonth();
+                const monthEl = document.createElement("div");
+                monthEl.textContent = monthNames[lastMonth];
+                monthsGrid.appendChild(monthEl);
+              }
             }
           } catch (error) {
-            calendarContainer.innerHTML = `<div class="empty-state">${error.message}</div>`;
+            calendarWrapper.innerHTML = `<div class="empty-state">${error.message}</div>`;
           }
         };
 
-        // --- Function to render Achievements ---
         const renderAchievements = async () => {
           try {
             const response = await fetch("/api/user/achievements", {
@@ -208,7 +278,7 @@
             if (!response.ok) throw new Error("Failed to load achievements");
             const achievements = await response.json();
 
-            achievementsGrid.innerHTML = ""; // Clear loading state
+            achievementsGrid.innerHTML = "";
             if (achievements.length === 0) {
               achievementsGrid.innerHTML = `<div class="empty-state">No achievements available yet.</div>`;
               return;
@@ -237,7 +307,6 @@
           }
         };
 
-        // --- Initial Load ---
         renderCalendar();
         renderAchievements();
       });
