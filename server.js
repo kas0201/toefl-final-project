@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (使用 Cloudflare Workers AI TTS - 最终 URL 修正版) ---
+﻿// --- START OF FILE server.js (Cloudflare TTS URL 最终正确修复版) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -68,7 +68,7 @@ async function callAIScoringAPI(responseText, promptText) {
 }
 // -------------------------------------------------------------------------------------
 
-// ======================= 【新】后台音频生成函数 (使用Cloudflare) =======================
+// ======================= 【关键修正】后台音频生成函数 (使用Cloudflare) =======================
 async function generateAudioIfNeeded(questionId) {
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
   const apiToken = process.env.CLOUDFLARE_API_TOKEN;
@@ -95,8 +95,11 @@ async function generateAudioIfNeeded(questionId) {
 
     console.log(`🎤 [后台任务 CF-TTS] 开始为题目 #${questionId} 生成音频...`);
 
-    // 【最终修正】: 删除了错误的 /workers/ 部分，这才是正确的 API 路径
-    const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/microsoft/speecht5-tts`;
+    // ====================== 【就是这里！已修正！】 ======================
+    // 错误的 URL: /ai/run/@cf/microsoft/speecht5-tts
+    // 正确的 URL: /ai/run/microsoft/speecht5-tts  (去掉了 @cf/)
+    const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/microsoft/speecht5-tts`;
+    // =================================================================
 
     const ttsResponse = await axios.post(
       endpoint,
@@ -142,7 +145,7 @@ async function generateAudioIfNeeded(questionId) {
     );
   } catch (error) {
     const errorDetails = error.response
-      ? new TextDecoder().decode(error.response.data)
+      ? JSON.parse(Buffer.from(error.response.data).toString())
       : error.message;
     console.error(
       `❌ [后台任务 CF-TTS] 为题目 #${questionId} 生成音频时出错:`,
@@ -181,7 +184,6 @@ const authenticateToken = (req, res, next) => {
 };
 
 // ======================= API 接口 (其余代码保持不变) =======================
-// ... (所有 /api/... 路由代码都无需修改，因此省略) ...
 // --- 生成音频的管理接口 ---
 app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
