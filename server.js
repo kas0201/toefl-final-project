@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (使用 Cloudflare Workers AI TTS - 最终修正版) ---
+﻿// --- START OF FILE server.js (使用 Cloudflare Workers AI TTS - 最终 URL 修正版) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -95,8 +95,8 @@ async function generateAudioIfNeeded(questionId) {
 
     console.log(`🎤 [后台任务 CF-TTS] 开始为题目 #${questionId} 生成音频...`);
 
-    // 【关键修正】: 在 URL 路径中添加了 /workers/
-    const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/ai/run/@cf/microsoft/speecht5-tts`;
+    // 【最终修正】: 删除了错误的 /workers/ 部分，这才是正确的 API 路径
+    const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/microsoft/speecht5-tts`;
 
     const ttsResponse = await axios.post(
       endpoint,
@@ -151,7 +151,6 @@ async function generateAudioIfNeeded(questionId) {
   }
 }
 // =======================================================================
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(cors());
