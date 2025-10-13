@@ -1,4 +1,4 @@
-<!-- START OF FILE public/mistake-book.html -->
+<!-- START OF FILE public/mistake-book.html (Final Version with Styled Select) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -58,23 +58,60 @@
         margin-bottom: 40px;
         font-size: 18px;
       }
+
+      /* --- 【关键修改 1/3】: 美化筛选器容器 --- */
       .filter-controls {
         margin-bottom: 24px;
         display: flex;
-        gap: 10px;
+        gap: 12px;
         align-items: center;
       }
       .filter-controls label {
-        font-weight: 500;
-        color: var(--text-secondary);
+        font-weight: 600;
+        color: var(--text-primary);
+        font-size: 16px;
       }
+
+      /* --- 【关键修改 2/3】: 自定义下拉菜单的包裹容器 --- */
+      .select-wrapper {
+        position: relative;
+        display: inline-block;
+      }
+      .select-wrapper::after {
+        content: "⌄"; /* 使用一个更优雅的箭头符号 */
+        font-size: 16px;
+        color: var(--text-secondary);
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        pointer-events: none; /* 确保箭头不会阻碍点击 */
+      }
+
+      /* --- 【关键修改 3/3】: 美化下拉菜单本身 --- */
       .filter-controls select {
-        padding: 8px 12px;
+        appearance: none; /* 移除默认的浏览器UI */
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        padding: 10px 32px 10px 16px; /* 增加右侧内边距，为自定义箭头留出空间 */
         border-radius: 8px;
         border: 1px solid var(--border-color);
         font-size: 15px;
+        font-family: inherit;
+        font-weight: 500;
         background-color: var(--card-bg);
+        cursor: pointer;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
       }
+      .filter-controls select:hover {
+        border-color: #b1b1b3;
+      }
+      .filter-controls select:focus {
+        outline: none;
+        border-color: var(--accent-blue);
+        box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+      }
+
       .mistake-list {
         display: grid;
         gap: 16px;
@@ -195,14 +232,17 @@
 
       <div class="filter-controls">
         <label for="type-filter">Filter by type:</label>
-        <select id="type-filter">
-          <option value="all">All Types</option>
-          <option value="grammar">Grammar</option>
-          <option value="spelling">Spelling</option>
-          <option value="punctuation">Punctuation</option>
-          <option value="vocabulary">Vocabulary</option>
-          <option value="style">Style</option>
-        </select>
+        <!-- 【关键修改】: 用一个 div 包裹 select 标签 -->
+        <div class="select-wrapper">
+          <select id="type-filter">
+            <option value="all">All Types</option>
+            <option value="grammar">Grammar</option>
+            <option value="spelling">Spelling</option>
+            <option value="punctuation">Punctuation</option>
+            <option value="vocabulary">Vocabulary</option>
+            <option value="style">Style</option>
+          </select>
+        </div>
       </div>
 
       <div class="mistake-list" id="mistake-list">
