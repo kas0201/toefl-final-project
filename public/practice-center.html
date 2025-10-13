@@ -1,4 +1,4 @@
-﻿<!-- START OF FILE public/practice-center.html (with categorization) -->
+﻿<!-- START OF FILE public/practice-center.html (with Tabs navigation) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -82,21 +82,45 @@
         margin-bottom: 40px;
         font-size: 18px;
       }
-      /* === NEW STYLES START === */
-      .section-header {
-        font-size: 24px;
-        font-weight: 700;
-        color: var(--text-primary);
-        margin-top: 48px;
-        margin-bottom: 20px;
-        padding-bottom: 8px;
+
+      /* === NEW TAB STYLES START === */
+      .tab-nav {
+        display: flex;
+        gap: 8px;
         border-bottom: 1px solid var(--border-color);
+        margin-bottom: 32px;
       }
+      .tab-btn {
+        padding: 12px 20px;
+        border: none;
+        background-color: transparent;
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        cursor: pointer;
+        border-bottom: 3px solid transparent;
+        transition: all 0.2s ease;
+      }
+      .tab-btn:hover {
+        color: var(--text-primary);
+      }
+      .tab-btn.active {
+        color: var(--accent-blue);
+        font-weight: 600;
+        border-bottom-color: var(--accent-blue);
+      }
+      .tab-pane {
+        display: none; /* Hide panes by default */
+      }
+      .tab-pane.active {
+        display: block; /* Show active pane */
+      }
+      /* === NEW TAB STYLES END === */
+
       .questions-grid {
         display: grid;
         gap: 20px;
       }
-      /* === NEW STYLES END === */
       .question-card {
         background-color: var(--container-bg);
         border-radius: 12px;
@@ -180,36 +204,65 @@
       <h1>Practice Center</h1>
       <p class="subtitle">Choose a topic for targeted practice.</p>
 
-      <!-- === NEW HTML STRUCTURE START === -->
-      <div id="practice-sections">
-        <h2 class="section-header">Academic Discussion Tasks</h2>
-        <div id="academic-discussion-list" class="questions-grid">
-          <div class="loading-state">Loading questions...</div>
-        </div>
+      <!-- === NEW TABS HTML STRUCTURE START === -->
+      <div class="tab-nav">
+        <button class="tab-btn active" data-target="#academic-content">
+          Academic Discussion
+        </button>
+        <button class="tab-btn" data-target="#integrated-content">
+          Integrated Writing
+        </button>
+      </div>
 
-        <h2 class="section-header">Integrated Writing Tasks</h2>
-        <div id="integrated-writing-list" class="questions-grid">
-          <div class="loading-state">Loading questions...</div>
+      <div class="tab-content">
+        <div id="academic-content" class="tab-pane active">
+          <div id="academic-discussion-list" class="questions-grid">
+            <div class="loading-state">Loading questions...</div>
+          </div>
         </div>
-
-        <div id="empty-state-container" style="display: none">
-          <div class="empty-state">
-            No practice questions found. Please check back later.
+        <div id="integrated-content" class="tab-pane">
+          <div id="integrated-writing-list" class="questions-grid">
+            <div class="loading-state">Loading questions...</div>
           </div>
         </div>
       </div>
-      <!-- === NEW HTML STRUCTURE END === -->
+
+      <div id="empty-state-container" style="display: none">
+        <div class="empty-state">
+          No practice questions found. Please check back later.
+        </div>
+      </div>
+      <!-- === NEW TABS HTML STRUCTURE END === -->
     </div>
 
     <script src="/auth.js"></script>
     <script>
       document.addEventListener("DOMContentLoaded", async () => {
+        // === NEW TAB SWITCHING LOGIC START ===
+        const tabButtons = document.querySelectorAll(".tab-btn");
+        const tabPanes = document.querySelectorAll(".tab-pane");
+
+        tabButtons.forEach((button) => {
+          button.addEventListener("click", () => {
+            // Deactivate all buttons and panes
+            tabButtons.forEach((btn) => btn.classList.remove("active"));
+            tabPanes.forEach((pane) => pane.classList.remove("active"));
+
+            // Activate the clicked button and its corresponding pane
+            button.classList.add("active");
+            const targetPane = document.querySelector(button.dataset.target);
+            if (targetPane) {
+              targetPane.classList.add("active");
+            }
+          });
+        });
+        // === NEW TAB SWITCHING LOGIC END ===
+
         if (!localStorage.getItem("token")) {
           window.location.href = "/login.html";
           return;
         }
 
-        // Get references to the new list containers
         const academicList = document.getElementById(
           "academic-discussion-list"
         );
@@ -219,6 +272,8 @@
         const emptyStateContainer = document.getElementById(
           "empty-state-container"
         );
+        const tabNav = document.querySelector(".tab-nav");
+        const tabContent = document.querySelector(".tab-content");
 
         try {
           const response = await fetch("/api/questions");
@@ -226,16 +281,16 @@
 
           const allQuestions = await response.json();
 
-          // Clear loading states
           academicList.innerHTML = "";
           integratedList.innerHTML = "";
 
           if (allQuestions.length === 0) {
+            tabNav.style.display = "none";
+            tabContent.style.display = "none";
             emptyStateContainer.style.display = "block";
             return;
           }
 
-          // Filter questions by type
           const academicQuestions = allQuestions.filter(
             (q) => q.task_type === "academic_discussion"
           );
@@ -243,7 +298,6 @@
             (q) => q.task_type === "integrated_writing"
           );
 
-          // Helper function to create a question card element
           const createQuestionCard = (question) => {
             const card = document.createElement("div");
             card.className = "question-card";
@@ -263,7 +317,6 @@
               <div class="card-content">
                 <h2>${question.title}</h2>
                 <div class="badge-group">
-                  <span class="task-type-badge ${taskTypeClass}">${taskTypeName}</span>
                   <span class="topic-badge">${question.topic}</span>
                 </div>
               </div>
@@ -272,7 +325,6 @@
             return card;
           };
 
-          // Populate Academic Discussion list
           if (academicQuestions.length > 0) {
             academicQuestions.forEach((q) =>
               academicList.appendChild(createQuestionCard(q))
@@ -282,7 +334,6 @@
               '<div class="empty-state" style="padding: 20px;">No Academic Discussion tasks available.</div>';
           }
 
-          // Populate Integrated Writing list
           if (integratedQuestions.length > 0) {
             integratedQuestions.forEach((q) =>
               integratedList.appendChild(createQuestionCard(q))
