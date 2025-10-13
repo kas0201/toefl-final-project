@@ -36,122 +36,93 @@
         background-color: var(--bg-color);
         color: var(--text-primary);
         margin: 0;
-        padding: 24px;
       }
-      .navbar {
-        max-width: 1000px;
-        margin: 20px auto 0;
-        padding: 0 10px;
+      .exam-header {
+        background-color: var(--card-bg);
+        border-bottom: 1px solid var(--border-color);
+        padding: 16px 32px;
         display: flex;
         justify-content: space-between;
         align-items: center;
+        position: sticky;
+        top: 0;
+        z-index: 10;
       }
-      .nav-link {
-        color: var(--text-secondary);
-        text-decoration: none;
+      .exam-header h1 {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0;
+        color: var(--text-primary);
+      }
+      .exam-header .timer {
+        font-family: "Roboto Mono", monospace;
+        font-size: 20px;
         font-weight: 500;
-        font-size: 15px;
-      }
-      .nav-right {
-        display: flex;
-        align-items: center;
-        gap: 20px;
+        color: var(--text-primary);
       }
       .main-container {
-        max-width: 1000px;
-        margin: 40px auto;
+        max-width: 1200px;
+        margin: 32px auto;
+        padding: 0 32px;
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 32px;
-        animation: fadeIn 0.6s ease-out;
+        grid-template-columns: 1fr;
+        gap: 32px; /* Default to single column */
       }
-      .left-panel,
-      .right-panel {
-        display: flex;
-        flex-direction: column;
-      }
-      h1 {
-        font-size: 28px;
-        font-weight: 700;
-        margin: 0 0 8px 0;
-      }
-      .subtitle {
-        color: var(--text-secondary);
-        margin-bottom: 24px;
-        font-size: 17px;
-      }
-      .content-card {
+      .content-panel,
+      .writing-panel {
         background-color: var(--card-bg);
+        border-radius: 20px;
         border: 1px solid var(--border-color);
-        border-radius: 16px;
-        padding: 24px;
+        padding: 32px;
+        height: calc(100vh - 160px);
         overflow-y: auto;
+        box-sizing: border-box;
+      }
+      .content-panel h2,
+      .writing-panel h2 {
+        font-size: 22px;
+        margin-top: 0;
+      }
+      .content-panel p {
+        font-size: 17px;
         line-height: 1.7;
-        font-size: 16px;
         color: var(--text-secondary);
-        height: 450px;
         white-space: pre-wrap;
+      }
+      .writing-panel.inactive {
+        background-color: var(--bg-color);
+        border: none;
+        box-shadow: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+      }
+      .inactive-message {
+        font-size: 18px;
+        color: var(--text-secondary);
       }
       #user-textarea {
         width: 100%;
-        min-height: 400px;
+        height: calc(100% - 80px);
         border: 1px solid var(--border-color);
-        border-radius: 16px;
+        border-radius: 12px;
         padding: 16px;
         font-size: 16px;
         font-family: inherit;
-        resize: vertical;
+        resize: none;
         box-sizing: border-box;
-        transition: border-color 0.2s ease, box-shadow 0.2s ease;
-      }
-      #user-textarea:focus {
-        outline: 0;
-        border-color: var(--accent-blue);
-        box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
-      }
-      #user-textarea:disabled {
-        background-color: var(--control-bg);
       }
       .controls-container {
-        background-color: var(--card-bg);
-        border: 1px solid var(--border-color);
-        border-radius: 16px;
-        padding: 12px 20px;
         margin-top: 16px;
         display: flex;
         justify-content: space-between;
         align-items: center;
       }
-      .timer-group,
-      .word-count-group {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-      .icon {
-        width: 20px;
-        height: 20px;
-        color: var(--text-tertiary);
-      }
-      #timer {
-        font-family: "Roboto Mono", monospace;
-        font-size: 18px;
-        font-weight: 500;
-      }
       #word-count {
-        font-size: 16px;
+        font-size: 15px;
+        color: var(--text-secondary);
         font-weight: 500;
-        color: var(--text-tertiary);
-      }
-      #phase-indicator {
-        text-align: center;
-        font-size: 16px;
-        font-weight: 600;
-        color: var(--accent-purple);
-        margin-bottom: 16px;
-        background-color: rgba(88, 86, 214, 0.1);
-        padding: 8px;
-        border-radius: 8px;
       }
       #submit-btn {
         padding: 10px 24px;
@@ -165,131 +136,97 @@
       }
       #submit-btn:disabled {
         background-color: #e5e5ea;
-        color: var(--text-tertiary);
+        color: var(--text-secondary);
         cursor: not-allowed;
       }
       #status-message {
         text-align: center;
-        margin-top: 16px;
+        margin-top: 24px;
         font-weight: 500;
         height: 20px;
       }
     </style>
   </head>
   <body>
-    <div class="navbar"></div>
-    <div class="main-container">
-      <div class="left-panel">
-        <h1 id="task-title">Integrated Writing</h1>
-        <p class="subtitle" id="task-topic">Loading Topic...</p>
-        <div id="phase-indicator">Phase 1: Reading</div>
-        <div id="content-display" class="content-card">Loading content...</div>
-      </div>
-      <div class="right-panel">
-        <p
-          style="
-            font-size: 21px;
-            font-weight: 700;
-            margin-top: 0;
-            margin-bottom: 35px;
-          "
-        >
-          Your Response
-        </p>
-        <textarea
-          id="user-textarea"
-          placeholder="You can write after the reading and lecture phases."
-          disabled
-        ></textarea>
-        <div class="controls-container">
-          <div class="timer-group">
-            <svg
-              class="icon"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke-width="1.5"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <div id="timer">03:00</div>
-          </div>
-          <div class="word-count-group">
-            <svg
-              class="icon"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke-width="1.5"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
-              />
-            </svg>
-            <div id="word-count">Words: 0</div>
-          </div>
-          <button id="submit-btn" disabled>Submit</button>
-        </div>
-        <p id="status-message"></p>
-      </div>
+    <div class="exam-header">
+      <h1 id="phase-title">Integrated Writing</h1>
+      <div class="timer" id="phase-timer">--:--</div>
     </div>
-    <script src="/auth.js"></script>
+    <div class="main-container" id="main-container">
+      <!-- Content will be injected here -->
+    </div>
+
     <script>
       const token = localStorage.getItem("token");
       if (!token) window.location.href = "/login.html";
-      const titleEl = document.getElementById("task-title"),
-        topicEl = document.getElementById("task-topic"),
-        phaseIndicatorEl = document.getElementById("phase-indicator"),
-        contentDisplayEl = document.getElementById("content-display"),
-        textarea = document.getElementById("user-textarea"),
-        timerEl = document.getElementById("timer"),
-        wordCountEl = document.getElementById("word-count"),
-        submitBtn = document.getElementById("submit-btn"),
-        statusMessageEl = document.getElementById("status-message");
-      let timer,
-        timeRemaining,
-        currentQuestion = null;
 
-      async function startReadingPhase() {
-        phaseIndicatorEl.textContent = "Phase 1: Reading (3 Minutes)";
-        contentDisplayEl.innerHTML = `<p>${currentQuestion.reading_passage}</p>`;
-        timeRemaining = 180;
-        startTimer(startLecturePhase);
+      const phaseTitleEl = document.getElementById("phase-title");
+      const phaseTimerEl = document.getElementById("phase-timer");
+      const mainContainer = document.getElementById("main-container");
+
+      let timer;
+      let currentQuestion = null;
+
+      function renderReadingPhase() {
+        phaseTitleEl.textContent = "Phase 1: Reading";
+        mainContainer.style.gridTemplateColumns = "1fr 1fr";
+        mainContainer.innerHTML = `
+                <div class="content-panel"><h2>Reading Passage</h2><p>${currentQuestion.reading_passage}</p></div>
+                <div class="writing-panel inactive"><p class="inactive-message">You will be able to write after the lecture.</p></div>`;
+        startTimer(180, renderLecturePhase);
       }
-      function startLecturePhase() {
-        phaseIndicatorEl.textContent = "Phase 2: Lecture Script (2 Minutes)";
-        contentDisplayEl.innerHTML = `<p>${currentQuestion.lecture_script}</p>`;
-        timeRemaining = 120;
-        startTimer(startWritingPhase);
+
+      function renderLecturePhase() {
+        phaseTitleEl.textContent = "Phase 2: Lecture";
+        mainContainer.style.gridTemplateColumns = "1fr"; // Single column for focus
+
+        if (currentQuestion.lecture_audio_url) {
+          mainContainer.innerHTML = `<div class="content-panel" style="display:flex; flex-direction:column; align-items:center; justify-content:center;"><p style="font-size: 18px;">Listen carefully to the lecture.</p><audio id="lecture-audio" src="${currentQuestion.lecture_audio_url}" controls></audio></div>`;
+          const audioEl = document.getElementById("lecture-audio");
+          phaseTimerEl.textContent = "Playing...";
+          audioEl.onended = renderWritingPhase;
+        } else {
+          mainContainer.innerHTML = `<div class="content-panel"><h2>Lecture Script</h2><p>${currentQuestion.lecture_script}</p></div>`;
+          startTimer(120, renderWritingPhase);
+        }
       }
-      function startWritingPhase() {
-        phaseIndicatorEl.textContent = "Phase 3: Writing (20 Minutes)";
-        contentDisplayEl.innerHTML = `<h4>Reading Passage Reference</h4><p>${currentQuestion.reading_passage}</p><hr><p><strong>Question:</strong> Summarize the points made in the lecture, being sure to explain how they challenge the specific points made in the reading passage.</p>`;
-        textarea.disabled = false;
-        submitBtn.disabled = false;
-        textarea.focus();
-        timeRemaining = 1200;
-        startTimer(() => {
+
+      function renderWritingPhase() {
+        phaseTitleEl.textContent = "Phase 3: Writing";
+        mainContainer.style.gridTemplateColumns = "1fr 1fr"; // Back to two columns
+        mainContainer.innerHTML = `
+                <div class="content-panel"><h2>Reading Passage Reference</h2><p>${currentQuestion.reading_passage}</p></div>
+                <div class="writing-panel" id="writing-panel"></div>`;
+        renderWritingArea();
+        startTimer(1200, () => {
           alert("Time's Up!");
           submitResponse(true);
         });
       }
-      function startTimer(onComplete) {
+
+      function renderWritingArea() {
+        document.getElementById(
+          "writing-panel"
+        ).innerHTML = `<h2>Your Response</h2><textarea id="user-textarea"></textarea><div class="controls-container"><div id="word-count">Words: 0</div><button id="submit-btn" onclick="submitResponse(false)">Submit</button></div><p id="status-message"></p>`;
+        document
+          .getElementById("user-textarea")
+          .addEventListener("input", (e) => {
+            const words = e.target.value.trim().match(/\S+/g)?.length || 0;
+            document.getElementById(
+              "word-count"
+            ).textContent = `Words: ${words}`;
+          });
+      }
+
+      function startTimer(duration, onComplete) {
         clearInterval(timer);
+        let timeRemaining = duration;
         const updateDisplay = () => {
           const minutes = Math.floor(timeRemaining / 60)
             .toString()
             .padStart(2, "0");
           const seconds = (timeRemaining % 60).toString().padStart(2, "0");
-          timerEl.textContent = `${minutes}:${seconds}`;
+          phaseTimerEl.textContent = `${minutes}:${seconds}`;
         };
         updateDisplay();
         timer = setInterval(() => {
@@ -301,11 +238,17 @@
           }
         }, 1000);
       }
+
       async function submitResponse(force = false) {
+        const submitBtn = document.getElementById("submit-btn");
+        const textarea = document.getElementById("user-textarea");
+        const statusMessageEl = document.getElementById("status-message");
         const content = textarea.value;
         const wordCount = content ? content.trim().match(/\S+/g).length : 0;
-        if (wordCount === 0 && !force)
-          return alert("Cannot submit an empty response.");
+        if (wordCount === 0 && !force) {
+          alert("Cannot submit an empty response.");
+          return;
+        }
         statusMessageEl.textContent = "Submitting...";
         submitBtn.disabled = true;
         try {
@@ -324,18 +267,18 @@
           });
           const result = await response.json();
           if (!response.ok) throw new Error(result.message);
-          // --- 【修正】: 跳转到成功页面 ---
           window.location.href = `/submission-success.html?id=${result.id}`;
         } catch (error) {
           statusMessageEl.innerHTML = `<span style="color: var(--accent-red);">✗ ${error.message}</span>`;
           submitBtn.disabled = false;
         }
       }
+
       document.addEventListener("DOMContentLoaded", async () => {
         const urlParams = new URLSearchParams(window.location.search);
         const questionId = urlParams.get("id");
         if (!questionId) {
-          topicEl.textContent = "Error: No question ID provided.";
+          mainContainer.innerHTML = `<h2>Error</h2><p>No question ID provided.</p>`;
           return;
         }
         try {
@@ -343,19 +286,12 @@
           if (!response.ok)
             throw new Error("Failed to fetch question details.");
           currentQuestion = await response.json();
-          titleEl.textContent = currentQuestion.title;
-          topicEl.textContent = currentQuestion.topic;
-          startReadingPhase();
+          renderReadingPhase();
         } catch (error) {
           console.error("Error fetching question:", error);
-          topicEl.textContent = "Error loading question.";
+          mainContainer.innerHTML = `<h2>Error</h2><p>Could not load the question.</p>`;
         }
       });
-      textarea.addEventListener("input", () => {
-        const words = textarea.value.trim().match(/\S+/g)?.length || 0;
-        wordCountEl.textContent = `Words: ${words}`;
-      });
-      submitBtn.addEventListener("click", () => submitResponse(false));
     </script>
   </body>
 </html>
