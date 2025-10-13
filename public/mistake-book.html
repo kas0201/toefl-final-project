@@ -1,4 +1,4 @@
-<!-- START OF FILE public/mistake-book.html (Final Version with Enhanced Apple-style Select) -->
+<!-- START OF FILE public/mistake-book.html (Final Version with Full Page Redesign) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -46,47 +46,55 @@
         max-width: 900px;
         margin: 40px auto;
       }
+
+      /* --- 【关键修改 1/6】: 创建一个新的页眉容器，用于 flex 布局 --- */
+      .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px; /* 调整与副标题的间距 */
+      }
+
+      /* --- 【关键修改 2/6】: 标题改为左对齐，并调整外边距 --- */
       h1 {
         font-size: 36px;
         font-weight: 700;
-        text-align: center;
-        margin: 0 0 8px 0;
+        text-align: left;
+        margin: 0;
       }
+
+      /* --- 【关键修改 3/6】: 副标题也改为左对齐，并调整外边距 --- */
       .subtitle {
-        text-align: center;
+        text-align: left;
         color: var(--text-secondary);
         margin-bottom: 40px;
         font-size: 18px;
+        margin-top: 0;
       }
 
-      /* --- 【关键修改 1/4】: 将整个控件容器设计成一个 "药丸" 形状 --- */
+      /* --- 【关键修改 4/6】: 筛选器控件样式保持不变，但外边距由父容器控制 --- */
       .filter-controls {
-        display: inline-flex; /* 让容器宽度自适应内容 */
+        display: inline-flex;
         align-items: center;
         border: 1px solid var(--border-color);
         border-radius: 10px;
         background-color: var(--card-bg);
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
         transition: box-shadow 0.2s ease, border-color 0.2s ease;
-        margin-bottom: 24px;
+        flex-shrink: 0; /* 防止在高分辨率下被压缩 */
       }
-
-      /* --- 【关键修改 2/4】: 当下拉框被激活时，整个控件显示辉光效果 --- */
       .filter-controls:focus-within {
         border-color: var(--accent-blue);
         box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
       }
-
-      /* --- 【关键修改 3/4】: 调整标签样式，并添加右侧分割线 --- */
       .filter-controls label {
         font-weight: 500;
         color: var(--text-secondary);
         font-size: 15px;
         padding: 10px 12px 10px 16px;
         border-right: 1px solid var(--border-color);
-        white-space: nowrap; /* 防止文字换行 */
+        white-space: nowrap;
       }
-
       .select-wrapper {
         position: relative;
         display: inline-block;
@@ -101,23 +109,21 @@
         transform: translateY(-50%);
         pointer-events: none;
       }
-
-      /* --- 【关键修改 4/4】: 移除下拉框自身的边框和背景，使其融入父容器 --- */
       .filter-controls select {
         appearance: none;
         -webkit-appearance: none;
         -moz-appearance: none;
         padding: 10px 32px 10px 16px;
-        border: none; /* 移除边框 */
+        border: none;
         font-size: 15px;
         font-family: inherit;
         font-weight: 500;
-        background-color: transparent; /* 背景透明 */
+        background-color: transparent;
         cursor: pointer;
         color: var(--text-primary);
       }
       .filter-controls select:focus {
-        outline: none; /* 移除默认的蓝色 outline */
+        outline: none;
       }
 
       .mistake-list {
@@ -233,24 +239,28 @@
   <body>
     <div class="navbar"></div>
     <div class="main-container">
-      <h1>My Mistake Book</h1>
+      <!-- --- 【关键修改 5/6】: HTML 结构调整，创建 page-header --- -->
+      <div class="page-header">
+        <h1>My Mistake Book</h1>
+        <div class="filter-controls">
+          <label for="type-filter">Filter by type</label>
+          <div class="select-wrapper">
+            <select id="type-filter">
+              <option value="all">All Types</option>
+              <option value="grammar">Grammar</option>
+              <option value="spelling">Spelling</option>
+              <option value="punctuation">Punctuation</option>
+              <option value="vocabulary">Vocabulary</option>
+              <option value="style">Style</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- --- 【关键修改 6/6】: 将副标题移到页眉下方 --- -->
       <p class="subtitle">
         A personalized log of your writing mistakes for targeted review.
       </p>
-
-      <div class="filter-controls">
-        <label for="type-filter">Filter by type</label>
-        <div class="select-wrapper">
-          <select id="type-filter">
-            <option value="all">All Types</option>
-            <option value="grammar">Grammar</option>
-            <option value="spelling">Spelling</option>
-            <option value="punctuation">Punctuation</option>
-            <option value="vocabulary">Vocabulary</option>
-            <option value="style">Style</option>
-          </select>
-        </div>
-      </div>
 
       <div class="mistake-list" id="mistake-list">
         <div class="loading-state">Loading your mistake book...</div>
