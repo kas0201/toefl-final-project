@@ -80,7 +80,7 @@ async function callAIPolishAPI(responseText) {
     const response = await axios.post(
       endpoint,
       {
-        model: "deepseek-coder",
+        model: "deepseek-reasoner",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: responseText },
@@ -163,7 +163,7 @@ async function callAIAnalysisAPI(feedbacks) {
     const response = await axios.post(
       endpoint,
       {
-        model: "deepseek-coder",
+        model: "deepseek-reasoner",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: feedbackText },
