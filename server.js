@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Absolutely Complete Final Version with Enhanced Logging) ---
+﻿// --- START OF FILE server.js (Absolutely Complete Final Version with Enhanced Logging & Polishing Prompt) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -71,11 +71,22 @@ async function checkAndAwardAchievements(userId, responseId) {
 }
 
 async function callAIPolishAPI(responseText) {
-  console.log("🤖 AI polishing started...");
+  console.log("🤖 AI polishing started with CONSERVATIVE prompt...");
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error("AI service is not configured.");
   const endpoint = "https://api.deepseek.com/chat/completions";
-  const systemPrompt = `You are an expert academic English editor specializing in refining TOEFL essays. Your task is to revise the user's text to elevate its linguistic quality to that of a high-scoring response (28-30), following these strict principles:\n\n1.  **Preserve Meaning Above All:** This is the most important rule. Strictly preserve the author's original meaning, arguments, and ideas. Do NOT add new information, change their core message, or alter their logical flow.\n\n2.  **Prioritize Natural Language:** Improve vocabulary, sentence structure, and grammar, but always prioritize natural, idiomatic phrasing that a native speaker would use. Avoid replacing words with more 'advanced' synonyms if it creates an awkward, "thesaurus-like" sentence. The goal is fluency and clarity, not just complexity.\n\n3.  **Ensure Accuracy:** Before providing the final output, double-check your revision to ensure you have not introduced any new grammatical, spelling, or logical errors.\n\nYour final output must be ONLY the fully revised text. Do not include any commentary, headings, or explanations before or after the text.`;
+
+  // --- 【关键修改】: 替换为更严格、更保守的系统指令 ---
+  const systemPrompt = `You are an expert academic English proofreader, not a rewriter. Your task is to polish the user's TOEFL essay by making only the most necessary corrections and refinements, following these four strict rules:
+
+1.  **Rule #1: Preserve Original Meaning and Voice.** This is the most critical rule. Do NOT alter the user's arguments, ideas, or overall tone. The final text must be recognizably the user's own work.
+
+2.  **Rule #2: Minimal Intervention.** Only correct clear errors in grammar, spelling, and punctuation. You may improve awkward phrasing or imprecise vocabulary. **If a sentence is already grammatically correct and its meaning is clear, LEAVE IT UNCHANGED.** Do not rewrite entire sentences simply for stylistic preference.
+
+3.  **Rule #3: Focus on Clarity and Fluency.** Your changes should make the text more natural and easier to read, not just more complex. Avoid using obscure words when a simpler one is more effective.
+
+4.  **Rule #4: Final Output Format.** Your output must be ONLY the fully revised text. Do not include any explanations, headings, or comments before or after the text.`;
+
   try {
     const response = await axios.post(
       endpoint,
@@ -85,7 +96,7 @@ async function callAIPolishAPI(responseText) {
           { role: "system", content: systemPrompt },
           { role: "user", content: responseText },
         ],
-        temperature: 0.5,
+        temperature: 0.3, // 降低 temperature 让输出更稳定、更保守
       },
       {
         headers: {
