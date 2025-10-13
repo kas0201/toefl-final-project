@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Absolutely Complete Final Version with Enhanced Polish Prompt) ---
+﻿// --- START OF FILE server.js (Absolutely Complete Final Version with Gamification) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -18,7 +18,61 @@ cloudinary.config({
   secure: true,
 });
 
-// --- 【关键更新】: 强化版 AI 文本润色函数 ---
+// --- 【新增】: 检查并授予成就的函数 ---
+async function checkAndAwardAchievements(userId, responseId) {
+  console.log(`🏆 [Achievement] Checking for user #${userId}...`);
+  try {
+    const userStatsQuery = await pool.query(
+      `SELECT
+        (SELECT COUNT(*) FROM responses WHERE user_id = $1) as total_practices,
+        (SELECT COUNT(*) FROM responses WHERE user_id = $1 AND task_type = 'integrated_writing') as integrated_practices,
+        (SELECT COUNT(*) FROM responses WHERE user_id = $1 AND task_type = 'academic_discussion') as academic_practices,
+        (SELECT ai_score FROM responses WHERE id = $2) as current_score;
+      `,
+      [userId, responseId]
+    );
+    const stats = userStatsQuery.rows[0];
+
+    const achievementsToAward = [];
+
+    // 检查各项成就
+    if (stats.total_practices >= 1) achievementsToAward.push("FIRST_PRACTICE");
+    if (stats.total_practices >= 10) achievementsToAward.push("TEN_PRACTICES");
+    if (stats.current_score >= 25) achievementsToAward.push("HIGH_SCORER_25");
+    if (stats.integrated_practices >= 5)
+      achievementsToAward.push("INTEGRATED_MASTER");
+    if (stats.academic_practices >= 5)
+      achievementsToAward.push("ACADEMIC_EXPERT");
+
+    if (achievementsToAward.length > 0) {
+      const achievementsQuery = await pool.query(
+        `SELECT id, tag FROM achievements WHERE tag = ANY($1::varchar[])`,
+        [achievementsToAward]
+      );
+      const achievementIds = achievementsQuery.rows.map((a) => a.id);
+
+      // 批量插入新成就，ON CONFLICT 确保不会重复授予
+      const insertPromises = achievementIds.map((achId) => {
+        return pool.query(
+          `INSERT INTO user_achievements (user_id, achievement_id) VALUES ($1, $2) ON CONFLICT (user_id, achievement_id) DO NOTHING`,
+          [userId, achId]
+        );
+      });
+      await Promise.all(insertPromises);
+      console.log(
+        `✅ [Achievement] User #${userId} was awarded: ${achievementsToAward.join(
+          ", "
+        )}`
+      );
+    }
+  } catch (error) {
+    console.error(
+      `❌ [Achievement] Error checking achievements for user #${userId}:`,
+      error
+    );
+  }
+}
+
 async function callAIPolishAPI(responseText) {
   console.log("🤖 AI a commencé le polissage avec un prompt amélioré...");
   const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -27,8 +81,6 @@ async function callAIPolishAPI(responseText) {
     throw new Error("AI service is not configured.");
   }
   const endpoint = "https://api.deepseek.com/chat/completions";
-
-  // 这是经过彻底重写的、更严格的 System Prompt
   const systemPrompt = `You are an expert academic English editor specializing in refining TOEFL essays. Your task is to revise the user's text to elevate its linguistic quality to that of a high-scoring response (28-30), following these strict principles:
 
 1.  **Preserve Meaning Above All:** This is the most important rule. Strictly preserve the author's original meaning, arguments, and ideas. Do NOT add new information, change their core message, or alter their logical flow.
@@ -48,7 +100,7 @@ Your final output must be ONLY the fully revised text. Do not include any commen
           { role: "system", content: systemPrompt },
           { role: "user", content: responseText },
         ],
-        temperature: 0.5, // 微调温度参数，使其更稳定
+        temperature: 0.5,
       },
       {
         headers: {
@@ -69,7 +121,6 @@ Your final output must be ONLY the fully revised text. Do not include any commen
   }
 }
 
-// --- AI评分函数 (无变动) ---
 async function callAIScoringAPI(responseText, promptText, taskType) {
   console.log(
     `🤖 AI a commencé à noter (Mode: ${taskType}) avec le mode de pensée deepseek-reasoner...`
@@ -125,9 +176,6 @@ async function callAIScoringAPI(responseText, promptText, taskType) {
   }
 }
 
-// ... (其余所有代码保持不变) ...
-
-// --- 音频生成函数 ---
 function addPausesToText(text) {
   if (!text) return "";
   let processedText = text;
@@ -233,7 +281,7 @@ const authenticateToken = (req, res, next) => {
   );
 };
 
-// --- API 路由 (无变动) ---
+// --- API 路由 ---
 app.get("/api/questions", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
@@ -297,9 +345,11 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
           aiResult.feedback,
           newResponseId,
         ]);
+
+        await checkAndAwardAchievements(userId, newResponseId);
       } catch (aiError) {
         console.error(
-          `❌ AI 评分失败 (Response ID: ${newResponseId}):`,
+          `❌ AI 后台任务失败 (Response ID: ${newResponseId}):`,
           aiError
         );
       }
@@ -515,64 +565,57 @@ app.get("/api/user/stats", authenticateToken, async (req, res) => {
           *,
           DATE(submitted_at) AS submission_date,
           CASE (ai_feedback::jsonb -> 'taskResponse' ->> 'rating')
-            WHEN 'Excellent' THEN 4
-            WHEN 'Good' THEN 3
-            WHEN 'Fair' THEN 2
-            WHEN 'Needs Improvement' THEN 1
-            ELSE 0
+            WHEN 'Excellent' THEN 4 WHEN 'Good' THEN 3 WHEN 'Fair' THEN 2 WHEN 'Needs Improvement' THEN 1 ELSE 0
           END AS task_response_score,
           CASE (ai_feedback::jsonb -> 'organization' ->> 'rating')
-            WHEN 'Excellent' THEN 4
-            WHEN 'Good' THEN 3
-            WHEN 'Fair' THEN 2
-            WHEN 'Needs Improvement' THEN 1
-            ELSE 0
+            WHEN 'Excellent' THEN 4 WHEN 'Good' THEN 3 WHEN 'Fair' THEN 2 WHEN 'Needs Improvement' THEN 1 ELSE 0
           END AS organization_score,
           CASE (ai_feedback::jsonb -> 'languageUse' ->> 'rating')
-            WHEN 'Excellent' THEN 4
-            WHEN 'Good' THEN 3
-            WHEN 'Fair' THEN 2
-            WHEN 'Needs Improvement' THEN 1
-            ELSE 0
+            WHEN 'Excellent' THEN 4 WHEN 'Good' THEN 3 WHEN 'Fair' THEN 2 WHEN 'Needs Improvement' THEN 1 ELSE 0
           END AS language_use_score
         FROM ValidResponses
       )
       SELECT
-        (SELECT json_build_object(
-          'total', COUNT(*),
-          'average', ROUND(AVG(ai_score), 1)
-        ) FROM ValidResponses) AS "overallStats",
-
-        (SELECT json_agg(stats) FROM (
-          SELECT
-            task_type,
-            COUNT(*) AS count,
-            ROUND(AVG(ai_score), 1) AS average
-          FROM ValidResponses
-          GROUP BY task_type
-        ) AS stats) AS "byType",
-
-        (SELECT json_agg(trends) FROM (
-          SELECT
-            submission_date,
-            ROUND(AVG(ai_score), 1) AS average_score
-          FROM RatingMapping
-          WHERE submitted_at >= NOW() - INTERVAL '30 days'
-          GROUP BY submission_date
-          ORDER BY submission_date
-        ) AS trends) AS "scoreTrend",
-
-        (SELECT json_build_object(
-          'taskResponse', ROUND(AVG(task_response_score), 2),
-          'organization', ROUND(AVG(organization_score), 2),
-          'languageUse', ROUND(AVG(language_use_score), 2)
-        ) FROM RatingMapping WHERE task_response_score > 0) AS "feedbackBreakdown";
+        (SELECT json_build_object('total', COUNT(*), 'average', ROUND(AVG(ai_score), 1)) FROM ValidResponses) AS "overallStats",
+        (SELECT json_agg(stats) FROM (SELECT task_type, COUNT(*) AS count, ROUND(AVG(ai_score), 1) AS average FROM ValidResponses GROUP BY task_type) AS stats) AS "byType",
+        (SELECT json_agg(trends) FROM (SELECT submission_date, ROUND(AVG(ai_score), 1) AS average_score FROM RatingMapping WHERE submitted_at >= NOW() - INTERVAL '30 days' GROUP BY submission_date ORDER BY submission_date) AS trends) AS "scoreTrend",
+        (SELECT json_build_object('taskResponse', ROUND(AVG(task_response_score), 2), 'organization', ROUND(AVG(organization_score), 2), 'languageUse', ROUND(AVG(language_use_score), 2)) FROM RatingMapping WHERE task_response_score > 0) AS "feedbackBreakdown";
     `;
-
     const result = await pool.query(sql, [userId]);
     res.json(result.rows[0]);
   } catch (err) {
     console.error("获取用户统计数据失败:", err);
+    res.status(500).json({ message: "服务器内部错误。" });
+  }
+});
+
+app.get("/api/user/achievements", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const sql = `
+      SELECT a.id, a.tag, a.name, a.description, a.icon_url,
+      CASE WHEN ua.user_id IS NOT NULL THEN TRUE ELSE FALSE END AS unlocked,
+      ua.unlocked_at
+      FROM achievements a
+      LEFT JOIN user_achievements ua ON a.id = ua.achievement_id AND ua.user_id = $1
+      ORDER BY a.id;
+    `;
+    const result = await pool.query(sql, [userId]);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("获取用户成就失败:", err);
+    res.status(500).json({ message: "服务器内部错误。" });
+  }
+});
+
+app.get("/api/user/practice-calendar", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const sql = `SELECT DISTINCT DATE(submitted_at) as date FROM responses WHERE user_id = $1 AND submitted_at >= NOW() - INTERVAL '1 year' ORDER BY date;`;
+    const result = await pool.query(sql, [userId]);
+    res.json(result.rows.map((row) => row.date));
+  } catch (err) {
+    console.error("获取练习日历数据失败:", err);
     res.status(500).json({ message: "服务器内部错误。" });
   }
 });

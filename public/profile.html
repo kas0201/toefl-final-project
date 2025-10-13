@@ -1,0 +1,246 @@
+<!-- START OF FILE public/profile.html -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Profile - TOEFL® Practice</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+      :root {
+        --bg-color: #f5f5f7;
+        --card-bg: #fff;
+        --text-primary: #1d1d1f;
+        --text-secondary: #6e6e73;
+        --accent-blue: #007aff;
+        --border-color: #d2d2d7;
+        --heatmap-color-1: #ebedf0;
+        --heatmap-color-2: #9be9a8;
+        --heatmap-color-3: #40c463;
+        --heatmap-color-4: #30a14e;
+        --heatmap-color-5: #216e39;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background-color: var(--bg-color);
+        margin: 0;
+        padding: 24px;
+      }
+      .navbar {
+        max-width: 1000px;
+        margin: 20px auto 0;
+        padding: 0 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .nav-link {
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-weight: 500;
+      }
+      .nav-right {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+      .main-container {
+        max-width: 1000px;
+        margin: 40px auto;
+      }
+      .section-header {
+        font-size: 24px;
+        font-weight: 700;
+        margin-top: 40px;
+        margin-bottom: 20px;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 8px;
+      }
+      .loading-state,
+      .empty-state {
+        text-align: center;
+        color: var(--text-secondary);
+        font-size: 16px;
+        padding: 40px;
+      }
+
+      /* Calendar Heatmap Styles */
+      .calendar-container {
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 24px;
+      }
+      .calendar-grid {
+        display: grid;
+        grid-template-rows: repeat(7, 1fr);
+        grid-auto-flow: column;
+        gap: 3px;
+      }
+      .day {
+        width: 15px;
+        height: 15px;
+        background-color: var(--heatmap-color-1);
+        border-radius: 3px;
+      }
+      .day.active {
+        background-color: var(--heatmap-color-4);
+      }
+
+      /* Achievements Styles */
+      .achievements-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
+      }
+      .achievement-card {
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 24px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        transition: transform 0.2s ease;
+      }
+      .achievement-card.locked {
+        opacity: 0.5;
+      }
+      .achievement-card.unlocked:hover {
+        transform: translateY(-4px);
+      }
+      .achievement-icon {
+        flex-shrink: 0;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background-color: #f0f0f5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .achievement-card.unlocked .achievement-icon {
+        background-color: #e4f8e9;
+        color: var(--heatmap-color-5);
+      }
+      .achievement-details h3 {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      .achievement-details p {
+        font-size: 14px;
+        color: var(--text-secondary);
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="navbar"></div>
+    <div class="main-container">
+      <h2 class="section-header">Practice Calendar</h2>
+      <div class="calendar-container" id="calendar-container">
+        <div class="loading-state">Loading calendar...</div>
+      </div>
+
+      <h2 class="section-header">My Achievements</h2>
+      <div class="achievements-grid" id="achievements-grid">
+        <div class="loading-state">Loading achievements...</div>
+      </div>
+    </div>
+
+    <script src="/auth.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          window.location.href = "/login.html";
+          return;
+        }
+
+        const calendarContainer = document.getElementById("calendar-container");
+        const achievementsGrid = document.getElementById("achievements-grid");
+
+        // --- Function to render Calendar Heatmap ---
+        const renderCalendar = async () => {
+          try {
+            const response = await fetch("/api/user/practice-calendar", {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!response.ok) throw new Error("Failed to load calendar data");
+            const practiceDates = await response.json();
+            const practiceDateSet = new Set(
+              practiceDates.map((d) => d.split("T")[0])
+            );
+
+            calendarContainer.innerHTML =
+              '<div class="calendar-grid" id="calendar-grid"></div>';
+            const grid = document.getElementById("calendar-grid");
+            const today = new Date();
+            const startDate = new Date();
+            startDate.setDate(today.getDate() - 364);
+
+            for (
+              let d = new Date(startDate);
+              d <= today;
+              d.setDate(d.getDate() + 1)
+            ) {
+              const dayEl = document.createElement("div");
+              dayEl.className = "day";
+              const dateString = d.toISOString().split("T")[0];
+              if (practiceDateSet.has(dateString)) {
+                dayEl.classList.add("active");
+              }
+              dayEl.title = d.toLocaleDateString();
+              grid.appendChild(dayEl);
+            }
+          } catch (error) {
+            calendarContainer.innerHTML = `<div class="empty-state">${error.message}</div>`;
+          }
+        };
+
+        // --- Function to render Achievements ---
+        const renderAchievements = async () => {
+          try {
+            const response = await fetch("/api/user/achievements", {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!response.ok) throw new Error("Failed to load achievements");
+            const achievements = await response.json();
+
+            achievementsGrid.innerHTML = ""; // Clear loading state
+            if (achievements.length === 0) {
+              achievementsGrid.innerHTML = `<div class="empty-state">No achievements available yet.</div>`;
+              return;
+            }
+
+            achievements.forEach((ach) => {
+              const card = document.createElement("div");
+              card.className = `achievement-card ${
+                ach.unlocked ? "unlocked" : "locked"
+              }`;
+              const iconSVG = ach.unlocked
+                ? `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`
+                : `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`;
+
+              card.innerHTML = `
+                            <div class="achievement-icon">${iconSVG}</div>
+                            <div class="achievement-details">
+                                <h3>${ach.name}</h3>
+                                <p>${ach.description}</p>
+                            </div>
+                        `;
+              achievementsGrid.appendChild(card);
+            });
+          } catch (error) {
+            achievementsGrid.innerHTML = `<div class="empty-state">${error.message}</div>`;
+          }
+        };
+
+        // --- Initial Load ---
+        renderCalendar();
+        renderAchievements();
+      });
+    </script>
+  </body>
+</html>

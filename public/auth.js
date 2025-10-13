@@ -1,4 +1,4 @@
-// --- START OF FILE public/auth.js (with Dashboard and Review Center link) ---
+// --- START OF FILE public/auth.js (with Profile link) ---
 document.addEventListener("DOMContentLoaded", () => {
   const navbar = document.querySelector(".navbar");
   if (!navbar) return;
@@ -14,9 +14,10 @@ document.addEventListener("DOMContentLoaded", () => {
         <a href="/dashboard.html" class="nav-link">Dashboard</a>
         <a href="/history.html" class="nav-link">History</a>
         <a href="/review-center.html" class="nav-link">Review Center</a>
-        <span class="nav-user">Hi, ${user.username}</span>
+        <a href="/profile.html" class="nav-link" style="font-weight: 600;">Hi, ${user.username}</a>
         <a href="#" id="logout-btn" class="nav-link" style="color: var(--accent-red);">Logout</a>
       </div>`;
+    // 我把用户名做成了个人中心的链接，并去掉了独立的 "Hi, ..." 文本
     const logoutBtn = document.getElementById("logout-btn");
     if (logoutBtn) {
       logoutBtn.addEventListener("click", (e) => {
