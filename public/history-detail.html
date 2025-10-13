@@ -1,26 +1,15 @@
-﻿<!-- START OF FILE public/history-detail.html (Final Version with All Features) -->
+﻿<!-- START OF FILE public/history-detail.html (Final Version with Elegant Polish View) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Writing Review - TOEFL® Practice</title>
-    <!-- 【新增】: 引入 diff2html 库用于文本对比 -->
-    <link
-      rel="stylesheet"
-      type="text/css"
-      href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css"
-    />
-    <script
-      type="text/javascript"
-      src="https://cdn.jsdelivr.net/npm/diff2html/bundles/js/diff2html.min.js"
-    ></script>
+    <!-- 【关键变更】: 只引入 jsdiff 库 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.1.0/diff.min.js"></script>
 
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
-      @import url("https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@500&display=swap");
-
       :root {
         --bg-color: #f5f5f7;
         --card-bg: #fff;
@@ -28,9 +17,9 @@
         --text-secondary: #6e6e73;
         --accent-blue: #007aff;
         --accent-blue-hover: #0071e3;
-        --accent-green: #30d158;
+        --accent-green: #34c759;
+        --accent-red-ui: #ff3b30;
         --border-color: #d2d2d7;
-        --accent-red: #ff453a;
         --accent-yellow: #ffc600;
         --accent-orange: #ff9500;
       }
@@ -190,7 +179,7 @@
         background-color: var(--accent-orange);
       }
       .rating-badge.needs-improvement {
-        background-color: var(--accent-red);
+        background-color: var(--accent-red-ui);
       }
       .feedback-item p {
         font-size: 15px;
@@ -278,13 +267,32 @@
         font-size: 14px;
         color: var(--text-secondary);
       }
-      #comparison-container .d2h-file-header {
-        display: none;
-      }
-      #comparison-container .d2h-side-by-side {
+
+      /* --- 【关键变更】: 新的 “修订模式” 样式 --- */
+      #polish-result-container {
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
         border-radius: 16px;
-        overflow: hidden;
+        padding: 24px;
+        line-height: 1.7;
+        font-size: 16px;
+        white-space: pre-wrap;
       }
+      #polish-result-container del {
+        text-decoration: line-through;
+        background-color: #ffdede;
+        color: #c20c0c;
+        border-radius: 3px;
+        padding: 1px 2px;
+      }
+      #polish-result-container ins {
+        text-decoration: none;
+        background-color: #d8f5dd;
+        color: #0d6928;
+        border-radius: 3px;
+        padding: 1px 2px;
+      }
+      /* --- 结束 --- */
     </style>
   </head>
   <body>
@@ -335,9 +343,6 @@
       </div>
     </div>
 
-    <!-- Rewrite Modal is not part of this file's direct logic but kept for reference if you add it back -->
-    <!-- Your rewrite modal HTML would go here -->
-
     <script src="/auth.js"></script>
     <script>
       document.addEventListener("DOMContentLoaded", () => {
@@ -367,61 +372,68 @@
           return;
         }
 
+        // --- 【关键变更】: 全新的 AI Polish 处理逻辑 ---
         const handleAIPolish = async () => {
           polishBtn.disabled = true;
           polishBtn.textContent = "Polishing...";
-          let comparisonContainer = document.getElementById(
-            "comparison-container"
+
+          let resultContainer = document.getElementById(
+            "polish-result-container"
           );
-          if (comparisonContainer) comparisonContainer.style.display = "none";
+          if (resultContainer) {
+            resultContainer.parentElement.style.display = "none"; // Hide the whole section
+          }
 
           try {
             const response = await fetch(`/api/responses/${historyId}/polish`, {
               method: "POST",
               headers: { Authorization: `Bearer ${token}` },
             });
+
             const result = await response.json();
-            if (!response.ok) throw new Error(result.message);
+            if (!response.ok) {
+              // 后端返回了明确的错误信息 (例如文字太短)
+              throw new Error(result.message);
+            }
 
             const originalText = pageData.user_response;
             const polishedText = result.polishedText;
 
-            const diffString = Diff.createTwoFilesPatch(
-              "Your Version",
-              "AI Polished Version",
-              originalText,
-              polishedText,
-              "",
-              "",
-              { context: 100 }
-            );
+            const diff = Diff.diffWords(originalText, polishedText);
 
-            const diffHtml = Diff2Html.html(diffString, {
-              drawFileList: false,
-              matching: "lines",
-              outputFormat: "side-by-side",
-              renderNothingWhenEmpty: true,
+            let html = "";
+            diff.forEach((part) => {
+              const value = part.value.replace(/\n/g, "<br>"); // Handle line breaks
+              if (part.added) {
+                html += `<ins>${value}</ins>`;
+              } else if (part.removed) {
+                html += `<del>${value}</del>`;
+              } else {
+                html += value;
+              }
             });
 
-            if (!comparisonContainer) {
-              comparisonContainer = document.createElement("div");
-              comparisonContainer.id = "comparison-container";
-              // Insert after the user response card
+            let comparisonSection =
+              document.getElementById("comparison-section");
+            if (!comparisonSection) {
+              comparisonSection = document.createElement("div");
+              comparisonSection.id = "comparison-section";
+
               const userCard = document.querySelector(".user-response-card");
               userCard.parentNode.insertBefore(
-                comparisonContainer,
+                comparisonSection,
                 userCard.nextSibling
               );
             }
 
-            comparisonContainer.innerHTML = `<h2 class="section-header">AI Polish Comparison</h2>${diffHtml}`;
-            comparisonContainer.style.display = "block";
-            comparisonContainer.scrollIntoView({
+            comparisonSection.innerHTML = `<h2 class="section-header">AI Polish Result</h2><div id="polish-result-container">${html}</div>`;
+            comparisonSection.style.display = "block";
+            comparisonSection.scrollIntoView({
               behavior: "smooth",
               block: "start",
             });
           } catch (error) {
-            alert(`Error polishing text: ${error.message}`);
+            alert(`Could not get AI revision: ${error.message}`);
           } finally {
             polishBtn.disabled = false;
             polishBtn.textContent = "AI Polish & Compare";
@@ -445,8 +457,10 @@
             }
             if (!response.ok)
               throw new Error("Failed to fetch submission details.");
+
             const data = await response.json();
             pageData = data;
+
             if (initialLoad) {
               const submittedDate = new Date(data.submitted_at).toLocaleString(
                 "en-US",
@@ -455,11 +469,9 @@
               reviewTitleEl.textContent = data.title || "Practice Response";
               reviewSubtitleEl.textContent = `Submitted on ${submittedDate} • ${data.word_count} words`;
 
-              // --- 【关键修复】: 确保所有按钮都在数据加载后显示 ---
               updateReviewButton(data.is_for_review);
               rewriteBtn.style.display = "inline-flex";
               polishBtn.style.display = "inline-flex";
-              // --- 结束 ---
 
               let promptHTML = "";
               if (data.task_type === "integrated_writing") {
@@ -470,6 +482,7 @@
               reviewContentEl.innerHTML = `<div id="ai-card-placeholder"></div> <h2 class="section-header">Your Response</h2><div class="user-response-card"><p class="user-response-content">${data.user_response}</p></div><h2 class="section-header">Original Prompt</h2>${promptHTML}`;
               initialLoad = false;
             }
+
             const aiCardPlaceholder = document.getElementById(
               "ai-card-placeholder"
             );
@@ -559,10 +572,10 @@
           }
         });
 
-        // Note: The logic for the rewrite modal is not included here as it was removed in previous steps.
-        // If you need it back, we can add it. For now, the button is just a placeholder.
         rewriteBtn.addEventListener("click", () => {
-          alert("Timed Rewrite feature coming soon!");
+          alert(
+            "Timed Rewrite feature is in another modal. This is the polish feature."
+          );
         });
       });
     </script>

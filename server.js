@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Absolutely Complete Final Version with Polish Feature) ---
+﻿// --- START OF FILE server.js (Absolutely Complete Final Version with Polish Feature v2) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -18,7 +18,7 @@ cloudinary.config({
   secure: true,
 });
 
-// --- 【新增】AI 文本润色函数 ---
+// --- AI 文本润色函数 ---
 async function callAIPolishAPI(responseText) {
   console.log("🤖 AI a commencé le polissage avec deepseek-coder...");
   const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -27,14 +27,13 @@ async function callAIPolishAPI(responseText) {
     throw new Error("AI service is not configured.");
   }
   const endpoint = "https://api.deepseek.com/chat/completions";
-  // 这个 System Prompt 是关键，它指导 AI 进行润色而不是评分
   const systemPrompt = `You are an expert academic English writer and proofreader specializing in TOEFL essays. Revise the user's provided text to improve its language quality to that of a high-scoring (28-30) response. Focus on enhancing vocabulary (using more academic and precise words), varying sentence structures, correcting grammatical errors, and improving overall flow and coherence. IMPORTANT: Do not alter the original meaning, arguments, or ideas of the user. Your output must be ONLY the fully revised text, with no additional commentary, headings, or explanations.`;
 
   try {
     const response = await axios.post(
       endpoint,
       {
-        model: "deepseek-coder", // 使用 Coder 模型可能更适合文本生成和修改
+        model: "deepseek-coder",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: responseText },
@@ -335,7 +334,7 @@ app.post(
   }
 );
 
-// --- 【新增】AI Polish Route ---
+// --- 【修复版】AI Polish Route ---
 app.post("/api/responses/:id/polish", authenticateToken, async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
@@ -348,6 +347,15 @@ app.post("/api/responses/:id/polish", authenticateToken, async (req, res) => {
       return res.status(404).json({ message: "Response not found." });
     }
     const originalText = responseQuery.rows[0].content;
+
+    // 【关键修复】: 增加输入长度检查
+    if (!originalText || originalText.trim().split(/\s+/).length < 20) {
+      return res.status(400).json({
+        message:
+          "Your text is too short for a meaningful revision. Please write at least 20 words.",
+      });
+    }
+
     const aiResult = await callAIPolishAPI(originalText);
     res.json({ polishedText: aiResult.polishedText });
   } catch (err) {
