@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Absolutely Complete Final Version with Dashboard Fix) ---
+﻿// --- START OF FILE server.js (Absolutely Complete Final Version with Polish Feature) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -17,6 +17,48 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
   secure: true,
 });
+
+// --- 【新增】AI 文本润色函数 ---
+async function callAIPolishAPI(responseText) {
+  console.log("🤖 AI a commencé le polissage avec deepseek-coder...");
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) {
+    console.error("❌ Erreur: DEEPSEEK_API_KEY non configuré.");
+    throw new Error("AI service is not configured.");
+  }
+  const endpoint = "https://api.deepseek.com/chat/completions";
+  // 这个 System Prompt 是关键，它指导 AI 进行润色而不是评分
+  const systemPrompt = `You are an expert academic English writer and proofreader specializing in TOEFL essays. Revise the user's provided text to improve its language quality to that of a high-scoring (28-30) response. Focus on enhancing vocabulary (using more academic and precise words), varying sentence structures, correcting grammatical errors, and improving overall flow and coherence. IMPORTANT: Do not alter the original meaning, arguments, or ideas of the user. Your output must be ONLY the fully revised text, with no additional commentary, headings, or explanations.`;
+
+  try {
+    const response = await axios.post(
+      endpoint,
+      {
+        model: "deepseek-coder", // 使用 Coder 模型可能更适合文本生成和修改
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: responseText },
+        ],
+        temperature: 0.6,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    let polishedText = response.data.choices[0].message.content;
+    console.log("✅ Polissage DeepSeek AI terminé !");
+    return { polishedText };
+  } catch (error) {
+    console.error(
+      "❌ Erreur lors de l'appel à l'API de polissage DeepSeek:",
+      error.response ? error.response.data : error.message
+    );
+    throw new Error("Failed to get a response from the AI polishing service.");
+  }
+}
 
 // --- AI评分函数 (严格托福标准版) ---
 async function callAIScoringAPI(responseText, promptText, taskType) {
@@ -293,6 +335,27 @@ app.post(
   }
 );
 
+// --- 【新增】AI Polish Route ---
+app.post("/api/responses/:id/polish", authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+  try {
+    const responseQuery = await pool.query(
+      "SELECT content FROM responses WHERE id = $1 AND user_id = $2",
+      [id, userId]
+    );
+    if (responseQuery.rows.length === 0) {
+      return res.status(404).json({ message: "Response not found." });
+    }
+    const originalText = responseQuery.rows[0].content;
+    const aiResult = await callAIPolishAPI(originalText);
+    res.json({ polishedText: aiResult.polishedText });
+  } catch (err) {
+    console.error(`AI 润色失败 (Response ID: ${id}):`, err);
+    res.status(500).json({ message: "Failed to get AI polish suggestion." });
+  }
+});
+
 app.get("/api/history/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
@@ -415,11 +478,9 @@ app.get("/api/history", authenticateToken, async (req, res) => {
   }
 });
 
-// --- 【修复版】Dashboard - User Stats Route ---
 app.get("/api/user/stats", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
-    // 【关键修复】: 增加了对 ai_feedback 的有效性检查，防止因数据格式错误导致查询失败
     const sql = `
       WITH ValidResponses AS (
         SELECT
@@ -429,7 +490,7 @@ app.get("/api/user/stats", authenticateToken, async (req, res) => {
           user_id = $1
           AND ai_score IS NOT NULL
           AND ai_feedback IS NOT NULL
-          AND ai_feedback LIKE '{%}' -- 确保字段内容是类 JSON 字符串，防止转换错误
+          AND ai_feedback LIKE '{%}'
       ),
       RatingMapping AS (
         SELECT
