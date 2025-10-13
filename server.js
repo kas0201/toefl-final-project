@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (最终正确版 - 使用 Cloudflare Aura 并控制语速) ---
+﻿// --- START OF FILE server.js (with structured AI feedback) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -18,9 +18,8 @@ cloudinary.config({
   secure: true,
 });
 
-// ----------------- AI 评分函数 (保持不变) -----------------
+// ======================= 【关键修改】更新AI评分函数 =======================
 async function callAIScoringAPI(responseText, promptText) {
-  // ... (内容省略以保持简洁)
   console.log(
     "🤖 AI a commencé à noter avec le mode de pensée `deepseek-reasoner`..."
   );
@@ -30,8 +29,44 @@ async function callAIScoringAPI(responseText, promptText) {
     throw new Error("AI service is not configured.");
   }
   const endpoint = "https://api.deepseek.com/chat/completions";
-  const systemPrompt = `You are an expert TOEFL writing evaluator. Your primary goal is to score a user's essay out of 30 points and provide high-quality, constructive feedback. To achieve this, you must follow a strict process: 1. First, think step-by-step inside a <thinking> block. Do not output the final JSON yet. 2. In your thinking process, analyze the user's response based on the following criteria: - Task Response: How well does the response address the prompt? Is the main idea clear and well-supported? - Organization & Development: Is the essay well-structured? Are ideas logically connected with good transitions? Are examples and details sufficient? - Language Use: How is the vocabulary and sentence structure? Is the grammar accurate? 3. Based on your analysis, determine a final overall score between 0 and 30. 4. Synthesize your key analysis points into concise, helpful feedback for the user. 5. After the <thinking> block, and only after, provide your final answer as a single JSON object in the specified format. Do not include any other text or markdown formatting around the JSON object.`;
+
+  // === 新的、更结构化的系统指令 ===
+  const systemPrompt = `You are an expert TOEFL writing evaluator. Your goal is to score an essay out of 30 and provide structured feedback.
+
+    Follow this process strictly:
+    1.  **Think Step-by-Step**: In a <thinking> block, analyze the user's response based on these criteria:
+        *   **Task Response**: How well does the response address the prompt? Is the main idea clear and well-supported?
+        *   **Organization & Development**: Is the essay well-structured with clear paragraphs and logical transitions? Are ideas well-developed with sufficient examples?
+        *   **Language Use**: How is the vocabulary, sentence structure, and grammar?
+
+    2.  **Determine Scores**: Based on your analysis, assign a sub-score (e.g., "Good", "Fair", "Excellent") and a final overall score out of 30.
+
+    3.  **Generate Feedback**: Synthesize your analysis into concise, constructive feedback for each category. Also provide one overall "General Suggestion" for improvement.
+
+    4.  **Final JSON Output**: After the <thinking> block, provide your final answer ONLY as a single, valid JSON object in the following format. Do not include any other text or markdown formatting.
+
+        {
+          "overallScore": <integer from 0 to 30>,
+          "feedback": {
+            "taskResponse": {
+              "rating": "<string, e.g., 'Excellent', 'Good', 'Fair', 'Needs Improvement'>",
+              "comment": "<string, detailed feedback for this category>"
+            },
+            "organization": {
+              "rating": "<string, e.g., 'Excellent', 'Good', 'Fair', 'Needs Improvement'>",
+              "comment": "<string, detailed feedback for this category>"
+            },
+            "languageUse": {
+              "rating": "<string, e.g., 'Excellent', 'Good', 'Fair', 'Needs Improvement'>",
+              "comment": "<string, detailed feedback for this category>"
+            },
+            "generalSuggestion": "<string, one key takeaway for the user to focus on next time>"
+          }
+        }
+    `;
+
   const userPrompt = `## PROMPT ##\n${promptText}\n\n## USER RESPONSE ##\n${responseText}`;
+
   try {
     const response = await axios.post(
       endpoint,
@@ -56,9 +91,13 @@ async function callAIScoringAPI(responseText, promptText) {
       throw new Error("AI did not return a valid JSON object.");
     }
     const jsonString = jsonMatch[0];
-    const result = JSON.parse(jsonString);
+    const result = JSON.parse(jsonString); // The entire result is now the structured JSON
     console.log("✅ Notation DeepSeek AI (Reasoner) terminée !");
-    return { score: result.score, feedback: result.feedback };
+    // We will now store the score and the stringified feedback JSON in the database
+    return {
+      score: result.overallScore,
+      feedback: JSON.stringify(result.feedback),
+    };
   } catch (error) {
     console.error(
       "❌ Erreur lors de l'appel à l'API DeepSeek:",
@@ -67,21 +106,18 @@ async function callAIScoringAPI(responseText, promptText) {
     throw new Error("Failed to get a response from the AI service.");
   }
 }
-// -------------------------------------------------------------------------------------
+// =======================================================================
 
-// ======================= 【新】增加停顿以控制语速的辅助函数 =======================
+// --- 增加停顿以控制语速的辅助函数 (保持不变) ---
 function addPausesToText(text) {
   if (!text) return "";
   let processedText = text;
-  // 1. 在每个句号后增加更长的停顿
   processedText = processedText.replace(/\./g, ". ... ");
-  // 2. 在每个换行符（段落之间）增加非常长的停顿
   processedText = processedText.replace(/\n/g, ". ... ... \n");
   return processedText;
 }
-// ====================================================================================
 
-// ======================= 【最终版】使用 Cloudflare Aura 的音频生成函数 =======================
+// --- 使用 Cloudflare Aura 的音频生成函数 (保持不变) ---
 async function generateAudioIfNeeded(questionId) {
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
   const apiToken = process.env.CLOUDFLARE_API_TOKEN;
@@ -109,9 +145,7 @@ async function generateAudioIfNeeded(questionId) {
     console.log(
       `🎤 [后台任务 CF-Aura-TTS] 开始为题目 #${questionId} 生成音频...`
     );
-
     const textWithPauses = addPausesToText(question.lecture_script);
-
     const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/deepgram/aura-1`;
 
     const ttsResponse = await axios.post(
@@ -127,7 +161,6 @@ async function generateAudioIfNeeded(questionId) {
     );
 
     const audioBuffer = Buffer.from(ttsResponse.data);
-
     if (!audioBuffer || audioBuffer.length === 0) {
       throw new Error("Cloudflare TTS 生成了空的音频 Buffer。");
     }
@@ -163,7 +196,7 @@ async function generateAudioIfNeeded(questionId) {
     );
   }
 }
-// =======================================================================
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(cors());
@@ -193,8 +226,7 @@ const authenticateToken = (req, res, next) => {
   );
 };
 
-// ... 省略所有 API 路由代码，因为它们无需修改 ...
-// --- 生成音频的管理接口 ---
+// --- API 路由 (保持不变) ---
 app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
   try {
@@ -219,7 +251,6 @@ app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// --- 获取写作模拟考试 ---
 app.get("/api/writing-test", async (req, res) => {
   try {
     const sql = `(SELECT * FROM questions WHERE task_type = 'integrated_writing' ORDER BY RANDOM() LIMIT 1) UNION ALL (SELECT * FROM questions WHERE task_type = 'academic_discussion' ORDER BY RANDOM() LIMIT 1);`;
@@ -242,7 +273,6 @@ app.get("/api/writing-test", async (req, res) => {
   }
 });
 
-// --- 获取所有练习题目 ---
 app.get("/api/questions", async (req, res) => {
   try {
     const sql = `SELECT id, title, topic, task_type FROM questions ORDER BY id`;
@@ -254,7 +284,6 @@ app.get("/api/questions", async (req, res) => {
   }
 });
 
-// --- 获取单个题目详情 ---
 app.get("/api/questions/:id", async (req, res) => {
   const { id } = req.params;
   try {
@@ -270,7 +299,6 @@ app.get("/api/questions/:id", async (req, res) => {
   }
 });
 
-// --- 用户注册 ---
 app.post("/api/auth/register", async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password)
@@ -293,7 +321,6 @@ app.post("/api/auth/register", async (req, res) => {
   }
 });
 
-// --- 用户登录 ---
 app.post("/api/auth/login", async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password)
@@ -324,7 +351,6 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
-// --- 提交作文 ---
 app.post("/api/submit-response", authenticateToken, async (req, res) => {
   const { content, wordCount, questionId, task_type } = req.body;
   const userId = req.user.id;
@@ -376,13 +402,10 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
   }
 });
 
-// --- 获取历史列表 ---
 app.get("/api/history", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
-    const sql = `SELECT r.id, r.word_count, r.submitted_at, COALESCE(q.title, 'Archived Question') as question_title 
-                       FROM responses r LEFT JOIN questions q ON r.question_id = q.id 
-                       WHERE r.user_id = $1 ORDER BY r.submitted_at DESC;`;
+    const sql = `SELECT r.id, r.word_count, r.submitted_at, COALESCE(q.title, 'Archived Question') as question_title FROM responses r LEFT JOIN questions q ON r.question_id = q.id WHERE r.user_id = $1 ORDER BY r.submitted_at DESC;`;
     const result = await pool.query(sql, [userId]);
     res.json(result.rows);
   } catch (err) {
@@ -391,13 +414,10 @@ app.get("/api/history", authenticateToken, async (req, res) => {
   }
 });
 
-// --- 获取历史详情 ---
 app.get("/api/history/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
-  const sql = `SELECT r.id, r.content as user_response, r.word_count, r.submitted_at, r.ai_score, r.ai_feedback, q.* 
-                   FROM responses r LEFT JOIN questions q ON r.question_id = q.id 
-                   WHERE r.id = $1 AND r.user_id = $2;`;
+  const sql = `SELECT r.id, r.content as user_response, r.word_count, r.submitted_at, r.ai_score, r.ai_feedback, q.* FROM responses r LEFT JOIN questions q ON r.question_id = q.id WHERE r.id = $1 AND r.user_id = $2;`;
   try {
     const result = await pool.query(sql, [id, userId]);
     if (result.rows.length === 0)
