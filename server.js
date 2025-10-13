@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Absolutely Complete Final Version with Polish Feature v2) ---
+﻿// --- START OF FILE server.js (Absolutely Complete Final Version with Enhanced Polish Prompt) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -18,27 +18,37 @@ cloudinary.config({
   secure: true,
 });
 
-// --- AI 文本润色函数 ---
+// --- 【关键更新】: 强化版 AI 文本润色函数 ---
 async function callAIPolishAPI(responseText) {
-  console.log("🤖 AI a commencé le polissage avec deepseek-reasoner...");
+  console.log("🤖 AI a commencé le polissage avec un prompt amélioré...");
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
     console.error("❌ Erreur: DEEPSEEK_API_KEY non configuré.");
     throw new Error("AI service is not configured.");
   }
   const endpoint = "https://api.deepseek.com/chat/completions";
-  const systemPrompt = `You are an expert academic English writer and proofreader specializing in TOEFL essays. Revise the user's provided text to improve its language quality to that of a high-scoring (28-30) response. Focus on enhancing vocabulary (using more academic and precise words), varying sentence structures, correcting grammatical errors, and improving overall flow and coherence. IMPORTANT: Do not alter the original meaning, arguments, or ideas of the user. Your output must be ONLY the fully revised text, with no additional commentary, headings, or explanations.`;
+
+  // 这是经过彻底重写的、更严格的 System Prompt
+  const systemPrompt = `You are an expert academic English editor specializing in refining TOEFL essays. Your task is to revise the user's text to elevate its linguistic quality to that of a high-scoring response (28-30), following these strict principles:
+
+1.  **Preserve Meaning Above All:** This is the most important rule. Strictly preserve the author's original meaning, arguments, and ideas. Do NOT add new information, change their core message, or alter their logical flow.
+
+2.  **Prioritize Natural Language:** Improve vocabulary, sentence structure, and grammar, but always prioritize natural, idiomatic phrasing that a native speaker would use. Avoid replacing words with more 'advanced' synonyms if it creates an awkward, "thesaurus-like" sentence. The goal is fluency and clarity, not just complexity.
+
+3.  **Ensure Accuracy:** Before providing the final output, double-check your revision to ensure you have not introduced any new grammatical, spelling, or logical errors.
+
+Your final output must be ONLY the fully revised text. Do not include any commentary, headings, or explanations before or after the text.`;
 
   try {
     const response = await axios.post(
       endpoint,
       {
-        model: "deepseek-reasoner",
+        model: "deepseek-coder",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: responseText },
         ],
-        temperature: 0.6,
+        temperature: 0.5, // 微调温度参数，使其更稳定
       },
       {
         headers: {
@@ -48,7 +58,7 @@ async function callAIPolishAPI(responseText) {
       }
     );
     let polishedText = response.data.choices[0].message.content;
-    console.log("✅ Polissage DeepSeek AI terminé !");
+    console.log("✅ Polissage DeepSeek AI (Qualité Améliorée) terminé !");
     return { polishedText };
   } catch (error) {
     console.error(
@@ -59,7 +69,7 @@ async function callAIPolishAPI(responseText) {
   }
 }
 
-// --- AI评分函数 (严格托福标准版) ---
+// --- AI评分函数 (无变动) ---
 async function callAIScoringAPI(responseText, promptText, taskType) {
   console.log(
     `🤖 AI a commencé à noter (Mode: ${taskType}) avec le mode de pensée deepseek-reasoner...`
@@ -114,6 +124,8 @@ async function callAIScoringAPI(responseText, promptText, taskType) {
     throw new Error("Failed to get a response from the AI service.");
   }
 }
+
+// ... (其余所有代码保持不变) ...
 
 // --- 音频生成函数 ---
 function addPausesToText(text) {
@@ -221,7 +233,7 @@ const authenticateToken = (req, res, next) => {
   );
 };
 
-// --- API 路由 ---
+// --- API 路由 (无变动) ---
 app.get("/api/questions", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
@@ -334,7 +346,6 @@ app.post(
   }
 );
 
-// --- 【修复版】AI Polish Route ---
 app.post("/api/responses/:id/polish", authenticateToken, async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
@@ -348,7 +359,6 @@ app.post("/api/responses/:id/polish", authenticateToken, async (req, res) => {
     }
     const originalText = responseQuery.rows[0].content;
 
-    // 【关键修复】: 增加输入长度检查
     if (!originalText || originalText.trim().split(/\s+/).length < 20) {
       return res.status(400).json({
         message:

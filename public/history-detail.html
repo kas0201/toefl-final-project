@@ -1,15 +1,16 @@
-﻿<!-- START OF FILE public/history-detail.html (Final Version with Elegant Polish View) -->
+﻿<!-- START OF FILE public/history-detail.html (Final Version with Elegant Polish View v2) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Writing Review - TOEFL® Practice</title>
-    <!-- 【关键变更】: 只引入 jsdiff 库 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.1.0/diff.min.js"></script>
 
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+      @import url("https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@500&display=swap");
+
       :root {
         --bg-color: #f5f5f7;
         --card-bg: #fff;
@@ -268,7 +269,7 @@
         color: var(--text-secondary);
       }
 
-      /* --- 【关键变更】: 新的 “修订模式” 样式 --- */
+      /* --- 【关键变更】: 全新 “修订模式” 样式 --- */
       #polish-result-container {
         background-color: var(--card-bg);
         border: 1px solid var(--border-color);
@@ -276,21 +277,44 @@
         padding: 24px;
         line-height: 1.7;
         font-size: 16px;
-        white-space: pre-wrap;
+        white-space: pre-wrap; /* 保持换行 */
       }
-      #polish-result-container del {
+      #polish-result-container .legend {
+        font-size: 14px;
+        color: var(--text-secondary);
+        margin-bottom: 20px;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 12px;
+        display: flex;
+        gap: 20px;
+      }
+      #polish-result-container .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      #polish-result-container .legend-item span {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border-radius: 3px;
+      }
+      #polish-result-container .legend-item .deleted-color {
+        background-color: rgba(255, 59, 48, 0.2);
+      }
+      #polish-result-container .legend-item .added-color {
+        background-color: rgba(52, 199, 89, 0.2);
+      }
+
+      #polish-result-container .diff-result del {
         text-decoration: line-through;
-        background-color: #ffdede;
-        color: #c20c0c;
-        border-radius: 3px;
-        padding: 1px 2px;
+        background-color: rgba(255, 59, 48, 0.2);
+        color: var(--accent-red-ui);
       }
-      #polish-result-container ins {
+      #polish-result-container .diff-result ins {
         text-decoration: none;
-        background-color: #d8f5dd;
+        background-color: rgba(52, 199, 89, 0.2);
         color: #0d6928;
-        border-radius: 3px;
-        padding: 1px 2px;
       }
       /* --- 结束 --- */
     </style>
@@ -354,16 +378,8 @@
 
         let pageData = null;
 
-        const reviewTitleEl = document.getElementById("review-title");
-        const reviewSubtitleEl = document.getElementById("review-subtitle");
-        const reviewContentEl = document.getElementById("review-content");
-        const reviewBtn = document.getElementById("review-toggle-btn");
-        const reviewBtnText = document.getElementById("review-btn-text");
-        const reviewIconAdd = document.getElementById("review-icon-add");
-        const reviewIconCheck = document.getElementById("review-icon-check");
         const polishBtn = document.getElementById("polish-btn");
-        const rewriteBtn = document.getElementById("rewrite-btn");
-
+        const reviewContentEl = document.getElementById("review-content");
         const urlParams = new URLSearchParams(window.location.search);
         const historyId = urlParams.get("id");
         if (!historyId) {
@@ -372,16 +388,14 @@
           return;
         }
 
-        // --- 【关键变更】: 全新的 AI Polish 处理逻辑 ---
+        // --- 【关键变更】: 全新的、更优雅的 AI Polish 处理逻辑 ---
         const handleAIPolish = async () => {
           polishBtn.disabled = true;
           polishBtn.textContent = "Polishing...";
 
-          let resultContainer = document.getElementById(
-            "polish-result-container"
-          );
-          if (resultContainer) {
-            resultContainer.parentElement.style.display = "none"; // Hide the whole section
+          let resultSection = document.getElementById("polish-section");
+          if (resultSection) {
+            resultSection.style.display = "none";
           }
 
           try {
@@ -392,43 +406,49 @@
 
             const result = await response.json();
             if (!response.ok) {
-              // 后端返回了明确的错误信息 (例如文字太短)
               throw new Error(result.message);
             }
 
             const originalText = pageData.user_response;
             const polishedText = result.polishedText;
 
-            const diff = Diff.diffWords(originalText, polishedText);
+            // 使用 diffSentences 进行句子级对比
+            const diff = Diff.diffSentences(originalText, polishedText);
 
             let html = "";
             diff.forEach((part) => {
-              const value = part.value.replace(/\n/g, "<br>"); // Handle line breaks
+              // 将换行符转换为 <br> 以在HTML中正确显示
+              const value = part.value.replace(/\n/g, "<br>");
               if (part.added) {
                 html += `<ins>${value}</ins>`;
               } else if (part.removed) {
                 html += `<del>${value}</del>`;
               } else {
-                html += value;
+                html += value; // 未改变的部分直接添加
               }
             });
 
-            let comparisonSection =
-              document.getElementById("comparison-section");
-            if (!comparisonSection) {
-              comparisonSection = document.createElement("div");
-              comparisonSection.id = "comparison-section";
+            if (!resultSection) {
+              resultSection = document.createElement("div");
+              resultSection.id = "polish-section";
 
               const userCard = document.querySelector(".user-response-card");
               userCard.parentNode.insertBefore(
-                comparisonSection,
+                resultSection,
                 userCard.nextSibling
               );
             }
 
-            comparisonSection.innerHTML = `<h2 class="section-header">AI Polish Result</h2><div id="polish-result-container">${html}</div>`;
-            comparisonSection.style.display = "block";
-            comparisonSection.scrollIntoView({
+            // 增加图例 (Legend)
+            const legendHTML = `
+              <div class="legend">
+                <div class="legend-item"><span class="deleted-color"></span> Original Text</div>
+                <div class="legend-item"><span class="added-color"></span> AI Polished Version</div>
+              </div>`;
+
+            resultSection.innerHTML = `<h2 class="section-header">AI Polish Result</h2><div id="polish-result-container">${legendHTML}<div class="diff-result">${html}</div></div>`;
+            resultSection.style.display = "block";
+            resultSection.scrollIntoView({
               behavior: "smooth",
               block: "start",
             });
@@ -462,6 +482,12 @@
             pageData = data;
 
             if (initialLoad) {
+              const reviewTitleEl = document.getElementById("review-title");
+              const reviewSubtitleEl =
+                document.getElementById("review-subtitle");
+              const reviewBtn = document.getElementById("review-toggle-btn");
+              const rewriteBtn = document.getElementById("rewrite-btn");
+
               const submittedDate = new Date(data.submitted_at).toLocaleString(
                 "en-US",
                 { dateStyle: "long", timeStyle: "short" }
@@ -539,6 +565,11 @@
         fetchAndRenderDetails();
 
         const updateReviewButton = (isInReview) => {
+          const reviewBtn = document.getElementById("review-toggle-btn");
+          const reviewBtnText = document.getElementById("review-btn-text");
+          const reviewIconAdd = document.getElementById("review-icon-add");
+          const reviewIconCheck = document.getElementById("review-icon-check");
+
           if (isInReview) {
             reviewBtn.classList.add("in-review");
             reviewBtnText.textContent = "In Review List";
@@ -553,28 +584,33 @@
           reviewBtn.style.display = "inline-flex";
         };
 
-        reviewBtn.addEventListener("click", async () => {
-          reviewBtn.disabled = true;
-          try {
-            const response = await fetch(
-              `/api/responses/${historyId}/toggle-review`,
-              { method: "POST", headers: { Authorization: `Bearer ${token}` } }
-            );
-            if (!response.ok)
-              throw new Error("Failed to update review status.");
-            const result = await response.json();
-            updateReviewButton(result.is_for_review);
-          } catch (error) {
-            console.error("Error toggling review status:", error);
-            alert("Could not update review status. Please try again.");
-          } finally {
-            reviewBtn.disabled = false;
-          }
-        });
+        document
+          .getElementById("review-toggle-btn")
+          .addEventListener("click", async (e) => {
+            e.currentTarget.disabled = true;
+            try {
+              const response = await fetch(
+                `/api/responses/${historyId}/toggle-review`,
+                {
+                  method: "POST",
+                  headers: { Authorization: `Bearer ${token}` },
+                }
+              );
+              if (!response.ok)
+                throw new Error("Failed to update review status.");
+              const result = await response.json();
+              updateReviewButton(result.is_for_review);
+            } catch (error) {
+              console.error("Error toggling review status:", error);
+              alert("Could not update review status. Please try again.");
+            } finally {
+              e.currentTarget.disabled = false;
+            }
+          });
 
-        rewriteBtn.addEventListener("click", () => {
+        document.getElementById("rewrite-btn").addEventListener("click", () => {
           alert(
-            "Timed Rewrite feature is in another modal. This is the polish feature."
+            "Timed Rewrite feature will be in a modal. This is the new polished diff view."
           );
         });
       });
