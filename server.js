@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Cloudflare TTS URL 最终正确修复版) ---
+﻿// --- START OF FILE server.js (Cloudflare TTS URL - 再次确认最终正确版) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -95,7 +95,7 @@ async function generateAudioIfNeeded(questionId) {
 
     console.log(`🎤 [后台任务 CF-TTS] 开始为题目 #${questionId} 生成音频...`);
 
-    // ====================== 【就是这里！已修正！】 ======================
+    // ====================== 【就是这里！已确认是最终正确版本！】 ======================
     // 错误的 URL: /ai/run/@cf/microsoft/speecht5-tts
     // 正确的 URL: /ai/run/microsoft/speecht5-tts  (去掉了 @cf/)
     const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/microsoft/speecht5-tts`;
