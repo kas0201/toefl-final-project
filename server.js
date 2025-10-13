@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Final Version with TTS Hotfix) ---
+﻿// --- START OF FILE server.js (Final Version with historyId fix) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -188,13 +188,9 @@ async function callAIAnalysisAPI(feedbacks) {
 }
 
 // --- 音频生成函数 ---
-
-// 【关键修复】: 移除画蛇添足的 "..." 添加逻辑。
-// 现代TTS模型能很好地处理原始标点，人为添加 "..." 反而可能导致API错误。
-// 我们将保留这个函数结构以防未来需要其他文本处理，但现在它只返回原文。
 function processTextForTTS(text) {
   if (!text) return "";
-  return text; // 直接返回原始文本
+  return text;
 }
 
 async function generateAudioIfNeeded(questionId) {
@@ -224,13 +220,12 @@ async function generateAudioIfNeeded(questionId) {
       `🎤 [Backend Task CF-Aura-TTS] Starting audio generation for question #${questionId}...`
     );
 
-    // 【关键修复】: 使用净化后的文本处理函数
     const textForTTS = processTextForTTS(question.lecture_script);
 
     const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/deepgram/aura-1`;
     const ttsResponse = await axios.post(
       endpoint,
-      { text: textForTTS }, // 发送原始、纯净的文本
+      { text: textForTTS },
       {
         headers: {
           Authorization: `Bearer ${apiToken}`,
@@ -263,11 +258,9 @@ async function generateAudioIfNeeded(questionId) {
       `✅ [Backend Task CF-Aura-TTS] Audio for question #${questionId} has been generated and saved: ${audioUrl}`
     );
   } catch (error) {
-    // 增强错误日志，以便更好地调试
     let errorDetails = error.message;
     if (error.response && error.response.data) {
       try {
-        // Cloudflare错误通常是ArrayBuffer形式的JSON字符串
         errorDetails = JSON.parse(Buffer.from(error.response.data).toString());
       } catch (e) {
         errorDetails = "Could not parse error response from Cloudflare.";
@@ -453,7 +446,8 @@ app.post("/api/responses/:id/polish", authenticateToken, async (req, res) => {
 app.get("/api/history/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
-  const sql = `SELECT r.id, r.content as user_response, r.word_count, r.submitted_at, r.ai_score, r.ai_feedback, r.is_for_review, q.* FROM responses r LEFT JOIN questions q ON r.question_id = q.id WHERE r.id = $1 AND r.user_id = $2;`;
+  // --- 【关键修复】: 在 SELECT 列表中添加 r.question_id ---
+  const sql = `SELECT r.id, r.question_id, r.content as user_response, r.word_count, r.submitted_at, r.ai_score, r.ai_feedback, r.is_for_review, q.* FROM responses r LEFT JOIN questions q ON r.question_id = q.id WHERE r.id = $1 AND r.user_id = $2;`;
   try {
     const result = await pool.query(sql, [id, userId]);
     if (result.rows.length === 0)
@@ -492,7 +486,6 @@ app.get("/api/writing-test", async (req, res) => {
 app.get("/api/questions/:id", async (req, res) => {
   const { id } = req.params;
   try {
-    // 立即触发音频生成（如果需要），但不等待结果
     generateAudioIfNeeded(id);
     const sql = `SELECT * FROM questions WHERE id = $1`;
     const result = await pool.query(sql, [id]);
