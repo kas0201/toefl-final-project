@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Truly, Absolutely, 100% Complete Final Version with Fixes) ---
+﻿// --- START OF FILE server.js (Final Version with TTS Hotfix) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -110,7 +110,7 @@ async function callAIScoringAPI(responseText, promptText, taskType) {
     throw new Error("AI service is not configured.");
   }
   const endpoint = "https://api.deepseek.com/chat/completions";
-  const systemPrompt = `You are an expert ETS-trained evaluator for the TOEFL iBT Writing section. Your evaluation must strictly adhere to the official scoring rubrics. Your process is as follows: 1. **Identify Task Type**: First, identify the task type from the user prompt ('Integrated Writing' or 'Academic Discussion'). 2. **Apply Correct Rubric**: In a <thinking> block, analyze the user's response strictly according to the specific rubric for that task type provided below. 3. **Holistic Scoring**: Based on your rubric-based analysis, determine a holistic overall score from 0-30. 4. **Structured Feedback**: Generate concise, constructive feedback for each category within the official rubric. 5. **Final JSON Output**: After the <thinking> block, provide your final answer ONLY as a single, valid JSON object in the specified format. ### Integrated Writing Task Rubric ### If the task is 'Integrated Writing', use these criteria: - **Task Response (Selection & Connection)**: How accurately and completely does the response select the important information from the lecture and explain how it challenges or supports the points in the reading passage? A high-scoring response must clearly connect lecture points to reading points. - **Organization & Development**: Is the response well-organized with a clear structure (e.g., introduction, body paragraphs for each point)? Are the ideas logically connected? - **Language Use**: How effectively is language used? Consider grammar, vocabulary, and sentence structure. Minor errors are acceptable if the meaning is clear. ### Academic Discussion Task Rubric ### If the task is 'Academic Discussion', use these criteria: - **Task Response (Contribution)**: Does the response make a relevant and clear contribution to the discussion? Does it directly address the professor's question and engage with the other students' ideas? - **Organization & Development**: Is the main idea clearly stated? Is it well-supported with reasons, details, and/or examples? Is the response easy to follow? - **Language Use**: Is the language clear and idiomatic? Does it demonstrate a good range of vocabulary and sentence structures? --- **JSON Output Format:** { "overallScore": <integer from 0 to 30>, "feedback": { "taskResponse": { "rating": "<string>", "comment": "<string>" }, "organization": { "rating": "<string>", "comment": "<string>" }, "languageUse": { "rating": "<string>", "comment": "<string>" }, "generalSuggestion": "<string>" } }`;
+  const systemPrompt = `You are an expert ETS-trained evaluator for the TOEFL iBT Writing section. Your evaluation must strictly adhere to the official scoring rubrics. Your process is as follows: 1. **Identify Task Type**: First, identify the task type from the user prompt ('Integrated Writing' or 'Academic Discussion'). 2. **Apply Correct Rubric**: In a <thinking> block, analyze the user's response strictly according to the specific rubric for that task type provided below. 3. **Holistic Scoring**: Based on your rubric-based analysis, determine a holistic overall score from 0-30. 4. **Structured Feedback**: Generate concise, constructive feedback for each category within the official rubric. 5. **Final JSON Output**: After the <thinking> block, provide your final answer ONLY as a single, valid JSON object in the specified format. ### Integrated Writing Task Rubric ### If the task is 'Integrated Writing', use these criteria: - **Task Response (Selection & Connection)**: How accurately and completely does the response select the important information from the lecture and explain how it challenges or supports the points in the reading passage? A high-scoring response must simply connect lecture points to reading points. - **Organization & Development**: Is the response well-organized with a clear structure (e.g., introduction, body paragraphs for each point)? Are the ideas logically connected? - **Language Use**: How effectively is language used? Consider grammar, vocabulary, and sentence structure. Minor errors are acceptable if the meaning is clear. ### Academic Discussion Task Rubric ### If the task is 'Academic Discussion', use these criteria: - **Task Response (Contribution)**: Does the response make a relevant and clear contribution to the discussion? Does it directly address the professor's question and engage with the other students' ideas? - **Organization & Development**: Is the main idea clearly stated? Is it well-supported with reasons, details, and/or examples? Is the response easy to follow? - **Language Use**: Is the language clear and idiomatic? Does it demonstrate a good range of vocabulary and sentence structures? --- **JSON Output Format:** { "overallScore": <integer from 0 to 30>, "feedback": { "taskResponse": { "rating": "<string>", "comment": "<string>" }, "organization": { "rating": "<string>", "comment": "<string>" }, "languageUse": { "rating": "<string>", "comment": "<string>" }, "generalSuggestion": "<string>" } }`;
   const taskTypeName =
     taskType === "integrated_writing"
       ? "Integrated Writing"
@@ -149,7 +149,7 @@ async function callAIScoringAPI(responseText, promptText, taskType) {
   }
 }
 
-// --- 【新增】AI 总结常犯错误的函数 ---
+// --- AI 总结常犯错误的函数 ---
 async function callAIAnalysisAPI(feedbacks) {
   console.log("🤖 AI a commencé l'analyse des erreurs communes...");
   const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -188,18 +188,22 @@ async function callAIAnalysisAPI(feedbacks) {
 }
 
 // --- 音频生成函数 ---
-function addPausesToText(text) {
+
+// 【关键修复】: 移除画蛇添足的 "..." 添加逻辑。
+// 现代TTS模型能很好地处理原始标点，人为添加 "..." 反而可能导致API错误。
+// 我们将保留这个函数结构以防未来需要其他文本处理，但现在它只返回原文。
+function processTextForTTS(text) {
   if (!text) return "";
-  let processedText = text;
-  processedText = processedText.replace(/\./g, ". ... ");
-  processedText = processedText.replace(/\n/g, ". ... ... \n");
-  return processedText;
+  return text; // 直接返回原始文本
 }
+
 async function generateAudioIfNeeded(questionId) {
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
   const apiToken = process.env.CLOUDFLARE_API_TOKEN;
   if (!accountId || !apiToken) {
-    console.log("🔊 [Cloudflare TTS] 音频生成跳过：环境变量未配置。");
+    console.log(
+      "🔊 [Cloudflare TTS] Audio generation skipped: Environment variables not configured."
+    );
     return;
   }
   try {
@@ -217,13 +221,16 @@ async function generateAudioIfNeeded(questionId) {
       return;
     }
     console.log(
-      `🎤 [后台任务 CF-Aura-TTS] 开始为题目 #${questionId} 生成音频...`
+      `🎤 [Backend Task CF-Aura-TTS] Starting audio generation for question #${questionId}...`
     );
-    const textWithPauses = addPausesToText(question.lecture_script);
+
+    // 【关键修复】: 使用净化后的文本处理函数
+    const textForTTS = processTextForTTS(question.lecture_script);
+
     const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/deepgram/aura-1`;
     const ttsResponse = await axios.post(
       endpoint,
-      { text: textWithPauses },
+      { text: textForTTS }, // 发送原始、纯净的文本
       {
         headers: {
           Authorization: `Bearer ${apiToken}`,
@@ -234,7 +241,7 @@ async function generateAudioIfNeeded(questionId) {
     );
     const audioBuffer = Buffer.from(ttsResponse.data);
     if (!audioBuffer || audioBuffer.length === 0) {
-      throw new Error("Cloudflare TTS 生成了空的音频 Buffer。");
+      throw new Error("Cloudflare TTS generated an empty audio buffer.");
     }
     const uploadPromise = new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
@@ -253,14 +260,21 @@ async function generateAudioIfNeeded(questionId) {
       [audioUrl, questionId]
     );
     console.log(
-      `✅ [后台任务 CF-Aura-TTS] 题目 #${questionId} 的音频已生成并保存: ${audioUrl}`
+      `✅ [Backend Task CF-Aura-TTS] Audio for question #${questionId} has been generated and saved: ${audioUrl}`
     );
   } catch (error) {
-    const errorDetails = error.response
-      ? JSON.parse(Buffer.from(error.response.data).toString())
-      : error.message;
+    // 增强错误日志，以便更好地调试
+    let errorDetails = error.message;
+    if (error.response && error.response.data) {
+      try {
+        // Cloudflare错误通常是ArrayBuffer形式的JSON字符串
+        errorDetails = JSON.parse(Buffer.from(error.response.data).toString());
+      } catch (e) {
+        errorDetails = "Could not parse error response from Cloudflare.";
+      }
+    }
     console.error(
-      `❌ [后台任务 CF-Aura-TTS] 为题目 #${questionId} 生成音频时出错:`,
+      `❌ [Backend Task CF-Aura-TTS] Error during audio generation for question #${questionId}:`,
       errorDetails
     );
   }
@@ -275,8 +289,8 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 pool.connect((err) => {
-  if (err) return console.error("❌ 数据库连接失败:", err);
-  console.log("✅ 成功连接到 PostgreSQL 数据库！");
+  if (err) return console.error("❌ Database connection failed:", err);
+  console.log("✅ Successfully connected to PostgreSQL database!");
 });
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
@@ -301,8 +315,8 @@ app.get("/api/questions", authenticateToken, async (req, res) => {
     const result = await pool.query(sql, [userId]);
     res.json(result.rows);
   } catch (err) {
-    console.error("获取题目列表失败:", err);
-    res.status(500).json({ message: "服务器内部错误。" });
+    console.error("Failed to get question list:", err);
+    res.status(500).json({ message: "Internal server error." });
   }
 });
 
@@ -311,7 +325,9 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   const qId = parseInt(questionId, 10);
   if ((!content && wordCount > 0) || !wordCount || isNaN(qId) || !task_type) {
-    return res.status(400).json({ message: "请求缺少必要信息或格式不正确。" });
+    return res.status(400).json({
+      message: "Request is missing required information or is malformed.",
+    });
   }
   try {
     const sql = `INSERT INTO responses (content, word_count, question_id, task_type, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING id`;
@@ -354,14 +370,14 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
         await checkAndAwardAchievements(userId, newResponseId);
       } catch (aiError) {
         console.error(
-          `❌ AI 后台任务失败 (Response ID: ${newResponseId}):`,
+          `❌ AI background task failed (Response ID: ${newResponseId}):`,
           aiError
         );
       }
     })();
   } catch (err) {
-    console.error("数据库插入失败:", err);
-    res.status(500).json({ message: "服务器内部错误。" });
+    console.error("Database insertion failed:", err);
+    res.status(500).json({ message: "Internal server error." });
   }
 });
 
@@ -372,8 +388,8 @@ app.get("/api/review-list", authenticateToken, async (req, res) => {
     const result = await pool.query(sql, [userId]);
     res.json(result.rows);
   } catch (err) {
-    console.error("获取复习列表失败:", err);
-    res.status(500).json({ message: "服务器内部错误。" });
+    console.error("Failed to get review list:", err);
+    res.status(500).json({ message: "Internal server error." });
   }
 });
 
@@ -399,8 +415,11 @@ app.post(
       }
       res.json({ is_for_review: result.rows[0].is_for_review });
     } catch (err) {
-      console.error(`切换复习状态失败 (Response ID: ${id}):`, err);
-      res.status(500).json({ message: "服务器内部错误。" });
+      console.error(
+        `Failed to toggle review status (Response ID: ${id}):`,
+        err
+      );
+      res.status(500).json({ message: "Internal server error." });
     }
   }
 );
@@ -426,7 +445,7 @@ app.post("/api/responses/:id/polish", authenticateToken, async (req, res) => {
     const aiResult = await callAIPolishAPI(originalText);
     res.json({ polishedText: aiResult.polishedText });
   } catch (err) {
-    console.error(`AI 润色失败 (Response ID: ${id}):`, err);
+    console.error(`AI polish failed (Response ID: ${id}):`, err);
     res.status(500).json({ message: "Failed to get AI polish suggestion." });
   }
 });
@@ -438,11 +457,13 @@ app.get("/api/history/:id", authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(sql, [id, userId]);
     if (result.rows.length === 0)
-      return res.status(404).json({ message: "历史记录未找到或无权访问。" });
+      return res
+        .status(404)
+        .json({ message: "History record not found or permission denied." });
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(`获取历史详情 ID ${id} 失败:`, err);
-    res.status(500).json({ message: "服务器内部错误。" });
+    console.error(`Failed to get history detail ID ${id}:`, err);
+    res.status(500).json({ message: "Internal server error." });
   }
 });
 
@@ -463,30 +484,33 @@ app.get("/api/writing-test", async (req, res) => {
     }
     res.json(result.rows);
   } catch (err) {
-    console.error("获取写作考试题目失败:", err);
-    res.status(500).json({ message: "服务器内部错误。" });
+    console.error("Failed to get writing test questions:", err);
+    res.status(500).json({ message: "Internal server error." });
   }
 });
 
 app.get("/api/questions/:id", async (req, res) => {
   const { id } = req.params;
   try {
+    // 立即触发音频生成（如果需要），但不等待结果
     generateAudioIfNeeded(id);
     const sql = `SELECT * FROM questions WHERE id = $1`;
     const result = await pool.query(sql, [id]);
     if (result.rows.length === 0)
-      return res.status(404).json({ message: "题目未找到。" });
+      return res.status(404).json({ message: "Question not found." });
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(`获取题目详情 ID ${id} 失败:`, err);
-    res.status(500).json({ message: "服务器内部错误。" });
+    console.error(`Failed to get question detail ID ${id}:`, err);
+    res.status(500).json({ message: "Internal server error." });
   }
 });
 
 app.post("/api/auth/register", async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
-    return res.status(400).json({ message: "用户名和密码不能为空。" });
+    return res
+      .status(400)
+      .json({ message: "Username and password are required." });
   }
   try {
     const userCheck = await pool.query(
@@ -494,23 +518,27 @@ app.post("/api/auth/register", async (req, res) => {
       [username]
     );
     if (userCheck.rows.length > 0) {
-      return res.status(409).json({ message: "用户名已存在。" });
+      return res.status(409).json({ message: "Username already exists." });
     }
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
     const sql = `INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username`;
     const newUser = await pool.query(sql, [username, hashedPassword]);
-    res.status(201).json({ message: "注册成功！", user: newUser.rows[0] });
+    res
+      .status(201)
+      .json({ message: "Registration successful!", user: newUser.rows[0] });
   } catch (err) {
-    console.error("注册失败:", err);
-    res.status(500).json({ message: "服务器内部错误。" });
+    console.error("Registration failed:", err);
+    res.status(500).json({ message: "Internal server error." });
   }
 });
 
 app.post("/api/auth/login", async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
-    return res.status(400).json({ message: "用户名和密码不能为空。" });
+    return res
+      .status(400)
+      .json({ message: "Username and password are required." });
   }
   try {
     const result = await pool.query("SELECT * FROM users WHERE username = $1", [
@@ -518,11 +546,11 @@ app.post("/api/auth/login", async (req, res) => {
     ]);
     const user = result.rows[0];
     if (!user) {
-      return res.status(401).json({ message: "用户名或密码错误。" });
+      return res.status(401).json({ message: "Invalid username or password." });
     }
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
-      return res.status(401).json({ message: "用户名或密码错误。" });
+      return res.status(401).json({ message: "Invalid username or password." });
     }
     const payload = { id: user.id, username: user.username };
     const token = jwt.sign(
@@ -531,13 +559,13 @@ app.post("/api/auth/login", async (req, res) => {
       { expiresIn: "1d" }
     );
     res.json({
-      message: "登录成功！",
+      message: "Login successful!",
       token,
       user: { id: user.id, username: user.username },
     });
   } catch (err) {
-    console.error("登录失败:", err);
-    res.status(500).json({ message: "服务器内部错误。" });
+    console.error("Login failed:", err);
+    res.status(500).json({ message: "Internal server error." });
   }
 });
 
@@ -548,8 +576,8 @@ app.get("/api/history", authenticateToken, async (req, res) => {
     const result = await pool.query(sql, [userId]);
     res.json(result.rows);
   } catch (err) {
-    console.error("获取写作历史失败:", err);
-    res.status(500).json({ message: "服务器内部错误。" });
+    console.error("Failed to get writing history:", err);
+    res.status(500).json({ message: "Internal server error." });
   }
 });
 
@@ -560,30 +588,24 @@ app.get("/api/user/achievements", authenticateToken, async (req, res) => {
     const result = await pool.query(sql, [userId]);
     res.json(result.rows);
   } catch (err) {
-    console.error("获取用户成就失败:", err);
-    res.status(500).json({ message: "服务器内部错误。" });
+    console.error("Failed to get user achievements:", err);
+    res.status(500).json({ message: "Internal server error." });
   }
 });
 
-// --- 【关键修复】: 新增写作分析API路由 ---
 app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
-    // 1. 获取用户所有有效的练习记录
     const responsesQuery = await pool.query(
       "SELECT content, ai_feedback FROM responses WHERE user_id = $1 AND content IS NOT NULL AND content != '' AND ai_feedback IS NOT NULL AND ai_feedback LIKE '{%}'",
       [userId]
     );
-
-    // 2. 检查是否有足够的的数据进行分析
     if (responsesQuery.rows.length < 3) {
       return res.status(404).json({
         message:
           "Not enough practice data for a meaningful analysis. Please complete at least 3 practices.",
       });
     }
-
-    // 3. 计算高频词云
     const stopWords = new Set([
       "a",
       "an",
@@ -630,27 +652,22 @@ app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
       const words = row.content.toLowerCase().match(/\b\w+\b/g) || [];
       words.forEach((word) => {
         if (!stopWords.has(word) && isNaN(word)) {
-          // 排除停用词和纯数字
           wordCounts[word] = (wordCounts[word] || 0) + 1;
         }
       });
     });
     const wordCloudData = Object.entries(wordCounts)
       .sort(([, a], [, b]) => b - a)
-      .slice(0, 50) // 取前50个高频词
+      .slice(0, 50)
       .map(([text, value]) => ({ text, value }));
-
-    // 4. 调用AI分析常见错误
     const feedbacks = responsesQuery.rows.map((row) =>
       JSON.parse(row.ai_feedback)
     );
     const aiAnalysis = await callAIAnalysisAPI(feedbacks);
-
-    // 5. 返回结果
     res.json({ wordCloud: wordCloudData, commonMistakes: aiAnalysis.analysis });
   } catch (err) {
-    console.error("获取写作分析数据失败:", err);
-    res.status(500).json({ message: "服务器内部错误。" });
+    console.error("Failed to get writing analysis data:", err);
+    res.status(500).json({ message: "Internal server error." });
   }
 });
 
@@ -681,5 +698,5 @@ app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
 // --- 启动服务器 ---
 app.use(express.static("public"));
 app.listen(PORT, () => {
-  console.log(`🚀 服务器正在端口 ${PORT} 上运行`);
+  console.log(`🚀 Server is running on port ${PORT}`);
 });
