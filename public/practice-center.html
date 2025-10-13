@@ -1,4 +1,4 @@
-﻿<!-- START OF FILE public/practice-center.html -->
+﻿<!-- START OF FILE public/practice-center.html (with categorization) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -82,10 +82,21 @@
         margin-bottom: 40px;
         font-size: 18px;
       }
-      #questions-list {
+      /* === NEW STYLES START === */
+      .section-header {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-top: 48px;
+        margin-bottom: 20px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border-color);
+      }
+      .questions-grid {
         display: grid;
         gap: 20px;
       }
+      /* === NEW STYLES END === */
       .question-card {
         background-color: var(--container-bg);
         border-radius: 12px;
@@ -151,7 +162,8 @@
       .start-button:hover {
         background-color: var(--accent-blue-hover);
       }
-      .loading-state {
+      .loading-state,
+      .empty-state {
         text-align: center;
         font-size: 18px;
         color: var(--text-secondary);
@@ -167,10 +179,28 @@
     <div class="main-container">
       <h1>Practice Center</h1>
       <p class="subtitle">Choose a topic for targeted practice.</p>
-      <div id="questions-list">
-        <div class="loading-state">Loading questions...</div>
+
+      <!-- === NEW HTML STRUCTURE START === -->
+      <div id="practice-sections">
+        <h2 class="section-header">Academic Discussion Tasks</h2>
+        <div id="academic-discussion-list" class="questions-grid">
+          <div class="loading-state">Loading questions...</div>
+        </div>
+
+        <h2 class="section-header">Integrated Writing Tasks</h2>
+        <div id="integrated-writing-list" class="questions-grid">
+          <div class="loading-state">Loading questions...</div>
+        </div>
+
+        <div id="empty-state-container" style="display: none">
+          <div class="empty-state">
+            No practice questions found. Please check back later.
+          </div>
+        </div>
       </div>
+      <!-- === NEW HTML STRUCTURE END === -->
     </div>
+
     <script src="/auth.js"></script>
     <script>
       document.addEventListener("DOMContentLoaded", async () => {
@@ -178,34 +208,94 @@
           window.location.href = "/login.html";
           return;
         }
-        const e = document.getElementById("questions-list");
+
+        // Get references to the new list containers
+        const academicList = document.getElementById(
+          "academic-discussion-list"
+        );
+        const integratedList = document.getElementById(
+          "integrated-writing-list"
+        );
+        const emptyStateContainer = document.getElementById(
+          "empty-state-container"
+        );
+
         try {
-          const t = await fetch("/api/questions");
-          if (!t.ok) throw new Error("Failed to fetch questions.");
-          const n = await t.json();
-          if (((e.innerHTML = ""), 0 === n.length)) {
-            e.innerHTML =
-              '<div class="loading-state">No questions found.</div>';
+          const response = await fetch("/api/questions");
+          if (!response.ok) throw new Error("Failed to fetch questions.");
+
+          const allQuestions = await response.json();
+
+          // Clear loading states
+          academicList.innerHTML = "";
+          integratedList.innerHTML = "";
+
+          if (allQuestions.length === 0) {
+            emptyStateContainer.style.display = "block";
             return;
           }
-          n.forEach((t) => {
-            const n = document.createElement("div");
-            let o, a, r;
-            (n.className = "question-card"),
-              "integrated_writing" === t.task_type
-                ? ((o = `/integrated-practice.html?id=${t.id}`),
-                  (a = "Integrated"),
-                  (r = "integrated"))
-                : ((o = `/practice-page.html?id=${t.id}`),
-                  (a = "Academic Discussion"),
-                  (r = "academic")),
-              (n.innerHTML = `\n                        <div class="card-content">\n                            <h2>${t.title}</h2>\n                            <div class="badge-group">\n                                <span class="task-type-badge ${r}">${a}</span>\n                                <span class="topic-badge">${t.topic}</span>\n                            </div>\n                        </div>\n                        <a href="${o}" class="start-button">Start Practice</a>\n                    `),
-              e.appendChild(n);
-          });
-        } catch (t) {
-          console.error("Error fetching questions:", t),
-            (e.innerHTML =
-              '<div class="loading-state">Error loading questions.</div>');
+
+          // Filter questions by type
+          const academicQuestions = allQuestions.filter(
+            (q) => q.task_type === "academic_discussion"
+          );
+          const integratedQuestions = allQuestions.filter(
+            (q) => q.task_type === "integrated_writing"
+          );
+
+          // Helper function to create a question card element
+          const createQuestionCard = (question) => {
+            const card = document.createElement("div");
+            card.className = "question-card";
+
+            let url, taskTypeName, taskTypeClass;
+            if (question.task_type === "integrated_writing") {
+              url = `/integrated-practice.html?id=${question.id}`;
+              taskTypeName = "Integrated";
+              taskTypeClass = "integrated";
+            } else {
+              url = `/practice-page.html?id=${question.id}`;
+              taskTypeName = "Academic Discussion";
+              taskTypeClass = "academic";
+            }
+
+            card.innerHTML = `
+              <div class="card-content">
+                <h2>${question.title}</h2>
+                <div class="badge-group">
+                  <span class="task-type-badge ${taskTypeClass}">${taskTypeName}</span>
+                  <span class="topic-badge">${question.topic}</span>
+                </div>
+              </div>
+              <a href="${url}" class="start-button">Start Practice</a>
+            `;
+            return card;
+          };
+
+          // Populate Academic Discussion list
+          if (academicQuestions.length > 0) {
+            academicQuestions.forEach((q) =>
+              academicList.appendChild(createQuestionCard(q))
+            );
+          } else {
+            academicList.innerHTML =
+              '<div class="empty-state" style="padding: 20px;">No Academic Discussion tasks available.</div>';
+          }
+
+          // Populate Integrated Writing list
+          if (integratedQuestions.length > 0) {
+            integratedQuestions.forEach((q) =>
+              integratedList.appendChild(createQuestionCard(q))
+            );
+          } else {
+            integratedList.innerHTML =
+              '<div class="empty-state" style="padding: 20px;">No Integrated Writing tasks available.</div>';
+          }
+        } catch (error) {
+          console.error("Error fetching questions:", error);
+          academicList.innerHTML =
+            '<div class="loading-state">Error loading questions.</div>';
+          integratedList.innerHTML = "";
         }
       });
     </script>
