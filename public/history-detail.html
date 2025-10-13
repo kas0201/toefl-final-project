@@ -312,8 +312,6 @@
         background-color: rgba(52, 199, 89, 0.2);
         color: #0d6928;
       }
-
-      /* --- 【恢复】: “定时重写”模态框的完整样式 --- */
       .modal {
         display: none;
         position: fixed;
@@ -531,7 +529,6 @@
       </div>
     </div>
 
-    <!-- 【恢复】: “定时重写”模态框的完整 HTML -->
     <div id="rewrite-modal" class="modal">
       <div class="modal-content">
         <div class="modal-header">
@@ -577,9 +574,8 @@
         let pageData = null;
         let pollingInterval = null;
         let initialLoad = true;
-        let rewriteTimer; // Timer specific to the rewrite modal
+        let rewriteTimer;
 
-        // --- 获取页面主要元素 ---
         const reviewTitleEl = document.getElementById("review-title");
         const reviewSubtitleEl = document.getElementById("review-subtitle");
         const reviewContentEl = document.getElementById("review-content");
@@ -587,7 +583,6 @@
         const polishBtn = document.getElementById("polish-btn");
         const rewriteBtn = document.getElementById("rewrite-btn");
 
-        // --- 【恢复】: 获取“定时重写”模态框的所有元素 ---
         const modal = document.getElementById("rewrite-modal");
         const cancelBtn = document.getElementById("cancel-rewrite-btn");
         const rewriteReferenceEl = document.getElementById("rewrite-reference");
@@ -597,12 +592,10 @@
         const rewriteTimerEl = document.getElementById("rewrite-timer");
         const submitRewriteBtn = document.getElementById("submit-rewrite-btn");
 
-        // --- 【关键修复】: 恢复“定时重写”模态框的全部功能函数 ---
         const openRewriteModal = () => {
           if (!pageData) return;
-          rewriteReferenceEl.innerHTML = ""; // 清空参考资料
+          rewriteReferenceEl.innerHTML = "";
 
-          // 动态创建并填充参考内容
           const promptContainer = document.createElement("div");
           let promptHTML = "<h3>Original Prompt</h3>";
           if (pageData.task_type === "integrated_writing") {
@@ -633,15 +626,14 @@
             rewriteReferenceEl.appendChild(aiContainer);
           }
 
-          // 根据任务类型设置计时器
           const timeLimit =
-            pageData.task_type === "integrated_writing" ? 1200 : 600; // 20分钟或10分钟
+            pageData.task_type === "integrated_writing" ? 1200 : 600;
           startTimer(timeLimit, rewriteTimerEl, () => {
             alert("Time's up! Submitting your rewrite.");
             submitRewrite();
           });
 
-          modal.style.display = "block"; // 显示模态框
+          modal.style.display = "block";
         };
 
         const closeRewriteModal = () => {
@@ -650,7 +642,7 @@
           rewriteWordCountEl.textContent = "Words: 0";
           modal.style.display = "none";
           const refContainer = document.getElementById("reference-container");
-          if (refContainer) refContainer.removeAttribute("open"); // 关闭details标签
+          if (refContainer) refContainer.removeAttribute("open");
         };
 
         const startTimer = (duration, display, onComplete) => {
@@ -669,7 +661,7 @@
               if (onComplete) onComplete();
             }
           };
-          update(); // Initial call
+          update();
           rewriteTimer = setInterval(update, 1000);
         };
 
@@ -696,7 +688,8 @@
               body: JSON.stringify({
                 content,
                 wordCount,
-                questionId: pageData.question_id, // 使用 question_id
+                // --- 【关键修复】: 使用 pageData.question_id 而不是 pageData.id ---
+                questionId: pageData.question_id,
                 task_type: pageData.task_type,
               }),
             });
@@ -705,7 +698,6 @@
             if (!response.ok)
               throw new Error(result.message || "Submission failed.");
 
-            // 跳转到新的提交成功页面
             window.location.href = `/submission-success.html?id=${result.id}`;
           } catch (error) {
             alert(`Error: ${error.message}`);
@@ -893,7 +885,6 @@
           }
         };
 
-        // --- 绑定事件监听器 ---
         polishBtn.addEventListener("click", handleAIPolish);
         reviewBtn.addEventListener("click", handleToggleReview);
         rewriteBtn.addEventListener("click", openRewriteModal);
@@ -904,7 +895,6 @@
           rewriteWordCountEl.textContent = `Words: ${words}`;
         });
 
-        // --- 初始调用 ---
         fetchAndRenderDetails();
       });
     </script>
