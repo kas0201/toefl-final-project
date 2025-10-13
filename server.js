@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (最终正确版 - 已增加语速控制) ---
+﻿// --- START OF FILE server.js (最终正确版 - 使用阿里云 TTS) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -7,6 +7,12 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
 const cloudinary = require("cloudinary").v2;
+const fs = require("fs");
+const path = require("path");
+
+// ======================= 【新】引入阿里云 TTS 客户端 =======================
+const SpeechSynthesizer = require("@alicloud/nls-nodejs-sdk").SpeechSynthesizer;
+// =========================================================================
 
 // --- 配置 Cloudinary (保持不变) ---
 cloudinary.config({
@@ -18,7 +24,7 @@ cloudinary.config({
 
 // ----------------- AI 评分函数 (保持不变) -----------------
 async function callAIScoringAPI(responseText, promptText) {
-  // ... (此函数无需任何修改)
+  // ... (此函数无需任何修改，内容省略以保持简洁)
   console.log(
     "🤖 AI a commencé à noter avec le mode de pensée `deepseek-reasoner`..."
   );
@@ -68,25 +74,59 @@ async function callAIScoringAPI(responseText, promptText) {
 }
 // -------------------------------------------------------------------------------------
 
-// ======================= 【新功能】增加停顿以控制语速的辅助函数 =======================
-function addPausesToText(text) {
-  if (!text) return "";
-  let processedText = text;
-  // 1. 在每个句号后增加更长的停顿
-  processedText = processedText.replace(/\./g, ". ... ");
-  // 2. 在每个换行符（段落之间）增加非常长的停顿
-  processedText = processedText.replace(/\n/g, ". ... ... \n");
-  return processedText;
+// ======================= 【新】使用阿里云 TTS 的音频生成函数 =======================
+async function generateAudioWithAliyun(text) {
+  return new Promise((resolve, reject) => {
+    const client = new SpeechSynthesizer({
+      token: process.env.ALIYUN_ACCESS_TOKEN, // 也可以使用 AccessKey
+      accessKeyId: process.env.ALIYUN_ACCESS_KEY_ID,
+      accessKeySecret: process.env.ALIYUN_ACCESS_KEY_SECRET,
+      appkey: process.env.ALIYUN_APP_KEY,
+      url: "wss://nls-gateway.cn-shanghai.aliyuncs.com/ws/v1",
+    });
+
+    const params = {
+      text: text,
+      format: "mp3",
+      voice: "Aitong", // Aitong 是一个比较自然的英文女声
+      speech_rate: -150, // 语速，-500 到 500，负数变慢
+    };
+
+    const audioFilePath = path.join(__dirname, `output-${Date.now()}.mp3`);
+    const writable = fs.createWriteStream(audioFilePath);
+    let audioStream = null;
+
+    client.on("meta", (msg) => {
+      if (msg) {
+        audioStream = client.getAudioStream();
+        audioStream.pipe(writable);
+        audioStream.on("end", () => {
+          resolve(audioFilePath);
+        });
+      }
+    });
+
+    client.on("error", (err) => {
+      console.error("Aliyun TTS client error:", err);
+      reject(err);
+    });
+
+    client.on("close", () => {
+      // on close
+    });
+
+    try {
+      client.start(params, true, 6000);
+    } catch (error) {
+      console.error("Aliyun TTS start failed:", error);
+      reject(error);
+    }
+  });
 }
-// ====================================================================================
 
-// ======================= 【关键修正】后台音频生成函数 (使用Cloudflare) =======================
 async function generateAudioIfNeeded(questionId) {
-  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-  const apiToken = process.env.CLOUDFLARE_API_TOKEN;
-
-  if (!accountId || !apiToken) {
-    console.log("🔊 [Cloudflare] 音频生成跳过：环境变量未配置。");
+  if (!process.env.ALIYUN_ACCESS_KEY_ID) {
+    console.log("🔊 [Aliyun TTS] 音频生成跳过：环境变量未配置。");
     return;
   }
 
@@ -105,63 +145,37 @@ async function generateAudioIfNeeded(questionId) {
       return;
     }
 
-    console.log(`🎤 [后台任务 CF-TTS] 开始为题目 #${questionId} 生成音频...`);
-
-    // ====================== 【调用新函数】在发送前处理文本 ======================
-    const textWithPauses = addPausesToText(question.lecture_script);
-    // =========================================================================
-
-    const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/deepgram/aura-1`;
-
-    const ttsResponse = await axios.post(
-      endpoint,
-      { text: textWithPauses }, // 使用处理过的文本
-      {
-        headers: {
-          Authorization: `Bearer ${apiToken}`,
-          "Content-Type": "application/json",
-        },
-        responseType: "arraybuffer", // 接收音频文件流
-      }
+    console.log(
+      `🎤 [后台任务 Aliyun-TTS] 开始为题目 #${questionId} 生成音频...`
     );
 
-    const audioBuffer = Buffer.from(ttsResponse.data);
+    // 1. 调用阿里云SDK生成音频文件
+    const audioFilePath = await generateAudioWithAliyun(
+      question.lecture_script
+    );
 
-    if (!audioBuffer || audioBuffer.length === 0) {
-      throw new Error("Cloudflare TTS 生成了空的音频 Buffer。");
-    }
-
-    // --- 后续上传到 Cloudinary 的逻辑保持不变 ---
-    const uploadPromise = new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        { resource_type: "video", folder: "toefl_lectures" },
-        (error, result) => {
-          if (error) {
-            console.error("❌ [后台任务] Cloudinary 上传失败:", error);
-            return reject(error);
-          }
-          resolve(result);
-        }
-      );
-      uploadStream.end(audioBuffer);
+    // 2. 上传到 Cloudinary
+    const uploadResult = await cloudinary.uploader.upload(audioFilePath, {
+      resource_type: "video",
+      folder: "toefl_lectures",
     });
-
-    const uploadResult = await uploadPromise;
     const audioUrl = uploadResult.secure_url;
+
+    // 3. 删除本地临时文件
+    fs.unlinkSync(audioFilePath);
+
+    // 4. 更新数据库
     await pool.query(
       "UPDATE questions SET lecture_audio_url = $1 WHERE id = $2",
       [audioUrl, questionId]
     );
     console.log(
-      `✅ [后台任务 CF-TTS] 题目 #${questionId} 的音频已生成并保存: ${audioUrl}`
+      `✅ [后台任务 Aliyun-TTS] 题目 #${questionId} 的音频已生成并保存: ${audioUrl}`
     );
   } catch (error) {
-    const errorDetails = error.response
-      ? JSON.parse(Buffer.from(error.response.data).toString())
-      : error.message;
     console.error(
-      `❌ [后台任务 CF-TTS] 为题目 #${questionId} 生成音频时出错:`,
-      errorDetails
+      `❌ [后台任务 Aliyun-TTS] 为题目 #${questionId} 生成音频时出错:`,
+      error
     );
   }
 }
@@ -195,8 +209,7 @@ const authenticateToken = (req, res, next) => {
   );
 };
 
-// ======================= API 接口 (其余代码保持不变) =======================
-// ... (所有 API 路由代码都无需修改，因此省略以保持简洁) ...
+// ... 省略所有 API 路由代码，因为它们无需修改 ...
 // --- 生成音频的管理接口 ---
 app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
@@ -384,8 +397,8 @@ app.get("/api/history", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
     const sql = `SELECT r.id, r.word_count, r.submitted_at, COALESCE(q.title, 'Archived Question') as question_title 
-                     FROM responses r LEFT JOIN questions q ON r.question_id = q.id 
-                     WHERE r.user_id = $1 ORDER BY r.submitted_at DESC;`;
+                       FROM responses r LEFT JOIN questions q ON r.question_id = q.id 
+                       WHERE r.user_id = $1 ORDER BY r.submitted_at DESC;`;
     const result = await pool.query(sql, [userId]);
     res.json(result.rows);
   } catch (err) {
@@ -399,8 +412,8 @@ app.get("/api/history/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
   const sql = `SELECT r.id, r.content as user_response, r.word_count, r.submitted_at, r.ai_score, r.ai_feedback, q.* 
-                 FROM responses r LEFT JOIN questions q ON r.question_id = q.id 
-                 WHERE r.id = $1 AND r.user_id = $2;`;
+                   FROM responses r LEFT JOIN questions q ON r.question_id = q.id 
+                   WHERE r.id = $1 AND r.user_id = $2;`;
   try {
     const result = await pool.query(sql, [id, userId]);
     if (result.rows.length === 0)
