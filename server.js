@@ -6,54 +6,34 @@ const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
+const cloudinary = require("cloudinary").v2;
 
-// ----------------- 【最终版 AI 评分函数 - 使用思维链 (Chain-of-Thought)】 -----------------
+// --- 配置 Cloudinary ---
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure: true,
+});
+
+// ----------------- 【最终版 AI 评分函数 - 使用 `deepseek-reasoner` 思考模式】 -----------------
 async function callAIScoringAPI(responseText, promptText) {
   console.log(
-    "🤖 AI a commencé à noter avec le modèle de pensée (Chain-of-Thought)..."
+    "🤖 AI a commencé à noter avec le mode de pensée `deepseek-reasoner`..."
   );
-
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
     console.error("❌ Erreur: DEEPSEEK_API_KEY non configuré.");
     throw new Error("AI service is not configured.");
   }
-
   const endpoint = "https://api.deepseek.com/chat/completions";
-
-  // 【思维链提示词】
-  // 1. 定义角色和最终目标。
-  // 2. 指示 AI 先在 <thinking> 标签内进行分步思考。
-  // 3. 给出清晰的思考步骤/评分标准。
-  // 4. 严格要求在思考之后，才输出最终的 JSON。
-  const systemPrompt = `You are an expert TOEFL writing evaluator. Your primary goal is to score a user's essay out of 30 points and provide high-quality, constructive feedback.
-
-To achieve this, you must follow a strict process:
-1.  First, think step-by-step inside a <thinking> block. Do not output the final JSON yet.
-2.  In your thinking process, analyze the user's response based on the following criteria:
-    - **Task Response**: How well does the response address the prompt? Is the main idea clear and well-supported?
-    - **Organization & Development**: Is the essay well-structured? Are ideas logically connected with good transitions? Are examples and details sufficient?
-    - **Language Use**: How is the vocabulary and sentence structure? Is the grammar accurate?
-3.  Based on your analysis, determine a final overall score between 0 and 30.
-4.  Synthesize your key analysis points into concise, helpful feedback for the user.
-5.  After the <thinking> block, and only after, provide your final answer as a single JSON object in the specified format. Do not include any other text or markdown formatting around the JSON object.
-
-Example of your entire output process:
-<thinking>
-The user's response correctly identifies the main conflict. The structure is clear with an introduction and two body paragraphs. However, the examples are a bit generic. Language use is mostly correct but lacks advanced vocabulary. I will assign a score of 24. The feedback should focus on developing more specific examples and improving vocabulary.
-</thinking>
-{
-  "score": 24,
-  "feedback": "This is a solid response that addresses the prompt well. Your structure is clear and easy to follow. To improve, try to provide more specific and detailed examples to support your points. Additionally, incorporating more varied academic vocabulary would elevate your writing."
-}`;
-
+  const systemPrompt = `You are an expert TOEFL writing evaluator. Your primary goal is to score a user's essay out of 30 points and provide high-quality, constructive feedback. To achieve this, you must follow a strict process: 1. First, think step-by-step inside a <thinking> block. Do not output the final JSON yet. 2. In your thinking process, analyze the user's response based on the following criteria: - Task Response: How well does the response address the prompt? Is the main idea clear and well-supported? - Organization & Development: Is the essay well-structured? Are ideas logically connected with good transitions? Are examples and details sufficient? - Language Use: How is the vocabulary and sentence structure? Is the grammar accurate? 3. Based on your analysis, determine a final overall score between 0 and 30. 4. Synthesize your key analysis points into concise, helpful feedback for the user. 5. After the <thinking> block, and only after, provide your final answer as a single JSON object in the specified format. Do not include any other text or markdown formatting around the JSON object.`;
   const userPrompt = `## PROMPT ##\n${promptText}\n\n## USER RESPONSE ##\n${responseText}`;
 
   try {
     const response = await axios.post(
       endpoint,
       {
-        // 【模型升级】: 使用 coder 模型，它更擅长遵循复杂指令和结构化输出
         model: "deepseek-reasoner",
         messages: [
           { role: "system", content: systemPrompt },
@@ -68,19 +48,14 @@ The user's response correctly identifies the main conflict. The structure is cle
         },
       }
     );
-
     let aiResultContent = response.data.choices[0].message.content;
-
-    // 从 AI 的完整输出中，只提取 JSON 部分
     const jsonMatch = aiResultContent.match(/{[\s\S]*}/);
     if (!jsonMatch) {
       throw new Error("AI did not return a valid JSON object.");
     }
-
     const jsonString = jsonMatch[0];
     const result = JSON.parse(jsonString);
-
-    console.log("✅ Notation DeepSeek AI (Coder) terminée !");
+    console.log("✅ Notation DeepSeek AI (Reasoner) terminée !");
     return { score: result.score, feedback: result.feedback };
   } catch (error) {
     console.error(
@@ -90,7 +65,7 @@ The user's response correctly identifies the main conflict. The structure is cle
     throw new Error("Failed to get a response from the AI service.");
   }
 }
-// -------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -121,22 +96,78 @@ const authenticateToken = (req, res, next) => {
   );
 };
 
-// ======================= 所有 API 接口 =======================
+// ======================= API 接口 =======================
 
+// --- 生成音频的管理接口 ---
+app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey)
+    return res
+      .status(500)
+      .json({ message: "DeepSeek API key is not configured." });
+  try {
+    const questionQuery = await pool.query(
+      "SELECT lecture_script FROM questions WHERE id = $1 AND task_type = 'integrated_writing'",
+      [id]
+    );
+    const script = questionQuery.rows[0]?.lecture_script;
+    if (!script)
+      return res.status(404).json({
+        message: "Integrated writing question not found or script is empty.",
+      });
+
+    console.log(`🎤 Generating audio for question ${id} using DeepSeek TTS...`);
+    const ttsResponse = await axios.post(
+      "https://api.deepseek.com/audio/speech",
+      { model: "deepseek-speech", input: script, voice: "zh-CN-Xiaoyao-Male" },
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        responseType: "arraybuffer",
+      }
+    );
+    const audioBuffer = Buffer.from(ttsResponse.data);
+    const uploadStream = cloudinary.uploader.upload_stream(
+      { resource_type: "video", folder: "toefl_lectures" },
+      async (error, result) => {
+        if (error) {
+          console.error("Cloudinary upload error:", error);
+          return res.status(500).json({ message: "Failed to upload audio." });
+        }
+        const audioUrl = result.secure_url;
+        await pool.query(
+          "UPDATE questions SET lecture_audio_url = $1 WHERE id = $2",
+          [audioUrl, id]
+        );
+        console.log(
+          `✅ Audio for question ${id} generated and saved: ${audioUrl}`
+        );
+        res.json({ message: "Audio generated successfully!", url: audioUrl });
+      }
+    );
+    uploadStream.end(audioBuffer);
+  } catch (error) {
+    console.error(
+      "Audio generation failed:",
+      error.response ? error.response.data.toString() : error.message
+    );
+    res.status(500).json({ message: "Failed to generate audio." });
+  }
+});
+
+// --- 获取写作模拟考试 ---
 app.get("/api/writing-test", async (req, res) => {
   try {
-    const sql = `
-            (SELECT * FROM questions WHERE task_type = 'integrated_writing' ORDER BY RANDOM() LIMIT 1)
-            UNION ALL
-            (SELECT * FROM questions WHERE task_type = 'academic_discussion' ORDER BY RANDOM() LIMIT 1);
-        `;
+    const sql = `(SELECT * FROM questions WHERE task_type = 'integrated_writing' ORDER BY RANDOM() LIMIT 1) UNION ALL (SELECT * FROM questions WHERE task_type = 'academic_discussion' ORDER BY RANDOM() LIMIT 1);`;
     const result = await pool.query(sql);
-    if (result.rows.length < 2) {
+    if (result.rows.length < 2)
       return res.status(404).json({
         message:
           "Not enough questions in database to start a full writing test.",
       });
-    }
     res.json(result.rows);
   } catch (err) {
     console.error("获取写作考试题目失败:", err);
@@ -144,6 +175,7 @@ app.get("/api/writing-test", async (req, res) => {
   }
 });
 
+// --- 获取所有练习题目 ---
 app.get("/api/questions", async (req, res) => {
   try {
     const sql = `SELECT id, title, topic, task_type FROM questions ORDER BY id`;
@@ -155,6 +187,7 @@ app.get("/api/questions", async (req, res) => {
   }
 });
 
+// --- 获取单个题目详情 ---
 app.get("/api/questions/:id", async (req, res) => {
   const { id } = req.params;
   try {
@@ -169,6 +202,7 @@ app.get("/api/questions/:id", async (req, res) => {
   }
 });
 
+// --- 用户注册 ---
 app.post("/api/auth/register", async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password)
@@ -191,6 +225,7 @@ app.post("/api/auth/register", async (req, res) => {
   }
 });
 
+// --- 用户登录 ---
 app.post("/api/auth/login", async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password)
@@ -221,17 +256,18 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
+// --- 提交作文 ---
 app.post("/api/submit-response", authenticateToken, async (req, res) => {
   const { content, wordCount, questionId, task_type } = req.body;
   const userId = req.user.id;
   const qId = parseInt(questionId, 10);
-  if (!content || !wordCount || isNaN(qId) || !task_type) {
+  if ((!content && wordCount > 0) || !wordCount || isNaN(qId) || !task_type) {
     return res.status(400).json({ message: "请求缺少必要信息或格式不正确。" });
   }
   try {
     const sql = `INSERT INTO responses (content, word_count, question_id, task_type, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING id`;
     const result = await pool.query(sql, [
-      content,
+      content || "",
       wordCount,
       qId,
       task_type,
@@ -252,7 +288,7 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
           questionData.task_type === "integrated_writing"
             ? `Reading: ${questionData.reading_passage}\nLecture: ${questionData.lecture_script}`
             : `Prompt: ${questionData.professor_prompt}\nStudent 1: ${questionData.student1_post}\nStudent 2: ${questionData.student2_post}`;
-        const aiResult = await callAIScoringAPI(content, promptText);
+        const aiResult = await callAIScoringAPI(content || "", promptText);
         const updateSql = `UPDATE responses SET ai_score = $1, ai_feedback = $2 WHERE id = $3`;
         await pool.query(updateSql, [
           aiResult.score,
@@ -272,6 +308,7 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
   }
 });
 
+// --- 获取历史列表 ---
 app.get("/api/history", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
@@ -286,6 +323,7 @@ app.get("/api/history", authenticateToken, async (req, res) => {
   }
 });
 
+// --- 获取历史详情 ---
 app.get("/api/history/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
@@ -303,6 +341,7 @@ app.get("/api/history/:id", authenticateToken, async (req, res) => {
   }
 });
 
+// --- 启动服务器 ---
 app.use(express.static("public"));
 app.listen(PORT, () => {
   console.log(`🚀 服务器正在端口 ${PORT} 上运行`);
