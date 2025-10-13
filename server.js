@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Truly Complete Final Version) ---
+﻿// --- START OF FILE server.js (Truly, Absolutely, 100% Complete Final Version) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -80,7 +80,7 @@ async function callAIPolishAPI(responseText) {
     const response = await axios.post(
       endpoint,
       {
-        model: "deepseek-reasoner",
+        model: "deepseek-coder",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: responseText },
@@ -149,7 +149,36 @@ async function callAIScoringAPI(responseText, promptText, taskType) {
   }
 }
 
-// (音频生成等辅助函数)
+// --- AI 总结常犯错误的函数 ---
+async function callAIAnalysisAPI(feedbacks) {
+  console.log("🤖 AI a commencé l'analyse des erreurs communes...");
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) {
+    throw new Error("AI service is not configured.");
+  }
+  const endpoint = "https://api.deepseek.com/chat/completions";
+  const systemPrompt = `You are an expert writing coach. Based on the provided list of feedback JSON objects from a user's past TOEFL essays, identify and summarize the top 3-5 recurring weaknesses or common mistakes. For each point, provide a concise description of the issue and a concrete suggestion for improvement. Present your analysis in a clear, easy-to-read markdown format. Focus on patterns in 'Language Use', 'Organization & Development', and 'Task Response'.`;
+  const feedbackText = feedbacks.map((f) => JSON.stringify(f)).join("\n---\n");
+  try {
+    const response = await axios.post(endpoint, {
+      model: "deepseek-coder",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: feedbackText },
+      ],
+      temperature: 0.5,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+    return { analysis: response.data.choices[0].message.content };
+  } catch (error) {
+    throw new Error("Failed to get a response from the AI analysis service.");
+  }
+}
+
+// --- 音频生成函数 ---
 function addPausesToText(text) {
   if (!text) return "";
   let processedText = text;
@@ -157,8 +186,77 @@ function addPausesToText(text) {
   processedText = processedText.replace(/\n/g, ". ... ... \n");
   return processedText;
 }
+
+// --- 【完整版】: 音频生成函数 ---
 async function generateAudioIfNeeded(questionId) {
-  /* ... same as before ... */
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN;
+  if (!accountId || !apiToken) {
+    console.log("🔊 [Cloudflare TTS] 音频生成跳过：环境变量未配置。");
+    return;
+  }
+  try {
+    const questionQuery = await pool.query(
+      "SELECT lecture_script, lecture_audio_url, task_type FROM questions WHERE id = $1",
+      [questionId]
+    );
+    const question = questionQuery.rows[0];
+    if (
+      !question ||
+      question.task_type !== "integrated_writing" ||
+      question.lecture_audio_url ||
+      !question.lecture_script
+    ) {
+      return;
+    }
+    console.log(
+      `🎤 [后台任务 CF-Aura-TTS] 开始为题目 #${questionId} 生成音频...`
+    );
+    const textWithPauses = addPausesToText(question.lecture_script);
+    const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/deepgram/aura-1`;
+    const ttsResponse = await axios.post(
+      endpoint,
+      { text: textWithPauses },
+      {
+        headers: {
+          Authorization: `Bearer ${apiToken}`,
+          "Content-Type": "application/json",
+        },
+        responseType: "arraybuffer",
+      }
+    );
+    const audioBuffer = Buffer.from(ttsResponse.data);
+    if (!audioBuffer || audioBuffer.length === 0) {
+      throw new Error("Cloudflare TTS 生成了空的音频 Buffer。");
+    }
+    const uploadPromise = new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        { resource_type: "video", folder: "toefl_lectures" },
+        (error, result) => {
+          if (error) return reject(error);
+          resolve(result);
+        }
+      );
+      uploadStream.end(audioBuffer);
+    });
+    const uploadResult = await uploadPromise;
+    const audioUrl = uploadResult.secure_url;
+    await pool.query(
+      "UPDATE questions SET lecture_audio_url = $1 WHERE id = $2",
+      [audioUrl, questionId]
+    );
+    console.log(
+      `✅ [后台任务 CF-Aura-TTS] 题目 #${questionId} 的音频已生成并保存: ${audioUrl}`
+    );
+  } catch (error) {
+    const errorDetails = error.response
+      ? JSON.parse(Buffer.from(error.response.data).toString())
+      : error.message;
+    console.error(
+      `❌ [后台任务 CF-Aura-TTS] 为题目 #${questionId} 生成音频时出错:`,
+      errorDetails
+    );
+  }
 }
 
 const app = express();
@@ -472,14 +570,75 @@ app.get("/api/user/achievements", authenticateToken, async (req, res) => {
   }
 });
 
-app.get("/api/user/practice-calendar", authenticateToken, async (req, res) => {
+app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
-    const sql = `SELECT submitted_at as date FROM responses WHERE user_id = $1 AND submitted_at >= NOW() - INTERVAL '1 year' ORDER BY date;`;
-    const result = await pool.query(sql, [userId]);
-    res.json(result.rows.map((row) => row.date));
+    const responsesQuery = await pool.query(
+      "SELECT content, ai_feedback FROM responses WHERE user_id = $1 AND content IS NOT NULL AND content != '' AND ai_feedback IS NOT NULL AND ai_feedback LIKE '{%}'",
+      [userId]
+    );
+    if (responsesQuery.rows.length < 3) {
+      return res.status(404).json({
+        message:
+          "Not enough practice data for a meaningful analysis. Please complete at least 3 practices.",
+      });
+    }
+    const stopWords = new Set([
+      "a",
+      "an",
+      "the",
+      "and",
+      "but",
+      "or",
+      "in",
+      "on",
+      "at",
+      "to",
+      "for",
+      "of",
+      "is",
+      "are",
+      "was",
+      "were",
+      "it",
+      "i",
+      "you",
+      "he",
+      "she",
+      "they",
+      "we",
+      "that",
+      "this",
+      "with",
+      "as",
+      "not",
+      "be",
+      "has",
+      "have",
+      "do",
+      "does",
+      "did",
+    ]);
+    const wordCounts = {};
+    responsesQuery.rows.forEach((row) => {
+      const words = row.content.toLowerCase().match(/\b\w+\b/g) || [];
+      words.forEach((word) => {
+        if (!stopWords.has(word) && isNaN(word)) {
+          wordCounts[word] = (wordCounts[word] || 0) + 1;
+        }
+      });
+    });
+    const wordCloudData = Object.entries(wordCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 50)
+      .map(([text, value]) => ({ text, value }));
+    const feedbacks = responsesQuery.rows.map((row) =>
+      JSON.parse(row.ai_feedback)
+    );
+    const aiAnalysis = await callAIAnalysisAPI(feedbacks);
+    res.json({ wordCloud: wordCloudData, commonMistakes: aiAnalysis.analysis });
   } catch (err) {
-    console.error("获取练习日历数据失败:", err);
+    console.error("获取写作分析数据失败:", err);
     res.status(500).json({ message: "服务器内部错误。" });
   }
 });
@@ -502,7 +661,7 @@ app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
         .status(404)
         .json({ message: "Question not found or audio still processing." });
     }
-  } catch (error) {
+  } catch (err) {
     console.error("Manual audio generation failed:", error);
     res.status(500).json({ message: "Failed to generate audio." });
   }
