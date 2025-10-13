@@ -27,6 +27,20 @@
         max-width: 900px;
         margin: 20px auto 0;
         padding: 0 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .nav-left,
+      .nav-right {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+      .nav-link {
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-weight: 500;
       }
       .main-container {
         max-width: 900px;
@@ -59,6 +73,7 @@
         border-radius: 8px;
         border: 1px solid var(--border-color);
         font-size: 15px;
+        background-color: var(--card-bg);
       }
       .mistake-list {
         display: grid;
@@ -69,10 +84,18 @@
         border: 1px solid var(--border-color);
         border-radius: 12px;
         padding: 20px;
-        display: none; /* Initially hidden, shown by JS */
-      }
-      .mistake-card.visible {
         display: block;
+        animation: fadeIn 0.5s ease;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
       .mistake-header {
         display: flex;
@@ -109,14 +132,23 @@
         font-size: 14px;
         color: var(--text-secondary);
       }
+      .mistake-body {
+        line-height: 1.6;
+      }
       .mistake-body .original {
         color: var(--accent-red);
         text-decoration: line-through;
+        background-color: rgba(255, 59, 48, 0.1);
+        padding: 2px 4px;
+        border-radius: 4px;
         font-size: 16px;
       }
       .mistake-body .corrected {
         color: var(--accent-green);
         font-weight: 500;
+        background-color: rgba(52, 199, 89, 0.1);
+        padding: 2px 4px;
+        border-radius: 4px;
         font-size: 16px;
         margin-left: 8px;
       }
@@ -128,6 +160,7 @@
         font-size: 15px;
         color: var(--text-secondary);
         line-height: 1.6;
+        border-left: 3px solid var(--border-color);
       }
       .mistake-explanation strong {
         color: var(--text-primary);
@@ -139,6 +172,9 @@
         font-weight: 500;
         margin-top: 16px;
         display: inline-block;
+      }
+      .context-link:hover {
+        text-decoration: underline;
       }
       .loading-state,
       .empty-state {
@@ -197,16 +233,16 @@
 
           if (filteredMistakes.length === 0) {
             const message =
-              filterValue === "all"
-                ? "No mistakes found yet. Keep practicing!"
-                : `No mistakes of type "${filterValue}" found.`;
+              allMistakes.length === 0
+                ? "No mistakes found yet. Keep practicing and the AI will automatically log them here!"
+                : `No mistakes of type "${filterValue}" found in your records.`;
             listContainer.innerHTML = `<div class="empty-state">${message}</div>`;
             return;
           }
 
           filteredMistakes.forEach((mistake) => {
             const card = document.createElement("div");
-            card.className = "mistake-card visible";
+            card.className = "mistake-card";
             card.dataset.type = mistake.type;
 
             const date = new Date(mistake.created_at).toLocaleDateString(
@@ -227,18 +263,20 @@
                     </div>
                     <div class="mistake-body">
                         <span class="original">${mistake.original_text}</span>
+                        <span>&rarr;</span>
                         <span class="corrected">${mistake.corrected_text}</span>
                     </div>
                     <div class="mistake-explanation">
                         <strong>Explanation:</strong> ${
-                          mistake.explanation || "N/A"
+                          mistake.explanation ||
+                          "AI did not provide a specific explanation."
                         }
                     </div>
                     <a href="/history-detail.html?id=${
                       mistake.response_id
                     }" class="context-link">
                         View in original context (${
-                          mistake.question_title
+                          mistake.question_title || "Practice Response"
                         }) &rarr;
                     </a>
                 `;
@@ -250,7 +288,12 @@
           const response = await fetch("/api/mistakes", {
             headers: { Authorization: `Bearer ${token}` },
           });
-          if (!response.ok) throw new Error("Failed to load mistakes.");
+          if (!response.ok) {
+            if (response.status === 401 || response.status === 403) {
+              window.location.href = "/login.html";
+            }
+            throw new Error("Failed to load mistakes.");
+          }
 
           allMistakes = await response.json();
           renderMistakes();
