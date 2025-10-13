@@ -1,11 +1,10 @@
-<!-- START OF FILE public/profile.html (with Writing Analysis) -->
+<!-- START OF FILE public/profile.html (with User-Triggered Writing Analysis) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>My Profile - TOEFL® Practice</title>
-    <!-- 【新增】: 引入词云和 Markdown 解析库 -->
     <script src="https://cdn.jsdelivr.net/npm/wordcloud@1.2.2/src/wordcloud2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
@@ -16,6 +15,7 @@
         --text-primary: #1d1d1f;
         --text-secondary: #6e6e73;
         --accent-blue: #007aff;
+        --accent-blue-hover: #0060c5;
         --border-color: #d2d2d7;
       }
       body {
@@ -28,19 +28,6 @@
         max-width: 1000px;
         margin: 20px auto 0;
         padding: 0 10px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-      .nav-link {
-        color: var(--text-secondary);
-        text-decoration: none;
-        font-weight: 500;
-      }
-      .nav-right {
-        display: flex;
-        align-items: center;
-        gap: 20px;
       }
       .main-container {
         max-width: 1000px;
@@ -64,6 +51,41 @@
         border-radius: 16px;
         border: 1px solid var(--border-color);
       }
+      /* --- 【新增】: 分析触发卡片的样式 --- */
+      .analysis-prompt-card {
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 40px;
+        text-align: center;
+      }
+      .analysis-prompt-card h3 {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0 0 12px 0;
+      }
+      .analysis-prompt-card p {
+        color: var(--text-secondary);
+        max-width: 500px;
+        margin: 0 auto 24px;
+        line-height: 1.6;
+      }
+      #start-analysis-btn {
+        background-color: var(--accent-blue);
+        color: #fff;
+        padding: 12px 28px;
+        border-radius: 999px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 16px;
+        transition: all 0.2s ease;
+        border: none;
+        cursor: pointer;
+      }
+      #start-analysis-btn:hover {
+        background-color: var(--accent-blue-hover);
+        transform: scale(1.05);
+      }
       .profile-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -79,8 +101,6 @@
         width: 100% !important;
         height: 300px !important;
       }
-
-      /* AI 分析报告的样式 */
       .ai-analysis-content {
         line-height: 1.7;
       }
@@ -96,8 +116,6 @@
       .ai-analysis-content li {
         margin-bottom: 12px;
       }
-
-      /* Achievements Styles */
       .achievements-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -149,8 +167,17 @@
     <div class="navbar"></div>
     <div class="main-container">
       <h2 class="section-header">Writing Analysis</h2>
+      <!-- 【关键修改 1/3】: 初始状态改为显示一个触发按钮 -->
       <div id="analysis-section">
-        <div class="loading-state">Analyzing your writing...</div>
+        <div class="analysis-prompt-card">
+          <h3>Generate Your Personalized Writing Report</h3>
+          <p>
+            Get an AI-powered summary of your high-frequency words and common
+            mistakes based on all your practice sessions. This may take up to 30
+            seconds.
+          </p>
+          <button id="start-analysis-btn">Start Analysis</button>
+        </div>
       </div>
 
       <h2 class="section-header">My Achievements</h2>
@@ -171,31 +198,32 @@
         const analysisSection = document.getElementById("analysis-section");
         const achievementsGrid = document.getElementById("achievements-grid");
 
-        // --- Function to render Writing Analysis ---
         const renderAnalysis = async () => {
+          // 【关键修改 2/3】: 在函数开始时显示加载状态
+          analysisSection.innerHTML = `<div class="loading-state">Analyzing your writing... This may take up to 30 seconds.</div>`;
+
           try {
             const response = await fetch("/api/user/writing-analysis", {
               headers: { Authorization: `Bearer ${token}` },
             });
             const data = await response.json();
-            if (!response.ok) throw new Error(data.message);
+            if (!response.ok)
+              throw new Error(data.message || "Failed to load analysis.");
 
             analysisSection.innerHTML = `
-                        <div class="profile-grid">
-                            <div class="analysis-card">
-                                <h3>High-Frequency Words</h3>
-                                <canvas id="wordcloud-canvas"></canvas>
-                            </div>
-                            <div class="analysis-card">
-                                <h3>AI Common Mistakes Summary</h3>
-                                <div id="ai-analysis-content" class="ai-analysis-content"></div>
-                            </div>
-                        </div>
-                    `;
+                <div class="profile-grid">
+                    <div class="analysis-card">
+                        <h3>High-Frequency Words</h3>
+                        <canvas id="wordcloud-canvas"></canvas>
+                    </div>
+                    <div class="analysis-card">
+                        <h3>AI Common Mistakes Summary</h3>
+                        <div id="ai-analysis-content" class="ai-analysis-content"></div>
+                    </div>
+                </div>`;
 
-            // Render Word Cloud
             WordCloud(document.getElementById("wordcloud-canvas"), {
-              list: data.wordCloud.map((d) => [d.text, d.value * 20]), // Multiply value for better visualization
+              list: data.wordCloud.map((d) => [d.text, d.value * 20]),
               gridSize: Math.round(
                 (16 * document.getElementById("wordcloud-canvas").width) / 1024
               ),
@@ -205,7 +233,6 @@
               backgroundColor: "#fff",
             });
 
-            // Render AI Analysis
             document.getElementById("ai-analysis-content").innerHTML =
               marked.parse(data.commonMistakes);
           } catch (error) {
@@ -213,7 +240,6 @@
           }
         };
 
-        // --- Function to render Achievements (no change) ---
         const renderAchievements = async () => {
           try {
             const response = await fetch("/api/user/achievements", {
@@ -242,8 +268,13 @@
           }
         };
 
-        // --- Initial Load ---
-        renderAnalysis();
+        // --- 【关键修改 3/3】: 绑定点击事件，而不是立即执行 ---
+        const startAnalysisBtn = document.getElementById("start-analysis-btn");
+        if (startAnalysisBtn) {
+          startAnalysisBtn.addEventListener("click", renderAnalysis);
+        }
+
+        // 成就加载保持不变
         renderAchievements();
       });
     </script>

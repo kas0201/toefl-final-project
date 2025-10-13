@@ -1,4 +1,6 @@
-﻿const express = require("express");
+﻿// --- START OF FILE server.js (Absolutely Complete Final Version with Enhanced Logging) ---
+
+const express = require("express");
 const { Pool } = require("pg");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
@@ -7,7 +9,7 @@ const axios = require("axios");
 const cloudinary = require("cloudinary").v2;
 const fs = require("fs");
 const path = require("path");
-// 【关键修改 1/2】: 引入新的、CJS 兼容的词典包
+const util = require("util");
 const englishWords = require("an-array-of-english-words");
 
 // --- 配置 Cloudinary ---
@@ -717,7 +719,6 @@ app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
       });
     }
 
-    // 【关键修复】: 使用新的、稳定的 CJS 词典包
     const wordSet = new Set(englishWords);
     const checkWord = (word) => wordSet.has(word);
 
@@ -781,9 +782,18 @@ app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
     );
     const aiAnalysis = await callAIAnalysisAPI(feedbacks);
 
-    res.json({ wordCloud: wordCloudData, commonMistakes: aiAnalysis.analysis });
+    // 【关键修改 2/2】: 在发送前添加详细日志
+    const responseData = {
+      wordCloud: wordCloudData,
+      commonMistakes: aiAnalysis.analysis,
+    };
+    console.log(
+      `✅ [Analysis API] Success for user #${userId}. Sending data summary: { wordCloudLength: ${responseData.wordCloud.length}, commonMistakesLength: ${responseData.commonMistakes.length} }`
+    );
+
+    res.json(responseData);
   } catch (err) {
-    console.error("Failed to get writing analysis data:", err);
+    console.error("❌ Failed to get writing analysis data:", err);
     res.status(500).json({ message: "Internal server error." });
   }
 });
