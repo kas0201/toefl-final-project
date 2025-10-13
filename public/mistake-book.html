@@ -1,4 +1,4 @@
-<!-- START OF FILE public/mistake-book.html (Final Version with Full Page Redesign) -->
+<!-- START OF FILE public/mistake-book.html (Final Version with Tab-based Filtering) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -46,84 +46,44 @@
         max-width: 900px;
         margin: 40px auto;
       }
-
-      /* --- 【关键修改 1/6】: 创建一个新的页眉容器，用于 flex 布局 --- */
-      .page-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 12px; /* 调整与副标题的间距 */
-      }
-
-      /* --- 【关键修改 2/6】: 标题改为左对齐，并调整外边距 --- */
       h1 {
         font-size: 36px;
         font-weight: 700;
-        text-align: left;
-        margin: 0;
+        text-align: center;
+        margin: 0 0 8px 0;
       }
-
-      /* --- 【关键修改 3/6】: 副标题也改为左对齐，并调整外边距 --- */
       .subtitle {
-        text-align: left;
+        text-align: center;
         color: var(--text-secondary);
         margin-bottom: 40px;
         font-size: 18px;
-        margin-top: 0;
       }
 
-      /* --- 【关键修改 4/6】: 筛选器控件样式保持不变，但外边距由父容器控制 --- */
-      .filter-controls {
-        display: inline-flex;
-        align-items: center;
-        border: 1px solid var(--border-color);
-        border-radius: 10px;
-        background-color: var(--card-bg);
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-        transition: box-shadow 0.2s ease, border-color 0.2s ease;
-        flex-shrink: 0; /* 防止在高分辨率下被压缩 */
+      /* --- 【关键修改 1/3】: 引入标签页导航栏的样式 --- */
+      .tab-nav {
+        display: flex;
+        gap: 8px;
+        border-bottom: 1px solid var(--border-color);
+        margin-bottom: 32px;
       }
-      .filter-controls:focus-within {
-        border-color: var(--accent-blue);
-        box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
-      }
-      .filter-controls label {
-        font-weight: 500;
-        color: var(--text-secondary);
-        font-size: 15px;
-        padding: 10px 12px 10px 16px;
-        border-right: 1px solid var(--border-color);
-        white-space: nowrap;
-      }
-      .select-wrapper {
-        position: relative;
-        display: inline-block;
-      }
-      .select-wrapper::after {
-        content: "⌄";
-        font-size: 16px;
-        color: var(--text-secondary);
-        position: absolute;
-        right: 12px;
-        top: 50%;
-        transform: translateY(-50%);
-        pointer-events: none;
-      }
-      .filter-controls select {
-        appearance: none;
-        -webkit-appearance: none;
-        -moz-appearance: none;
-        padding: 10px 32px 10px 16px;
+      .tab-btn {
+        padding: 12px 20px;
         border: none;
-        font-size: 15px;
-        font-family: inherit;
-        font-weight: 500;
         background-color: transparent;
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--text-secondary);
         cursor: pointer;
+        border-bottom: 3px solid transparent;
+        transition: all 0.2s ease;
+      }
+      .tab-btn:hover {
         color: var(--text-primary);
       }
-      .filter-controls select:focus {
-        outline: none;
+      .tab-btn.active {
+        color: var(--accent-blue);
+        font-weight: 600;
+        border-bottom-color: var(--accent-blue);
       }
 
       .mistake-list {
@@ -239,28 +199,20 @@
   <body>
     <div class="navbar"></div>
     <div class="main-container">
-      <!-- --- 【关键修改 5/6】: HTML 结构调整，创建 page-header --- -->
-      <div class="page-header">
-        <h1>My Mistake Book</h1>
-        <div class="filter-controls">
-          <label for="type-filter">Filter by type</label>
-          <div class="select-wrapper">
-            <select id="type-filter">
-              <option value="all">All Types</option>
-              <option value="grammar">Grammar</option>
-              <option value="spelling">Spelling</option>
-              <option value="punctuation">Punctuation</option>
-              <option value="vocabulary">Vocabulary</option>
-              <option value="style">Style</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <!-- --- 【关键修改 6/6】: 将副标题移到页眉下方 --- -->
+      <h1>My Mistake Book</h1>
       <p class="subtitle">
         A personalized log of your writing mistakes for targeted review.
       </p>
+
+      <!-- --- 【关键修改 2/3】: 将筛选器替换为标签页导航 --- -->
+      <div class="tab-nav">
+        <button class="tab-btn active" data-filter="all">All Types</button>
+        <button class="tab-btn" data-filter="grammar">Grammar</button>
+        <button class="tab-btn" data-filter="spelling">Spelling</button>
+        <button class="tab-btn" data-filter="punctuation">Punctuation</button>
+        <button class="tab-btn" data-filter="vocabulary">Vocabulary</button>
+        <button class="tab-btn" data-filter="style">Style</button>
+      </div>
 
       <div class="mistake-list" id="mistake-list">
         <div class="loading-state">Loading your mistake book...</div>
@@ -277,11 +229,12 @@
         }
 
         const listContainer = document.getElementById("mistake-list");
-        const typeFilter = document.getElementById("type-filter");
         let allMistakes = [];
 
-        const renderMistakes = () => {
-          const filterValue = typeFilter.value;
+        // --- 【关键修改 3/3】: 更新 JavaScript 逻辑以适配标签页 ---
+        const tabButtons = document.querySelectorAll(".tab-btn");
+
+        const renderMistakes = (filterValue) => {
           listContainer.innerHTML = "";
 
           const filteredMistakes = allMistakes.filter(
@@ -312,34 +265,46 @@
             );
 
             card.innerHTML = `
-                    <div class="mistake-header">
-                        <span class="mistake-type-badge ${mistake.type}">${
+              <div class="mistake-header">
+                  <span class="mistake-type-badge ${mistake.type}">${
               mistake.type
             }</span>
-                        <span class="mistake-date">${date}</span>
-                    </div>
-                    <div class="mistake-body">
-                        <span class="original">${mistake.original_text}</span>
-                        <span>&rarr;</span>
-                        <span class="corrected">${mistake.corrected_text}</span>
-                    </div>
-                    <div class="mistake-explanation">
-                        <strong>Explanation:</strong> ${
-                          mistake.explanation ||
-                          "AI did not provide a specific explanation."
-                        }
-                    </div>
-                    <a href="/history-detail.html?id=${
-                      mistake.response_id
-                    }" class="context-link">
-                        View in original context (${
-                          mistake.question_title || "Practice Response"
-                        }) &rarr;
-                    </a>
-                `;
+                  <span class="mistake-date">${date}</span>
+              </div>
+              <div class="mistake-body">
+                  <span class="original">${mistake.original_text}</span>
+                  <span>&rarr;</span>
+                  <span class="corrected">${mistake.corrected_text}</span>
+              </div>
+              <div class="mistake-explanation">
+                  <strong>Explanation:</strong> ${
+                    mistake.explanation ||
+                    "AI did not provide a specific explanation."
+                  }
+              </div>
+              <a href="/history-detail.html?id=${
+                mistake.response_id
+              }" class="context-link">
+                  View in original context (${
+                    mistake.question_title || "Practice Response"
+                  }) &rarr;
+              </a>`;
             listContainer.appendChild(card);
           });
         };
+
+        // 为每个标签页按钮添加点击事件
+        tabButtons.forEach((button) => {
+          button.addEventListener("click", () => {
+            // 移除所有按钮的 'active' 状态
+            tabButtons.forEach((btn) => btn.classList.remove("active"));
+            // 为当前点击的按钮添加 'active' 状态
+            button.classList.add("active");
+            // 根据按钮的 data-filter 属性重新渲染列表
+            const filter = button.dataset.filter;
+            renderMistakes(filter);
+          });
+        });
 
         try {
           const response = await fetch("/api/mistakes", {
@@ -353,9 +318,8 @@
           }
 
           allMistakes = await response.json();
-          renderMistakes();
-
-          typeFilter.addEventListener("change", renderMistakes);
+          // 初始加载时，显示 "All Types"
+          renderMistakes("all");
         } catch (error) {
           console.error("Error loading mistake book:", error);
           listContainer.innerHTML = `<div class="empty-state">Error loading your data. Please try again later.</div>`;
