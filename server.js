@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (with Review List feature) ---
+﻿// --- START OF FILE server.js (Absolutely Complete Final Version) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -10,7 +10,7 @@ const cloudinary = require("cloudinary").v2;
 const fs = require("fs");
 const path = require("path");
 
-// --- 配置与函数 (保持不变) ---
+// --- 配置 Cloudinary ---
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -18,12 +18,14 @@ cloudinary.config({
   secure: true,
 });
 
+// --- AI评分函数 (严格托福标准版) ---
 async function callAIScoringAPI(responseText, promptText, taskType) {
   console.log(
     `🤖 AI a commencé à noter (Mode: ${taskType}) avec le mode de pensée deepseek-reasoner...`
   );
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
+    console.error("❌ Erreur: DEEPSEEK_API_KEY non configuré.");
     throw new Error("AI service is not configured.");
   }
   const endpoint = "https://api.deepseek.com/chat/completions";
@@ -71,6 +73,8 @@ async function callAIScoringAPI(responseText, promptText, taskType) {
     throw new Error("Failed to get a response from the AI service.");
   }
 }
+
+// --- 音频生成函数 ---
 function addPausesToText(text) {
   if (!text) return "";
   let processedText = text;
@@ -193,6 +197,9 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
   const { content, wordCount, questionId, task_type } = req.body;
   const userId = req.user.id;
   const qId = parseInt(questionId, 10);
+  if ((!content && wordCount > 0) || !wordCount || isNaN(qId) || !task_type) {
+    return res.status(400).json({ message: "请求缺少必要信息或格式不正确。" });
+  }
   try {
     const sql = `INSERT INTO responses (content, word_count, question_id, task_type, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING id`;
     const result = await pool.query(sql, [
@@ -206,22 +213,31 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
     res
       .status(201)
       .json({ message: "Submission successful!", id: newResponseId });
+
     (async () => {
       try {
         const questionRes = await pool.query(
           "SELECT * FROM questions WHERE id = $1",
           [qId]
         );
+        if (questionRes.rows.length === 0) {
+          throw new Error(`Question with ID ${qId} not found.`);
+        }
         const questionData = questionRes.rows[0];
-        const promptText =
-          questionData.task_type === "integrated_writing"
-            ? `Reading: ${questionData.reading_passage}\nLecture: ${questionData.lecture_script}`
-            : `Prompt: ${questionData.professor_prompt}\nStudent 1: ${questionData.student1_post}\nStudent 2: ${questionData.student2_post}`;
+
+        let promptText = "";
+        if (questionData.task_type === "integrated_writing") {
+          promptText = `Reading: ${questionData.reading_passage}\nLecture: ${questionData.lecture_script}`;
+        } else {
+          promptText = `Professor's Prompt: ${questionData.professor_prompt}\n${questionData.student1_author}'s Post: ${questionData.student1_post}\n${questionData.student2_author}'s Post: ${questionData.student2_post}`;
+        }
+
         const aiResult = await callAIScoringAPI(
           content || "",
           promptText,
-          task_type
+          questionData.task_type
         );
+
         const updateSql = `UPDATE responses SET ai_score = $1, ai_feedback = $2 WHERE id = $3`;
         await pool.query(updateSql, [
           aiResult.score,
@@ -241,7 +257,6 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
   }
 });
 
-// ======================= 【新功能API】开始 =======================
 app.get("/api/review-list", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
@@ -277,7 +292,6 @@ app.post(
     }
   }
 );
-// ======================= 【新功能API】结束 =======================
 
 app.get("/api/history/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
@@ -294,7 +308,6 @@ app.get("/api/history/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// 其他API路由
 app.get("/api/writing-test", async (req, res) => {
   try {
     const sql = `(SELECT * FROM questions WHERE task_type = 'integrated_writing' ORDER BY RANDOM() LIMIT 1) UNION ALL (SELECT * FROM questions WHERE task_type = 'academic_discussion' ORDER BY RANDOM() LIMIT 1);`;
@@ -316,6 +329,7 @@ app.get("/api/writing-test", async (req, res) => {
     res.status(500).json({ message: "服务器内部错误。" });
   }
 });
+
 app.get("/api/questions/:id", async (req, res) => {
   const { id } = req.params;
   try {
@@ -330,6 +344,7 @@ app.get("/api/questions/:id", async (req, res) => {
     res.status(500).json({ message: "服务器内部错误。" });
   }
 });
+
 app.post("/api/auth/register", async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
@@ -353,6 +368,7 @@ app.post("/api/auth/register", async (req, res) => {
     res.status(500).json({ message: "服务器内部错误。" });
   }
 });
+
 app.post("/api/auth/login", async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
@@ -386,6 +402,7 @@ app.post("/api/auth/login", async (req, res) => {
     res.status(500).json({ message: "服务器内部错误。" });
   }
 });
+
 app.get("/api/history", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
@@ -397,6 +414,7 @@ app.get("/api/history", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "服务器内部错误。" });
   }
 });
+
 app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
   try {
