@@ -1,4 +1,4 @@
-﻿<!-- START OF FILE public/history-detail.html (with auto-refreshing feedback) -->
+﻿<!-- START OF FILE public/history-detail.html (with Timed Rewrite feature) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Writing Review - TOEFL® Practice</title>
     <style>
-      /* CSS styles are identical to the previous version, no changes needed */
       @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
       :root {
         --bg-color: #f5f5f7;
@@ -27,7 +26,7 @@
         padding: 24px;
       }
       .navbar {
-        max-width: 800px;
+        max-width: 900px;
         margin: 20px auto 0;
         padding: 0 10px;
         display: flex;
@@ -61,6 +60,11 @@
         color: var(--text-secondary);
         margin: 0 0 16px 0;
         font-size: 18px;
+      }
+      .action-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
       }
       .post,
       .user-response-card {
@@ -189,7 +193,8 @@
       .general-suggestion p {
         color: #0052cc;
       }
-      #review-toggle-btn {
+      #review-toggle-btn,
+      #rewrite-btn {
         background-color: transparent;
         border: 2px solid var(--accent-blue);
         color: var(--accent-blue);
@@ -203,7 +208,8 @@
         gap: 8px;
         transition: all 0.2s ease;
       }
-      #review-toggle-btn:hover {
+      #review-toggle-btn:hover,
+      #rewrite-btn:hover {
         background-color: var(--accent-blue);
         color: white;
       }
@@ -250,6 +256,100 @@
         font-size: 14px;
         color: var(--text-secondary);
       }
+
+      /* === NEW MODAL STYLES START === */
+      .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0, 0, 0, 0.6);
+      }
+      .modal-content {
+        background-color: var(--bg-color);
+        margin: 5% auto;
+        padding: 20px;
+        border: 1px solid var(--border-color);
+        width: 90%;
+        max-width: 1400px;
+        border-radius: 16px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+      }
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 16px;
+        margin-bottom: 16px;
+      }
+      .modal-header h2 {
+        margin: 0;
+        font-size: 24px;
+      }
+      .modal-header .timer {
+        font-family: "Roboto Mono", monospace;
+        font-size: 24px;
+      }
+      .close-btn {
+        color: #aaa;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+      }
+      .close-btn:hover {
+        color: black;
+      }
+      .rewrite-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        max-height: 70vh;
+      }
+      .reference-panel {
+        overflow-y: auto;
+        padding-right: 16px;
+        border-right: 1px solid var(--border-color);
+      }
+      .response-panel textarea {
+        width: 100%;
+        height: calc(100% - 80px);
+        box-sizing: border-box;
+        resize: none;
+        font-size: 16px;
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+      }
+      .word-count {
+        text-align: right;
+        margin-top: 8px;
+        color: var(--text-secondary);
+        font-size: 14px;
+      }
+      .modal-footer {
+        text-align: right;
+        margin-top: 16px;
+      }
+      .modal-footer button {
+        padding: 10px 24px;
+        font-size: 15px;
+        font-weight: 600;
+        border-radius: 999px;
+        cursor: pointer;
+        border: none;
+        background-color: var(--accent-blue);
+        color: #fff;
+      }
+      .modal-footer button:disabled {
+        background-color: #e5e5ea;
+        cursor: not-allowed;
+      }
+      /* === NEW MODAL STYLES END === */
     </style>
   </head>
   <body>
@@ -258,39 +358,69 @@
       <div class="title-container">
         <h1 id="review-title">Reviewing Submission</h1>
         <p class="subtitle" id="review-subtitle">Loading details...</p>
-        <button id="review-toggle-btn" style="display: none">
-          <svg
-            id="review-icon-add"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M12 5v14M5 12h14"></path>
-          </svg>
-          <svg
-            id="review-icon-check"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="3"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            style="display: none"
-          >
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg>
-          <span id="review-btn-text">Add to Review List</span>
-        </button>
+        <div class="action-buttons">
+          <button id="review-toggle-btn" style="display: none">
+            <svg
+              id="review-icon-add"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 5v14M5 12h14"></path>
+            </svg>
+            <svg
+              id="review-icon-check"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              style="display: none"
+            >
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span id="review-btn-text">Add to Review List</span>
+          </button>
+          <button id="rewrite-btn" style="display: none">Timed Rewrite</button>
+        </div>
       </div>
       <div id="review-content"><div class="loading-state">Loading...</div></div>
     </div>
+
+    <!-- === NEW MODAL HTML START === -->
+    <div id="rewrite-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Timed Rewrite</h2>
+          <div id="rewrite-timer" class="timer">--:--</div>
+          <span class="close-btn">&times;</span>
+        </div>
+        <div class="rewrite-container">
+          <div class="reference-panel" id="rewrite-reference">
+            <!-- Reference content will be injected here by JS -->
+          </div>
+          <div class="response-panel">
+            <textarea
+              id="rewrite-textarea"
+              placeholder="Start your rewrite here..."
+            ></textarea>
+            <div id="rewrite-word-count" class="word-count">Words: 0</div>
+            <div class="modal-footer">
+              <button id="submit-rewrite-btn">Submit Rewrite</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- === NEW MODAL HTML END === -->
 
     <script src="/auth.js"></script>
     <script>
@@ -301,6 +431,10 @@
           return;
         }
 
+        let pageData = null; // Store the fetched data globally
+        let rewriteTimer;
+
+        // --- DOM Element Refs ---
         const reviewTitleEl = document.getElementById("review-title");
         const reviewSubtitleEl = document.getElementById("review-subtitle");
         const reviewContentEl = document.getElementById("review-content");
@@ -308,6 +442,17 @@
         const reviewBtnText = document.getElementById("review-btn-text");
         const reviewIconAdd = document.getElementById("review-icon-add");
         const reviewIconCheck = document.getElementById("review-icon-check");
+        const rewriteBtn = document.getElementById("rewrite-btn");
+
+        // Modal elements
+        const modal = document.getElementById("rewrite-modal");
+        const closeBtn = document.querySelector(".close-btn");
+        const rewriteReferenceEl = document.getElementById("rewrite-reference");
+        const rewriteTextarea = document.getElementById("rewrite-textarea");
+        const rewriteWordCountEl =
+          document.getElementById("rewrite-word-count");
+        const rewriteTimerEl = document.getElementById("rewrite-timer");
+        const submitRewriteBtn = document.getElementById("submit-rewrite-btn");
 
         const urlParams = new URLSearchParams(window.location.search);
         const historyId = urlParams.get("id");
@@ -317,19 +462,119 @@
           return;
         }
 
-        // ======================= 【新功能逻辑】开始 =======================
+        // --- Modal Functions ---
+        const openRewriteModal = () => {
+          if (!pageData) return;
 
-        let pollingInterval = null; // Variable to hold our timer
-        let initialLoad = true; // A flag to render static content only once
+          // Populate reference panel
+          const aiCard = document
+            .getElementById("ai-score-card")
+            .cloneNode(true);
+          const originalResponseCard = document
+            .querySelector(".user-response-card")
+            .cloneNode(true);
+          rewriteReferenceEl.innerHTML = `<h3>Reference</h3>`;
+          rewriteReferenceEl.appendChild(aiCard);
+          rewriteReferenceEl.appendChild(originalResponseCard);
 
-        // This function will fetch data and render the page content
+          // Set up timer
+          const timeLimit =
+            pageData.task_type === "integrated_writing" ? 1200 : 600; // 20 or 10 mins
+          startTimer(timeLimit, rewriteTimerEl, () => {
+            alert("Time's up! Submitting your rewrite.");
+            submitRewrite();
+          });
+
+          modal.style.display = "block";
+        };
+
+        const closeRewriteModal = () => {
+          clearInterval(rewriteTimer);
+          rewriteTextarea.value = "";
+          rewriteWordCountEl.textContent = "Words: 0";
+          modal.style.display = "none";
+        };
+
+        const startTimer = (duration, display, onComplete) => {
+          let timer = duration,
+            minutes,
+            seconds;
+          const update = () => {
+            minutes = parseInt(timer / 60, 10);
+            seconds = parseInt(timer % 60, 10);
+            minutes = minutes < 10 ? "0" + minutes : minutes;
+            seconds = seconds < 10 ? "0" + seconds : seconds;
+            display.textContent = minutes + ":" + seconds;
+            if (--timer < 0) {
+              clearInterval(rewriteTimer);
+              onComplete();
+            }
+          };
+          update();
+          rewriteTimer = setInterval(update, 1000);
+        };
+
+        const submitRewrite = async () => {
+          submitRewriteBtn.disabled = true;
+          submitRewriteBtn.textContent = "Submitting...";
+          const content = rewriteTextarea.value;
+          const wordCount = content.trim().match(/\S+/g)?.length || 0;
+
+          if (wordCount === 0) {
+            alert("Cannot submit an empty rewrite.");
+            submitRewriteBtn.disabled = false;
+            submitRewriteBtn.textContent = "Submit Rewrite";
+            return;
+          }
+
+          try {
+            const response = await fetch("/api/submit-response", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                content: content,
+                wordCount: wordCount,
+                questionId: pageData.question_id,
+                task_type: pageData.task_type,
+              }),
+            });
+            const result = await response.json();
+            if (!response.ok)
+              throw new Error(result.message || "Submission failed.");
+
+            // Redirect to submission success page with the NEW response ID
+            window.location.href = `/submission-success.html?id=${result.id}`;
+          } catch (error) {
+            alert(`Error: ${error.message}`);
+            submitRewriteBtn.disabled = false;
+            submitRewriteBtn.textContent = "Submit Rewrite";
+          }
+        };
+
+        // Wire up modal events
+        rewriteBtn.addEventListener("click", openRewriteModal);
+        closeBtn.addEventListener("click", closeRewriteModal);
+        window.addEventListener("click", (event) => {
+          if (event.target == modal) closeRewriteModal();
+        });
+        rewriteTextarea.addEventListener("input", (e) => {
+          const words = e.target.value.trim().match(/\S+/g)?.length || 0;
+          rewriteWordCountEl.textContent = `Words: ${words}`;
+        });
+        submitRewriteBtn.addEventListener("click", submitRewrite);
+
+        // --- Auto-refreshing feedback logic (from previous step) ---
+        let pollingInterval = null;
+        let initialLoad = true;
+
         const fetchAndRenderDetails = async () => {
           try {
-            console.log("Checking for feedback...");
             const response = await fetch(`/api/history/${historyId}`, {
               headers: { Authorization: `Bearer ${token}` },
             });
-
             if (response.status === 401 || response.status === 403) {
               clearInterval(pollingInterval);
               window.location.href = "/login.html";
@@ -339,8 +584,8 @@
               throw new Error("Failed to fetch submission details.");
 
             const data = await response.json();
+            pageData = data; // Store data globally
 
-            // On the first successful load, render the static parts of the page
             if (initialLoad) {
               const submittedDate = new Date(data.submitted_at).toLocaleString(
                 "en-US",
@@ -349,6 +594,7 @@
               reviewTitleEl.textContent = data.title || "Practice Response";
               reviewSubtitleEl.textContent = `Submitted on ${submittedDate} • ${data.word_count} words`;
               updateReviewButton(data.is_for_review);
+              rewriteBtn.style.display = "inline-flex";
 
               let promptHTML = "";
               if (data.task_type === "integrated_writing") {
@@ -356,14 +602,7 @@
               } else {
                 promptHTML = `<div class="post"><p class="post-author">${data.professor_author}</p><p class="post-content">${data.professor_prompt}</p></div><div class="post"><p class="post-author">${data.student1_author}</p><p class="post-content">${data.student1_post}</p></div><div class="post"><p class="post-author">${data.student2_author}</p><p class="post-content">${data.student2_post}</p></div>`;
               }
-
-              reviewContentEl.innerHTML = `
-                        <div id="ai-card-placeholder"></div>
-                        <h2 class="section-header">Your Response</h2>
-                        <div class="user-response-card"><p class="user-response-content">${data.user_response}</p></div>
-                        <h2 class="section-header">Original Prompt</h2>
-                        ${promptHTML}
-                    `;
+              reviewContentEl.innerHTML = `<div id="ai-card-placeholder"></div> <h2 class="section-header">Your Response</h2><div class="user-response-card"><p class="user-response-content">${data.user_response}</p></div><h2 class="section-header">Original Prompt</h2>${promptHTML}`;
               initialLoad = false;
             }
 
@@ -371,23 +610,17 @@
               "ai-card-placeholder"
             );
 
-            // CORE LOGIC: Check if feedback is ready
             if (data.ai_score !== null && data.ai_feedback) {
-              // If feedback is ready, stop polling
               if (pollingInterval) {
                 clearInterval(pollingInterval);
                 pollingInterval = null;
-                console.log("Feedback received, polling stopped.");
               }
-
-              // Render the final feedback card
               let feedbackData;
               try {
                 feedbackData = JSON.parse(data.ai_feedback);
               } catch (e) {
                 feedbackData = null;
               }
-
               let aiCardHTML = "";
               if (feedbackData) {
                 const createFeedbackItem = (title, feedbackObj) => {
@@ -415,12 +648,9 @@
               }
               aiCardPlaceholder.innerHTML = aiCardHTML;
             } else {
-              // If feedback is NOT ready, show spinner and start polling if not already started
               aiCardPlaceholder.innerHTML = `<div id="ai-score-card"><div class="scoring-pending"><div class="spinner"></div><div class="main-text">AI Feedback is being generated...</div><div class="sub-text">This may take up to 30 seconds. The page will update automatically.</div></div></div>`;
-
               if (!pollingInterval) {
-                console.log("Feedback not ready, starting to poll...");
-                pollingInterval = setInterval(fetchAndRenderDetails, 5000); // Poll every 5 seconds
+                pollingInterval = setInterval(fetchAndRenderDetails, 5000);
               }
             }
           } catch (error) {
@@ -431,12 +661,10 @@
           }
         };
 
-        // Initial call to start the whole process
         fetchAndRenderDetails();
 
-        // ======================= 【新功能逻辑】结束 =======================
-
         const updateReviewButton = (isInReview) => {
+          /* ... (same as before) ... */
           if (isInReview) {
             reviewBtn.classList.add("in-review");
             reviewBtnText.textContent = "In Review List";
@@ -450,8 +678,8 @@
           }
           reviewBtn.style.display = "inline-flex";
         };
-
         reviewBtn.addEventListener("click", async () => {
+          /* ... (same as before) ... */
           reviewBtn.disabled = true;
           try {
             const response = await fetch(
