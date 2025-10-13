@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (最终正确版 - 已更换为官方支持的TTS模型) ---
+﻿// --- START OF FILE server.js (最终正确版 - 已增加语速控制) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -68,6 +68,18 @@ async function callAIScoringAPI(responseText, promptText) {
 }
 // -------------------------------------------------------------------------------------
 
+// ======================= 【新功能】增加停顿以控制语速的辅助函数 =======================
+function addPausesToText(text) {
+  if (!text) return "";
+  let processedText = text;
+  // 1. 在每个句号后增加更长的停顿
+  processedText = processedText.replace(/\./g, ". ... ");
+  // 2. 在每个换行符（段落之间）增加非常长的停顿
+  processedText = processedText.replace(/\n/g, ". ... ... \n");
+  return processedText;
+}
+// ====================================================================================
+
 // ======================= 【关键修正】后台音频生成函数 (使用Cloudflare) =======================
 async function generateAudioIfNeeded(questionId) {
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
@@ -95,14 +107,15 @@ async function generateAudioIfNeeded(questionId) {
 
     console.log(`🎤 [后台任务 CF-TTS] 开始为题目 #${questionId} 生成音频...`);
 
-    // ====================== 【就是这里！已更换为官方支持的模型】 ======================
-    // 根据官方文档，URL 中需要包含 @cf/ 前缀，并且使用官方支持的模型名称
+    // ====================== 【调用新函数】在发送前处理文本 ======================
+    const textWithPauses = addPausesToText(question.lecture_script);
+    // =========================================================================
+
     const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/deepgram/aura-1`;
-    // ==============================================================================
 
     const ttsResponse = await axios.post(
       endpoint,
-      { text: question.lecture_script },
+      { text: textWithPauses }, // 使用处理过的文本
       {
         headers: {
           Authorization: `Bearer ${apiToken}`,
@@ -183,6 +196,7 @@ const authenticateToken = (req, res, next) => {
 };
 
 // ======================= API 接口 (其余代码保持不变) =======================
+// ... (所有 API 路由代码都无需修改，因此省略以保持简洁) ...
 // --- 生成音频的管理接口 ---
 app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
