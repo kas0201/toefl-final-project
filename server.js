@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Cloudflare TTS URL - 再次确认最终正确版) ---
+﻿// --- START OF FILE server.js (最终正确版 - 已更换为官方支持的TTS模型) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -95,11 +95,10 @@ async function generateAudioIfNeeded(questionId) {
 
     console.log(`🎤 [后台任务 CF-TTS] 开始为题目 #${questionId} 生成音频...`);
 
-    // ====================== 【就是这里！已确认是最终正确版本！】 ======================
-    // 错误的 URL: /ai/run/@cf/microsoft/speecht5-tts
-    // 正确的 URL: /ai/run/microsoft/speecht5-tts  (去掉了 @cf/)
-    const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/microsoft/speecht5-tts`;
-    // =================================================================
+    // ====================== 【就是这里！已更换为官方支持的模型】 ======================
+    // 根据官方文档，URL 中需要包含 @cf/ 前缀，并且使用官方支持的模型名称
+    const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/deepgram/aura-1`;
+    // ==============================================================================
 
     const ttsResponse = await axios.post(
       endpoint,
