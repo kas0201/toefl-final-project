@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js ---
+﻿// --- START OF FILE server.js (用于测试英文声音) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -16,7 +16,7 @@ cloudinary.config({
   secure: true,
 });
 
-// ----------------- 【最终版 AI 评分函数 - 使用 `deepseek-reasoner` 思考模式】 -----------------
+// ----------------- AI 评分函数 (保持不变) -----------------
 async function callAIScoringAPI(responseText, promptText) {
   console.log(
     "🤖 AI a commencé à noter avec le mode de pensée `deepseek-reasoner`..."
@@ -94,8 +94,8 @@ async function generateAudioIfNeeded(questionId) {
       {
         model: "deepseek-speech",
         input: script,
-        // 【关键修正】: 使用一个有效的中文男声
-        voice: "zh-CN-Yuxuan-Male",
+        // 【终极测试】: 使用一个基础的英文声音模型
+        voice: "en-Nick",
       },
       {
         headers: {
@@ -129,17 +129,23 @@ async function generateAudioIfNeeded(questionId) {
       `✅ [后台任务] 题目 #${questionId} 的音频已生成并保存: ${audioUrl}`
     );
   } catch (error) {
-    const errorData = error.response
-      ? JSON.stringify(error.response.data)
-      : error.message;
+    let errorDetails = error.message;
+    if (error.response && error.response.data) {
+      if (Buffer.isBuffer(error.response.data)) {
+        errorDetails = error.response.data.toString("utf-8");
+      } else {
+        errorDetails = JSON.stringify(error.response.data);
+      }
+    }
     console.error(
       `❌ [后台任务] 为题目 #${questionId} 生成音频时出错:`,
-      errorData
+      errorDetails
     );
   }
 }
 // =======================================================================
 
+// --- 省略其余不变的代码 ---
 const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(cors());
@@ -169,9 +175,9 @@ const authenticateToken = (req, res, next) => {
   );
 };
 
-// ======================= API 接口 =======================
+// ======================= API 接口 (其余部分保持不变) =======================
 
-// --- 生成音频的管理接口 (保留，用于手动触发) ---
+// --- 生成音频的管理接口 ---
 app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
   const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -195,8 +201,7 @@ app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
       {
         model: "deepseek-speech",
         input: script,
-        // 【关键修正】: 使用一个有效的中文男声
-        voice: "zh-CN-Yuxuan-Male",
+        voice: "en-Nick",
       },
       {
         headers: {
