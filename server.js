@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Absolutely Complete Final Version with ESM Fix) ---
+﻿// --- START OF FILE server.js (Absolutely Complete Final Version with Dictionary Loading Fix) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -9,9 +9,6 @@ const axios = require("axios");
 const cloudinary = require("cloudinary").v2;
 const fs = require("fs");
 const path = require("path");
-
-// 【注意】: 我们不再在文件顶部同步加载 'dictionary-en'
-// const dictionary = require('dictionary-en');
 
 // --- 配置 Cloudinary ---
 cloudinary.config({
