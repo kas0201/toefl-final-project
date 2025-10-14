@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (UPDATED with Analysis Caching) ---
+﻿// --- START OF FILE server.js (UPDATED with Enhanced Logging) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -140,7 +140,9 @@ async function generateAudioInBackground(questionId) {
 }
 
 async function checkAndAwardAchievements(userId, responseId) {
-  console.log(`🏆 [Achievement] Checking for user #${userId}...`);
+  console.log(
+    `🏆 [ACHIEVEMENT] Checking for user #${userId} regarding response #${responseId}...`
+  );
   try {
     const userStatsQuery = await pool.query(
       `SELECT
@@ -174,21 +176,23 @@ async function checkAndAwardAchievements(userId, responseId) {
       );
       await Promise.all(insertPromises);
       console.log(
-        `✅ [Achievement] User #${userId} was awarded: ${achievementsToAward.join(
+        `✅ [ACHIEVEMENT] User #${userId} was awarded: ${achievementsToAward.join(
           ", "
         )}`
       );
+    } else {
+      console.log(`ℹ️ [ACHIEVEMENT] No new achievements for user #${userId}.`);
     }
   } catch (error) {
     console.error(
-      `❌ [Achievement] Error checking achievements for user #${userId}:`,
+      `❌ [ACHIEVEMENT] Error checking achievements for user #${userId}:`,
       error
     );
   }
 }
 
 async function callAIPolishAPI(responseText) {
-  console.log("🤖 AI polishing started with CONSERVATIVE prompt...");
+  console.log("🤖 [AI] Polishing started with CONSERVATIVE prompt...");
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error("AI service is not configured.");
   const endpoint = "https://api.deepseek.com/chat/completions";
@@ -228,7 +232,7 @@ async function callAIPolishAPI(responseText) {
 
 async function callAIScoringAPI(responseText, promptText, taskType) {
   console.log(
-    `🤖 AI scoring started (Task: ${taskType}) with mistake extraction...`
+    `🤖 [AI] Scoring started (Task: ${taskType}) with mistake extraction...`
   );
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error("AI service is not configured.");
@@ -301,7 +305,7 @@ Follow these steps precisely:
 }
 
 async function callAIAnalysisAPI(feedbacks) {
-  console.log("🤖 AI common mistakes analysis started...");
+  console.log("🤖 [AI] Common mistakes analysis started...");
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error("AI service is not configured.");
   const endpoint = "https://api.deepseek.com/chat/completions";
@@ -521,6 +525,11 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
       .status(201)
       .json({ message: "Submission successful!", id: newResponseId });
 
+    // --- [ADDED] --- Start log for the background task
+    console.log(
+      `▶️ [BACKGROUND] Starting AI processing for new response #${newResponseId}...`
+    );
+
     (async () => {
       const client = await pool.connect();
       try {
@@ -547,6 +556,10 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
         await client.query(
           `UPDATE responses SET ai_score = $1, ai_feedback = $2 WHERE id = $3`,
           [aiResult.score, aiResult.feedback, newResponseId]
+        );
+        // --- [ADDED] --- Log after scoring is complete
+        console.log(
+          `ℹ️ [BACKGROUND] AI scoring complete for response #${newResponseId}. Score: ${aiResult.score}`
         );
 
         if (aiResult.mistakes && aiResult.mistakes.length > 0) {
@@ -576,17 +589,22 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
           });
           await Promise.all(mistakeInsertPromises);
           console.log(
-            `✅ Saved ${aiResult.mistakes.length} mistakes for response #${newResponseId}`
+            `✅ [BACKGROUND] Saved ${aiResult.mistakes.length} mistakes for response #${newResponseId}`
           );
         }
 
         await client.query("COMMIT");
 
         await checkAndAwardAchievements(userId, newResponseId);
+
+        // --- [ADDED] --- Final success log for the entire background task
+        console.log(
+          `✅ [BACKGROUND] Successfully finished all AI processing for response #${newResponseId}.`
+        );
       } catch (aiError) {
         await client.query("ROLLBACK");
         console.error(
-          `❌ AI background task failed (Response ID: ${newResponseId}):`,
+          `❌ [BACKGROUND] AI background task failed for response #${newResponseId}:`,
           aiError
         );
       } finally {
@@ -659,6 +677,10 @@ app.post(
 app.post("/api/responses/:id/polish", authenticateToken, async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
+  // --- [ADDED] --- Start log for the polish API request
+  console.log(
+    `▶️ [POLISH API] Starting AI polish for response #${id} by user #${userId}...`
+  );
   try {
     const responseQuery = await pool.query(
       "SELECT content FROM responses WHERE id = $1 AND user_id = $2",
@@ -675,9 +697,16 @@ app.post("/api/responses/:id/polish", authenticateToken, async (req, res) => {
       });
     }
     const aiResult = await callAIPolishAPI(originalText);
+
+    // --- [ADDED] --- Success log for the polish API request
+    console.log(`✅ [POLISH API] Successfully polished response #${id}.`);
     res.json({ polishedText: aiResult.polishedText });
   } catch (err) {
-    console.error(`AI polish failed (Response ID: ${id}):`, err);
+    // --- [MODIFIED] --- Enhanced error log
+    console.error(
+      `❌ [POLISH API] AI polish failed for response #${id}:`,
+      err.message
+    );
     res.status(500).json({ message: "Failed to get AI polish suggestion." });
   }
 });
@@ -760,7 +789,6 @@ app.get("/api/user/achievements", authenticateToken, async (req, res) => {
   }
 });
 
-// --- [MODIFICATION 1/3]: GET endpoint to fetch the stored analysis ---
 app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
@@ -781,9 +809,10 @@ app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
   }
 });
 
-// --- [MODIFICATION 2/3]: POST endpoint to generate, save, and return a new analysis ---
 app.post("/api/user/writing-analysis", authenticateToken, async (req, res) => {
   const userId = req.user.id;
+  // --- [ADDED] --- Start log for the analysis generation API request
+  console.log(`▶️ [ANALYSIS API] Starting new analysis for user #${userId}...`);
   try {
     const responsesQuery = await pool.query(
       "SELECT content, ai_feedback FROM responses WHERE user_id = $1 AND content IS NOT NULL AND content != '' AND ai_feedback IS NOT NULL AND ai_feedback LIKE '{%}'",
@@ -863,21 +892,25 @@ app.post("/api/user/writing-analysis", authenticateToken, async (req, res) => {
     const responseData = {
       wordCloud: wordCloudData,
       commonMistakes: aiAnalysis.analysis,
-      analyzedAt: new Date().toISOString(), // Add a timestamp
+      analyzedAt: new Date().toISOString(),
     };
 
-    // --- [MODIFICATION 3/3]: Save the new analysis to the database ---
     await pool.query(
       "UPDATE users SET last_analysis_result = $1, last_analysis_at = NOW() WHERE id = $2",
       [JSON.stringify(responseData), userId]
     );
 
+    // --- [MODIFIED] --- Changed log message to be more specific
     console.log(
-      `✅ [Analysis API] Generated and saved new analysis for user #${userId}.`
+      `✅ [ANALYSIS API] Generated and saved new analysis for user #${userId}.`
     );
     res.json(responseData);
   } catch (err) {
-    console.error("❌ Failed to generate writing analysis:", err);
+    // --- [ADDED] --- Enhanced error log for analysis generation
+    console.error(
+      `❌ [ANALYSIS API] Failed to generate writing analysis for user #${userId}:`,
+      err.message
+    );
     res
       .status(500)
       .json({ message: "Internal server error during analysis generation." });
@@ -888,4 +921,18 @@ app.post("/api/user/writing-analysis", authenticateToken, async (req, res) => {
 app.use(express.static("public"));
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
+  console.log(`==> Your service is live ✨`);
+  console.log(`==>`);
+  console.log(
+    `==> //////////////////////////////////////////////////////////////`
+  );
+  console.log(`==>`);
+  console.log(
+    `==> Available at your primary URL: https://toefl-final-project.onrender.com`
+  );
+  console.log(`==>`);
+  console.log(
+    `==> //////////////////////////////////////////////////////////////`
+  );
+  console.log(`==>`);
 });
