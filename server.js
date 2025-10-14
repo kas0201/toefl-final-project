@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Final Version with Hugging Face TTS) ---
+﻿// --- START OF FILE server.js (Final Version with ESM import fix) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -11,7 +11,7 @@ const fs = require("fs");
 const path = require("path");
 const util = require("util");
 const englishWords = require("an-array-of-english-words");
-const { client } = require("@gradio/client"); // 【关键】: 引入 Gradio 客户端
+// 【关键修改 1/2】: 我们不再在这里用 require() 加载 @gradio/client
 
 // --- 配置 Cloudinary ---
 cloudinary.config({
@@ -228,7 +228,6 @@ function processTextForTTS(text) {
   return cleanedText;
 }
 
-// 【关键修改】: 替换为调用 Hugging Face Space 的全新函数
 async function generateAudioIfNeeded(questionId) {
   try {
     const questionQuery = await pool.query(
@@ -237,11 +236,10 @@ async function generateAudioIfNeeded(questionId) {
     );
     const question = questionQuery.rows[0];
 
-    // 检查是否需要生成音频
     if (
       !question ||
       question.task_type !== "integrated_writing" ||
-      question.lecture_audio_url || // 如果已经有URL了，就不用再生成
+      question.lecture_audio_url ||
       !question.lecture_script ||
       question.lecture_script.trim() === ""
     ) {
@@ -260,20 +258,21 @@ async function generateAudioIfNeeded(questionId) {
       `🎤 [Backend Task Gradio-XTTS] Starting audio generation for question #${questionId}...`
     );
 
-    // 1. 连接到 Hugging Face Space 上的 XTTS 应用
+    // 【关键修改 2/2】: 使用动态 import() 来加载 ESM 模块
+    const { client } = await import("@gradio/client");
+
     const app = await client("coqui/xtts");
     const result = await app.predict("/synthesize", [
-      textForTTS, // (string) Text to synthesize
-      "en", // (string) Language
-      "Aaron Dreschner", // (string) Voice selection. 您可以在 Space 页面找到更多选项
-      null, // (Audio) Whisper output (not used)
-      null, // (Audio) Prompt audio (not used)
-      null, // (string) Reference audio selection (not used)
-      true, // (boolean) Agree to license
-      0.9, // (number) Speed 【语速控制! 1.0是正常, 0.9是90%速度】
+      textForTTS,
+      "en",
+      "Aaron Dreschner",
+      null,
+      null,
+      null,
+      true,
+      0.9,
     ]);
 
-    // 2. 从返回的临时 URL 下载音频文件
     // @ts-ignore
     const audioUrl = result.data[0].url;
     const audioResponse = await axios.get(audioUrl, {
@@ -285,7 +284,6 @@ async function generateAudioIfNeeded(questionId) {
       throw new Error("Gradio Space returned an empty audio buffer.");
     }
 
-    // 3. 将下载的音频上传到 Cloudinary
     const uploadPromise = new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         { resource_type: "video", folder: "toefl_lectures" },
@@ -300,7 +298,6 @@ async function generateAudioIfNeeded(questionId) {
     // @ts-ignore
     const finalAudioUrl = uploadResult.secure_url;
 
-    // 4. 将 Cloudinary 的 URL 更新回数据库
     await pool.query(
       "UPDATE questions SET lecture_audio_url = $1 WHERE id = $2",
       [finalAudioUrl, questionId]
@@ -343,7 +340,7 @@ const authenticateToken = (req, res, next) => {
   );
 };
 
-// ... (所有 API 路由，如 /api/auth/register 等，都保持不变) ...
+// ... (所有 API 路由都保持不变) ...
 // --- API 路由 ---
 
 app.post("/api/auth/register", async (req, res) => {
