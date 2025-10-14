@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (DEFINITIVE FINAL VERSION with CORRECT AURA MODEL) ---
+﻿// --- START OF FILE server.js (UPDATED with Analysis Caching) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -23,103 +23,122 @@ async function generateAudioInBackground(questionId) {
   console.log(
     `🎤 [BACKGROUND JOB - CF] Starting audio generation for question #${questionId}...`
   );
-  try {
-    const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-    const apiToken = process.env.CLOUDFLARE_API_TOKEN;
 
-    if (!accountId || !apiToken) {
-      console.error(
-        "❌ [BACKGROUND JOB - CF] Cloudflare credentials are not set."
-      );
-      return;
-    }
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 3000;
 
-    const poolClient = await pool.connect();
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const questionQuery = await poolClient.query(
-        "SELECT lecture_script, lecture_audio_url FROM questions WHERE id = $1",
-        [questionId]
-      );
-      const question = questionQuery.rows[0];
+      const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+      const apiToken = process.env.CLOUDFLARE_API_TOKEN;
 
-      if (!question || question.lecture_audio_url) {
-        console.log(
-          `[BACKGROUND JOB - CF] Skipped: Question #${questionId} not found or already has audio.`
+      if (!accountId || !apiToken) {
+        console.error(
+          "❌ [BACKGROUND JOB - CF] Cloudflare credentials are not set."
         );
         return;
       }
 
-      const textForTTS = (question.lecture_script || "")
-        .replace(/[\s\n\r]+/g, " ")
-        .trim();
-      if (!textForTTS) {
-        console.log(
-          `[BACKGROUND JOB - CF] Skipped: Question #${questionId} has no script.`
+      const poolClient = await pool.connect();
+      try {
+        const questionQuery = await poolClient.query(
+          "SELECT lecture_script, lecture_audio_url FROM questions WHERE id = $1",
+          [questionId]
         );
+        const question = questionQuery.rows[0];
+
+        if (!question || question.lecture_audio_url) {
+          console.log(
+            `[BACKGROUND JOB - CF] Skipped: Question #${questionId} not found or already has audio.`
+          );
+          return;
+        }
+
+        const textForTTS = (question.lecture_script || "")
+          .replace(/[\s\n\r]+/g, " ")
+          .trim();
+        if (!textForTTS) {
+          console.log(
+            `[BACKGROUND JOB - CF] Skipped: Question #${questionId} has no script.`
+          );
+          return;
+        }
+
+        const model = "@cf/deepgram/aura-1";
+        const apiUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
+        const requestBody = { text: textForTTS };
+
+        console.log(
+          `[BACKGROUND JOB - CF] Attempt ${attempt}: Sending POST request to Cloudflare AI with model ${model}...`
+        );
+
+        const response = await axios.post(apiUrl, requestBody, {
+          headers: { Authorization: `Bearer ${apiToken}` },
+          responseType: "arraybuffer",
+        });
+
+        const audioBuffer = response.data;
+
+        if (!audioBuffer || audioBuffer.length === 0) {
+          throw new Error("Cloudflare AI returned an empty audio buffer.");
+        }
+
+        console.log(
+          `[BACKGROUND JOB - CF] Received audio buffer from Cloudflare.`
+        );
+
+        const uploadPromise = new Promise((resolve, reject) => {
+          cloudinary.uploader
+            .upload_stream(
+              { resource_type: "video", folder: "toefl_lectures" },
+              (error, uploadResult) =>
+                error ? reject(error) : resolve(uploadResult)
+            )
+            .end(audioBuffer);
+        });
+        const uploadResult = await uploadPromise;
+
+        const finalAudioUrl = uploadResult.secure_url;
+        await poolClient.query(
+          "UPDATE questions SET lecture_audio_url = $1 WHERE id = $2",
+          [finalAudioUrl, questionId]
+        );
+        console.log(
+          `✅ [BACKGROUND JOB - CF] Success on attempt ${attempt}! Audio for question #${questionId} is ready: ${finalAudioUrl}`
+        );
+
         return;
+      } finally {
+        poolClient.release();
       }
+    } catch (error) {
+      const errorMessage = error.response
+        ? `Status ${error.response.status}: ${Buffer.from(
+            error.response.data
+          ).toString()}`
+        : error.message;
 
-      // --- 【最终修正】: 使用您指定的、正确的 AURA 模型名称 ---
-      const model = "@cf/deepgram/aura-1";
-      const apiUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
-      const requestBody = { text: textForTTS };
-
-      console.log(
-        `[BACKGROUND JOB - CF] Sending POST request to Cloudflare AI with model ${model}...`
+      console.error(
+        `❌ [BACKGROUND JOB - CF] FAILED on attempt ${attempt} for question #${questionId}:`,
+        errorMessage
       );
 
-      const response = await axios.post(apiUrl, requestBody, {
-        headers: { Authorization: `Bearer ${apiToken}` },
-        responseType: "arraybuffer",
-      });
-
-      const audioBuffer = response.data;
-
-      if (!audioBuffer || audioBuffer.length === 0) {
-        throw new Error("Cloudflare AI returned an empty audio buffer.");
+      if (attempt < MAX_RETRIES) {
+        console.log(
+          `[BACKGROUND JOB - CF] Waiting ${
+            RETRY_DELAY / 1000
+          } seconds before retrying...`
+        );
+        await new Promise((res) => setTimeout(res, RETRY_DELAY));
+      } else {
+        console.error(
+          `❌ [BACKGROUND JOB - CF] All ${MAX_RETRIES} attempts failed for question #${questionId}. Giving up.`
+        );
       }
-
-      console.log(
-        `[BACKGROUND JOB - CF] Received audio buffer from Cloudflare.`
-      );
-
-      const uploadPromise = new Promise((resolve, reject) => {
-        cloudinary.uploader
-          .upload_stream(
-            { resource_type: "video", folder: "toefl_lectures" },
-            (error, uploadResult) =>
-              error ? reject(error) : resolve(uploadResult)
-          )
-          .end(audioBuffer);
-      });
-      const uploadResult = await uploadPromise;
-
-      const finalAudioUrl = uploadResult.secure_url;
-      await poolClient.query(
-        "UPDATE questions SET lecture_audio_url = $1 WHERE id = $2",
-        [finalAudioUrl, questionId]
-      );
-      console.log(
-        `✅ [BACKGROUND JOB - CF] Success! Audio for question #${questionId} is ready: ${finalAudioUrl}`
-      );
-    } finally {
-      poolClient.release();
     }
-  } catch (error) {
-    const errorMessage = error.response
-      ? `Status ${error.response.status}: ${Buffer.from(
-          error.response.data
-        ).toString()}`
-      : error.message;
-    console.error(
-      `❌ [BACKGROUND JOB - CF] FAILED for question #${questionId}:`,
-      errorMessage
-    );
   }
 }
 
-// --- 辅助函数 (保持不变) ---
-// (此处省略所有其他未改动的辅助函数)
 async function checkAndAwardAchievements(userId, responseId) {
   console.log(`🏆 [Achievement] Checking for user #${userId}...`);
   try {
@@ -740,7 +759,30 @@ app.get("/api/user/achievements", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Internal server error." });
   }
 });
+
+// --- [MODIFICATION 1/3]: GET endpoint to fetch the stored analysis ---
 app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const result = await pool.query(
+      "SELECT last_analysis_result FROM users WHERE id = $1",
+      [userId]
+    );
+    const analysis = result.rows[0]?.last_analysis_result;
+
+    if (analysis) {
+      res.json(analysis);
+    } else {
+      res.status(404).json({ message: "No analysis found for this user." });
+    }
+  } catch (err) {
+    console.error("❌ Failed to get stored writing analysis:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+// --- [MODIFICATION 2/3]: POST endpoint to generate, save, and return a new analysis ---
+app.post("/api/user/writing-analysis", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
     const responsesQuery = await pool.query(
@@ -749,7 +791,7 @@ app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
     );
 
     if (responsesQuery.rows.length < 3) {
-      return res.status(404).json({
+      return res.status(400).json({
         message:
           "Not enough practice data for a meaningful analysis. Please complete at least 3 practices.",
       });
@@ -821,13 +863,24 @@ app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
     const responseData = {
       wordCloud: wordCloudData,
       commonMistakes: aiAnalysis.analysis,
+      analyzedAt: new Date().toISOString(), // Add a timestamp
     };
-    console.log(`✅ [Analysis API] Success for user #${userId}.`);
 
+    // --- [MODIFICATION 3/3]: Save the new analysis to the database ---
+    await pool.query(
+      "UPDATE users SET last_analysis_result = $1, last_analysis_at = NOW() WHERE id = $2",
+      [JSON.stringify(responseData), userId]
+    );
+
+    console.log(
+      `✅ [Analysis API] Generated and saved new analysis for user #${userId}.`
+    );
     res.json(responseData);
   } catch (err) {
-    console.error("❌ Failed to get writing analysis data:", err);
-    res.status(500).json({ message: "Internal server error." });
+    console.error("❌ Failed to generate writing analysis:", err);
+    res
+      .status(500)
+      .json({ message: "Internal server error during analysis generation." });
   }
 });
 
