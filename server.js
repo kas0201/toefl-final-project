@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (FINAL VERSION using Cloudflare Workers AI) ---
+﻿// --- START OF FILE server.js (FINAL, CORRECTED VERSION using Cloudflare Workers AI) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -19,18 +19,19 @@ cloudinary.config({
   secure: true,
 });
 
-// --- 【终极解决方案 V3】: 使用稳定可靠的 Cloudflare Workers AI TTS ---
+// --- 【终极解决方案 V3.1】: 修正了读取 Cloudflare Token 的环境变量名 ---
 async function generateAudioInBackground(questionId) {
   console.log(
     `🎤 [BACKGROUND JOB - CF] Starting audio generation for question #${questionId}...`
   );
   try {
     const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-    const apiToken = process.env.CLOUDINARY_API_KEY;
+    // 【关键修复】: 从正确的环境变量中读取 Token
+    const apiToken = process.env.CLOUDFLARE_API_TOKEN;
 
     if (!accountId || !apiToken) {
       console.error(
-        "❌ [BACKGROUND JOB - CF] Cloudflare credentials are not set in environment variables."
+        "❌ [BACKGROUND JOB - CF] Cloudflare credentials (ACCOUNT_ID or API_TOKEN) are not set in environment variables."
       );
       return;
     }
@@ -60,7 +61,6 @@ async function generateAudioInBackground(questionId) {
         return;
       }
 
-      // 1. 定义 Cloudflare API 的 URL 和模型
       const model = "@cf/facebook/mms-1-1024";
       const apiUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
       const requestBody = { text: textForTTS };
@@ -69,10 +69,9 @@ async function generateAudioInBackground(questionId) {
         `[BACKGROUND JOB - CF] Sending POST request to Cloudflare AI...`
       );
 
-      // 2. 使用 axios 发送请求，直接获取音频数据 Buffer
       const response = await axios.post(apiUrl, requestBody, {
         headers: { Authorization: `Bearer ${apiToken}` },
-        responseType: "arraybuffer", // 关键：告诉axios返回的是二进制数据
+        responseType: "arraybuffer",
       });
 
       const audioBuffer = response.data;
@@ -85,7 +84,6 @@ async function generateAudioInBackground(questionId) {
         `[BACKGROUND JOB - CF] Received audio buffer from Cloudflare.`
       );
 
-      // 3. 上传到 Cloudinary (逻辑不变)
       const uploadPromise = new Promise((resolve, reject) => {
         cloudinary.uploader
           .upload_stream(
@@ -109,9 +107,13 @@ async function generateAudioInBackground(questionId) {
       poolClient.release();
     }
   } catch (error) {
+    // 打印更详细的错误信息
+    const errorMessage = error.response
+      ? `Status ${error.response.status}: ${error.response.data.toString()}`
+      : error.message;
     console.error(
       `❌ [BACKGROUND JOB - CF] FAILED for question #${questionId}:`,
-      error.response ? error.response.data.toString() : error.message
+      errorMessage
     );
   }
 }
