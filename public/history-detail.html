@@ -1,4 +1,4 @@
-﻿<!-- START OF FILE public/history-detail.html (FINAL & COMPLETE VERSION with Tabbed Interface) -->
+﻿<!-- START OF FILE public/history-detail.html (FINAL SPLIT-SCREEN LAYOUT - COMPLETE & UNABRIDGED) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -29,8 +29,8 @@
         padding: 24px;
       }
       .navbar {
-        max-width: 900px;
-        margin: 20px auto 0;
+        max-width: 1200px;
+        margin: 0 auto 24px;
         padding: 0 10px;
         display: flex;
         justify-content: space-between;
@@ -47,163 +47,161 @@
         gap: 20px;
       }
       .main-container {
-        max-width: 800px;
-        margin: 40px auto;
+        max-width: 1200px;
+        margin: 0 auto;
       }
       .title-container {
         text-align: center;
         margin-bottom: 24px;
       }
       h1 {
-        font-size: 36px;
+        font-size: 32px;
         font-weight: 700;
         margin: 0 0 8px 0;
       }
       .subtitle {
         color: var(--text-secondary);
         margin: 0 0 16px 0;
-        font-size: 18px;
+        font-size: 16px;
       }
       .action-buttons {
         display: flex;
         justify-content: center;
         gap: 12px;
       }
-      .post {
+
+      .split-layout-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        align-items: start;
+      }
+      .prompt-panel,
+      .review-panel {
         background-color: var(--card-bg);
-        border-radius: 16px;
-        padding: 24px;
         border: 1px solid var(--border-color);
-        margin-bottom: 24px;
+        border-radius: 16px;
+      }
+      .prompt-panel {
+        padding: 24px;
+        position: sticky;
+        top: 24px;
+        max-height: calc(100vh - 48px);
+        overflow-y: auto;
+      }
+      .prompt-panel h2 {
+        font-size: 20px;
+        margin-top: 0;
+        margin-bottom: 16px;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 8px;
+      }
+      .post {
+        padding: 0;
+        margin-bottom: 16px;
+        border: none;
+        background: none;
       }
       .post-author {
-        font-size: 17px;
+        font-size: 16px;
         font-weight: 600;
-        margin-bottom: 12px;
+        margin-bottom: 8px;
       }
       .post-content,
       .user-response-content {
-        font-size: 16px;
+        font-size: 15px;
         line-height: 1.7;
         color: var(--text-secondary);
         white-space: pre-wrap;
       }
-      .section-header {
-        font-size: 24px;
-        font-weight: 700;
-        color: var(--text-primary);
-        margin-top: 48px;
-        margin-bottom: 20px;
-        border-bottom: 1px solid var(--border-color);
-        padding-bottom: 8px;
+
+      .review-panel {
         display: flex;
-        justify-content: space-between;
-        align-items: center;
+        flex-direction: column;
       }
-      .loading-state {
-        text-align: center;
-        font-size: 18px;
+      .tab-nav {
+        display: flex;
+        gap: 8px;
+        border-bottom: 1px solid var(--border-color);
+        padding: 8px 24px 0;
+        flex-shrink: 0;
+      }
+      .tab-btn {
+        padding: 12px 16px;
+        border: none;
+        background-color: transparent;
+        font-size: 15px;
+        font-weight: 500;
         color: var(--text-secondary);
-        padding: 40px;
+        cursor: pointer;
+        border-bottom: 3px solid transparent;
+        transition: all 0.2s ease;
       }
-      #ai-score-card {
-        background-color: var(--card-bg);
-        border: 1px solid var(--border-color);
-        border-radius: 16px;
+      .tab-btn:hover {
+        color: var(--text-primary);
+      }
+      .tab-btn.active {
+        color: var(--accent-blue);
+        font-weight: 600;
+        border-bottom-color: var(--accent-blue);
+      }
+      .tab-btn#ai-polish-tab {
+        display: none;
+      }
+      .tab-content-container {
         padding: 24px;
-        margin-bottom: 24px;
+        flex-grow: 1;
+        overflow-y: auto;
+        max-height: calc(100vh - 300px);
+      }
+      .tab-pane {
+        display: none;
+      }
+      .tab-pane.active {
+        display: block;
+        animation: fadeIn 0.3s ease;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      #ai-score-card {
+        background: none;
+        border: none;
+        padding: 0;
+        margin: 0;
         display: flex;
         gap: 24px;
         align-items: flex-start;
       }
       .score-display {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-        padding: 20px;
-        background-color: #f5f5f7;
-        border-radius: 12px;
-        min-width: 120px;
-      }
-      .score-value {
-        font-size: 48px;
-        font-weight: 700;
-        color: var(--accent-blue);
-        line-height: 1;
-      }
-      .score-label {
-        font-size: 16px;
-        font-weight: 500;
-        color: var(--text-secondary);
-        margin-top: 4px;
-      }
-      .feedback-details {
-        flex-grow: 1;
+        flex-shrink: 0;
       }
       .feedback-grid {
         display: grid;
-        gap: 16px;
+        gap: 20px;
       }
       .feedback-item {
-        border-left: 3px solid var(--border-color);
-        padding-left: 16px;
-      }
-      .feedback-item-header {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 8px;
-      }
-      .feedback-item-header h4 {
-        margin: 0;
-        font-size: 16px;
-        font-weight: 600;
-      }
-      .rating-badge {
-        font-size: 12px;
-        font-weight: 600;
-        padding: 3px 8px;
-        border-radius: 99px;
-        color: #fff;
-      }
-      .rating-badge.excellent {
-        background-color: var(--accent-green);
-      }
-      .rating-badge.good {
-        background-color: var(--accent-blue);
-      }
-      .rating-badge.fair {
-        background-color: var(--accent-orange);
-      }
-      .rating-badge.needs-improvement {
-        background-color: var(--accent-red-ui);
-      }
-      .feedback-item p {
-        font-size: 15px;
-        line-height: 1.6;
-        color: var(--text-secondary);
-        margin: 0;
+        border-left: none;
+        padding-left: 0;
       }
       .general-suggestion {
-        margin-top: 16px;
-        padding: 12px;
-        background-color: #eef5ff;
-        border-radius: 8px;
-        border: 1px solid #cce0ff;
-      }
-      .general-suggestion p {
-        color: #0052cc;
+        margin-top: 24px;
       }
       #review-toggle-btn,
       #rewrite-btn {
         background-color: transparent;
-        border: 2px solid var(--accent-blue);
+        border: 1px solid var(--accent-blue);
         color: var(--accent-blue);
-        padding: 8px 20px;
+        padding: 6px 16px;
         border-radius: 99px;
-        font-size: 15px;
-        font-weight: 600;
+        font-size: 14px;
+        font-weight: 500;
         cursor: pointer;
         display: inline-flex;
         align-items: center;
@@ -263,11 +261,11 @@
       }
       #polish-result-container {
         line-height: 1.7;
-        font-size: 16px;
+        font-size: 15px;
         white-space: pre-wrap;
       }
       #polish-result-container .legend {
-        font-size: 14px;
+        font-size: 13px;
         color: var(--text-secondary);
         margin-bottom: 20px;
         border-bottom: 1px solid var(--border-color);
@@ -282,8 +280,8 @@
       }
       #polish-result-container .legend-item span {
         display: inline-block;
-        width: 14px;
-        height: 14px;
+        width: 12px;
+        height: 12px;
         border-radius: 3px;
       }
       #polish-result-container .legend-item .deleted-color {
@@ -307,8 +305,8 @@
       .no-change-card {
         background-color: #e4f8e9;
         border: 1px solid #a3e9a4;
-        border-radius: 16px;
-        padding: 24px;
+        border-radius: 12px;
+        padding: 20px;
         display: flex;
         align-items: center;
         gap: 16px;
@@ -328,56 +326,7 @@
       }
       .no-change-card p {
         margin: 0;
-        font-size: 15px;
-      }
-      .tab-nav {
-        display: flex;
-        gap: 8px;
-        border-bottom: 1px solid var(--border-color);
-        margin-bottom: -1px;
-      }
-      .tab-btn {
-        padding: 12px 20px;
-        border: none;
-        background-color: transparent;
-        font-size: 16px;
-        font-weight: 500;
-        color: var(--text-secondary);
-        cursor: pointer;
-        border-bottom: 3px solid transparent;
-        transition: all 0.2s ease;
-      }
-      .tab-btn:hover {
-        color: var(--text-primary);
-      }
-      .tab-btn.active {
-        color: var(--accent-blue);
-        font-weight: 600;
-        border-bottom-color: var(--accent-blue);
-      }
-      .tab-btn#ai-polish-tab {
-        display: none;
-      }
-      .tab-content-container {
-        background-color: var(--card-bg);
-        border: 1px solid var(--border-color);
-        border-radius: 0 0 16px 16px;
-        padding: 24px;
-      }
-      .tab-pane {
-        display: none;
-      }
-      .tab-pane.active {
-        display: block;
-        animation: fadeIn 0.3s ease;
-      }
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-        }
-        to {
-          opacity: 1;
-        }
+        font-size: 14px;
       }
       .model-essay-actions {
         display: flex;
@@ -471,18 +420,6 @@
         overflow-y: auto;
         padding: 24px 0;
       }
-      .rewrite-main-content::-webkit-scrollbar {
-        width: 10px;
-      }
-      .rewrite-main-content::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      .rewrite-main-content::-webkit-scrollbar-thumb {
-        background-color: rgba(0, 0, 0, 0.25);
-        border-radius: 5px;
-        border: 3px solid transparent;
-        background-clip: content-box;
-      }
       #rewrite-textarea {
         display: block;
         width: 85%;
@@ -534,9 +471,6 @@
         padding: 20px;
         border-radius: 12px;
       }
-      #rewrite-reference .post {
-        background-color: #fff;
-      }
       .modal-footer {
         border-top: 1px solid var(--border-color);
         display: flex;
@@ -576,43 +510,6 @@
   <body>
     <div class="navbar"></div>
     <div class="main-container">
-      <div class="title-container">
-        <h1 id="review-title">Reviewing Submission</h1>
-        <p class="subtitle" id="review-subtitle">Loading details...</p>
-        <div class="action-buttons">
-          <button id="review-toggle-btn" style="display: none">
-            <svg
-              id="review-icon-add"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M12 5v14M5 12h14"></path>
-            </svg>
-            <svg
-              id="review-icon-check"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="3"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              style="display: none"
-            >
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-            <span id="review-btn-text">Add to Review List</span>
-          </button>
-          <button id="rewrite-btn" style="display: none">Timed Rewrite</button>
-        </div>
-      </div>
       <div id="review-content">
         <div class="loading-state">Loading...</div>
       </div>
@@ -661,170 +558,7 @@
 
         let pageData = null;
         let pollingInterval = null;
-        let initialLoad = true;
         let rewriteTimer;
-
-        const reviewTitleEl = document.getElementById("review-title");
-        const reviewSubtitleEl = document.getElementById("review-subtitle");
-        const reviewContentEl = document.getElementById("review-content");
-        const reviewBtn = document.getElementById("review-toggle-btn");
-        const rewriteBtn = document.getElementById("rewrite-btn");
-
-        const modal = document.getElementById("rewrite-modal");
-        const cancelBtn = document.getElementById("cancel-rewrite-btn");
-        const rewriteReferenceEl = document.getElementById("rewrite-reference");
-        const rewriteTextarea = document.getElementById("rewrite-textarea");
-        const rewriteWordCountEl =
-          document.getElementById("rewrite-word-count");
-        const rewriteTimerEl = document.getElementById("rewrite-timer");
-        const submitRewriteBtn = document.getElementById("submit-rewrite-btn");
-
-        const openRewriteModal = () => {
-          if (!pageData) return;
-          rewriteReferenceEl.innerHTML = "";
-          const promptContainer = document.createElement("div");
-          let promptHTML = "<h3>Original Prompt</h3>";
-          if (pageData.task_type === "integrated_writing") {
-            promptHTML += `<div class="post"><h4>Reading Passage</h4><p class="post-content">${pageData.reading_passage}</p></div><div class="post"><h4>Lecture Script</h4><p class="post-content">${pageData.lecture_script}</p></div>`;
-          } else {
-            promptHTML += `<div class="post"><p class="post-author">${pageData.professor_author}</p><p class="post-content">${pageData.professor_prompt}</p></div><div class="post"><p class="post-author">${pageData.student1_author}</p><p class="post-content">${pageData.student1_post}</p></div><div class="post"><p class="post-author">${pageData.student2_author}</p><p class="post-content">${pageData.student2_post}</p></div>`;
-          }
-          promptContainer.innerHTML = promptHTML;
-          rewriteReferenceEl.appendChild(promptContainer);
-
-          const originalResponseCard = document
-            .querySelector(".user-response-content")
-            ?.cloneNode(true);
-          if (originalResponseCard) {
-            const responseContainer = document.createElement("div");
-            responseContainer.innerHTML = "<h3>Your Previous Response</h3>";
-            const postDiv = document.createElement("div");
-            postDiv.className = "post";
-            postDiv.appendChild(originalResponseCard);
-            responseContainer.appendChild(postDiv);
-            rewriteReferenceEl.appendChild(responseContainer);
-          }
-
-          const aiCard = document
-            .getElementById("ai-score-card")
-            ?.cloneNode(true);
-          if (aiCard) {
-            const aiContainer = document.createElement("div");
-            aiContainer.innerHTML = "<h3>AI Feedback</h3>";
-            aiContainer.appendChild(aiCard);
-            rewriteReferenceEl.appendChild(aiContainer);
-          }
-
-          const timeLimit =
-            pageData.task_type === "integrated_writing" ? 1200 : 600;
-          startTimer(timeLimit, rewriteTimerEl, () => {
-            alert("Time's up! Submitting your rewrite.");
-            submitRewrite();
-          });
-          modal.style.display = "block";
-        };
-
-        const closeRewriteModal = () => {
-          clearInterval(rewriteTimer);
-          rewriteTextarea.value = "";
-          rewriteWordCountEl.textContent = "Words: 0";
-          modal.style.display = "none";
-          const refContainer = document.getElementById("reference-container");
-          if (refContainer) refContainer.removeAttribute("open");
-        };
-
-        const startTimer = (duration, display, onComplete) => {
-          clearInterval(rewriteTimer);
-          let timer = duration;
-          const update = () => {
-            const minutes = parseInt(timer / 60, 10)
-              .toString()
-              .padStart(2, "0");
-            const seconds = parseInt(timer % 60, 10)
-              .toString()
-              .padStart(2, "0");
-            display.textContent = `${minutes}:${seconds}`;
-            if (--timer < 0) {
-              clearInterval(rewriteTimer);
-              if (onComplete) onComplete();
-            }
-          };
-          update();
-          rewriteTimer = setInterval(update, 1000);
-        };
-
-        const submitRewrite = async () => {
-          submitRewriteBtn.disabled = true;
-          submitRewriteBtn.textContent = "Submitting...";
-          const content = rewriteTextarea.value;
-          const wordCount = content.trim().match(/\S+/g)?.length || 0;
-          if (wordCount === 0) {
-            alert("Cannot submit an empty rewrite.");
-            submitRewriteBtn.disabled = false;
-            submitRewriteBtn.textContent = "Submit Rewrite";
-            return;
-          }
-          try {
-            const response = await fetch("/api/submit-response", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                content,
-                wordCount,
-                questionId: pageData.question_id,
-                task_type: pageData.task_type,
-              }),
-            });
-            const result = await response.json();
-            if (!response.ok)
-              throw new Error(result.message || "Submission failed.");
-            window.location.href = `/submission-success.html?id=${result.id}`;
-          } catch (error) {
-            alert(`Error: ${error.message}`);
-            submitRewriteBtn.disabled = false;
-            submitRewriteBtn.textContent = "Submit Rewrite";
-          }
-        };
-
-        const handleToggleReview = async () => {
-          reviewBtn.disabled = true;
-          try {
-            const response = await fetch(
-              `/api/responses/${historyId}/toggle-review`,
-              { method: "POST", headers: { Authorization: `Bearer ${token}` } }
-            );
-            if (!response.ok)
-              throw new Error("Failed to update review status.");
-            const result = await response.json();
-            updateReviewButton(result.is_for_review);
-          } catch (error) {
-            console.error("Error toggling review status:", error);
-            alert("Could not update review status. Please try again.");
-          } finally {
-            reviewBtn.disabled = false;
-          }
-        };
-
-        const updateReviewButton = (isInReview) => {
-          const reviewBtnText = document.getElementById("review-btn-text");
-          const reviewIconAdd = document.getElementById("review-icon-add");
-          const reviewIconCheck = document.getElementById("review-icon-check");
-          if (isInReview) {
-            reviewBtn.classList.add("in-review");
-            reviewBtnText.textContent = "In Review List";
-            reviewIconAdd.style.display = "none";
-            reviewIconCheck.style.display = "inline";
-          } else {
-            reviewBtn.classList.remove("in-review");
-            reviewBtnText.textContent = "Add to Review List";
-            reviewIconAdd.style.display = "inline";
-            reviewIconCheck.style.display = "none";
-          }
-          reviewBtn.style.display = "inline-flex";
-        };
 
         const handleGenerateEssay = async (event) => {
           const button = event.target;
@@ -835,10 +569,7 @@
           try {
             const response = await fetch(
               `/api/questions/${pageData.question_id}/generate-model-essay`,
-              {
-                method: "POST",
-                headers: { Authorization: `Bearer ${token}` },
-              }
+              { method: "POST", headers: { Authorization: `Bearer ${token}` } }
             );
             const result = await response.json();
             if (!response.ok) {
@@ -924,56 +655,75 @@
               throw new Error("Failed to fetch submission details.");
             pageData = await response.json();
 
-            if (initialLoad) {
-              const submittedDate = new Date(
-                pageData.submitted_at
-              ).toLocaleString("en-US", {
-                dateStyle: "long",
-                timeStyle: "short",
-              });
-              reviewTitleEl.textContent = pageData.title || "Practice Response";
-              reviewSubtitleEl.textContent = `Submitted on ${submittedDate} • ${pageData.word_count} words`;
-              updateReviewButton(pageData.is_for_review);
-              rewriteBtn.style.display = "inline-flex";
+            const reviewContentEl = document.getElementById("review-content");
+            const submittedDate = new Date(
+              pageData.submitted_at
+            ).toLocaleString("en-US", {
+              dateStyle: "long",
+              timeStyle: "short",
+            });
 
-              let promptHTML = "";
-              if (pageData.task_type === "integrated_writing") {
-                promptHTML = `<div class="post"><h4>Reading Passage</h4><p class="post-content">${pageData.reading_passage}</p></div><div class="post"><h4>Lecture Script</h4><p class="post-content">${pageData.lecture_script}</p></div>`;
-              } else {
-                promptHTML = `<div class="post"><p class="post-author">${pageData.professor_author}</p><p class="post-content">${pageData.professor_prompt}</p></div><div class="post"><p class="post-author">${pageData.student1_author}</p><p class="post-content">${pageData.student1_post}</p></div><div class="post"><p class="post-author">${pageData.student2_author}</p><p class="post-content">${pageData.student2_post}</p></div>`;
-              }
-
-              reviewContentEl.innerHTML = `
-                <div id="ai-card-placeholder"></div>
-                <div class="tab-nav">
-                    <button class="tab-btn active" data-target="#your-response-pane">Your Response</button>
-                    <button class="tab-btn" data-target="#model-essay-pane">Model Essay</button>
-                    <button class="tab-btn" id="ai-polish-tab" data-target="#ai-polish-pane">AI Polish</button>
-                </div>
-                <div class="tab-content-container">
-                    <div id="your-response-pane" class="tab-pane active">
-                        <p class="user-response-content">${pageData.user_response}</p>
-                        <div class="model-essay-actions" style="margin-top: 24px;">
-                            <button id="polish-btn">Polish with AI & Compare</button>
-                        </div>
-                    </div>
-                    <div id="model-essay-pane" class="tab-pane"></div>
-                    <div id="ai-polish-pane" class="tab-pane"></div>
-                </div>
-                <div class="section-header" style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 24px;"><span>Original Prompt</span></div>
-                ${promptHTML}`;
-
-              document
-                .getElementById("polish-btn")
-                .addEventListener("click", handleAIPolish);
-              renderModelEssayPane();
-              setupTabs();
-              initialLoad = false;
+            let promptHTML = "";
+            if (pageData.task_type === "integrated_writing") {
+              promptHTML = `<div class="post"><h4>Reading Passage</h4><p class="post-content">${pageData.reading_passage}</p></div><hr style="border: none; border-top: 1px solid var(--border-color); margin: 24px 0;"><div class="post"><h4>Lecture Script</h4><p class="post-content">${pageData.lecture_script}</p></div>`;
+            } else {
+              promptHTML = `<div class="post"><p class="post-author">${pageData.professor_author}</p><p class="post-content">${pageData.professor_prompt}</p></div><div class="post"><p class="post-author">${pageData.student1_author}</p><p class="post-content">${pageData.student1_post}</p></div><div class="post"><p class="post-author">${pageData.student2_author}</p><p class="post-content">${pageData.student2_post}</p></div>`;
             }
 
-            const aiCardPlaceholder = document.getElementById(
-              "ai-card-placeholder"
-            );
+            reviewContentEl.innerHTML = `
+                <div class="title-container">
+                    <h1>${pageData.title || "Practice Response"}</h1>
+                    <p class="subtitle">Submitted on ${submittedDate} • ${
+              pageData.word_count
+            } words</p>
+                    <div class="action-buttons">
+                        <button id="review-toggle-btn" style="display: none"></button>
+                        <button id="rewrite-btn" style="display: none">Timed Rewrite</button>
+                    </div>
+                </div>
+                <div class="split-layout-container">
+                    <div class="prompt-panel">
+                        <h2>Original Prompt</h2>
+                        ${promptHTML}
+                    </div>
+                    <div class="review-panel">
+                        <div class="tab-nav">
+                            <button class="tab-btn active" data-target="#ai-feedback-pane">AI Feedback</button>
+                            <button class="tab-btn" data-target="#your-response-pane">Your Response</button>
+                            <button class="tab-btn" data-target="#model-essay-pane">Model Essay</button>
+                            <button class="tab-btn" id="ai-polish-tab" data-target="#ai-polish-pane">AI Polish</button>
+                        </div>
+                        <div class="tab-content-container">
+                            <div id="ai-feedback-pane" class="tab-pane active"></div>
+                            <div id="your-response-pane" class="tab-pane">
+                                <p class="user-response-content">${
+                                  pageData.user_response
+                                }</p>
+                                <div class="model-essay-actions" style="margin-top: 24px;">
+                                    <button id="polish-btn">Polish with AI & Compare</button>
+                                </div>
+                            </div>
+                            <div id="model-essay-pane" class="tab-pane"></div>
+                            <div id="ai-polish-pane" class="tab-pane"></div>
+                        </div>
+                    </div>
+                </div>`;
+
+            document
+              .getElementById("polish-btn")
+              .addEventListener("click", handleAIPolish);
+            document
+              .getElementById("rewrite-btn")
+              .addEventListener("click", openRewriteModal);
+            const reviewBtn = document.getElementById("review-toggle-btn");
+            reviewBtn.innerHTML = `<svg id="review-icon-add" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"> <path d="M12 5v14M5 12h14"></path> </svg><svg id="review-icon-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display: none" > <polyline points="20 6 9 17 4 12"></polyline> </svg><span id="review-btn-text">Add to Review List</span>`;
+            reviewBtn.addEventListener("click", handleToggleReview);
+            updateReviewButton(pageData.is_for_review);
+
+            renderModelEssayPane();
+            setupTabs();
+
+            const aiFeedbackPane = document.getElementById("ai-feedback-pane");
             if (pageData.ai_score !== null && pageData.ai_feedback) {
               if (pollingInterval) {
                 clearInterval(pollingInterval);
@@ -992,7 +742,7 @@
                     .replace(" ", "-");
                   return `<div class="feedback-item"><div class="feedback-item-header"><h4>${title}</h4><span class="rating-badge ${ratingClass}">${feedbackObj.rating}</span></div><p>${feedbackObj.comment}</p></div>`;
                 };
-                aiCardPlaceholder.innerHTML = `<div id="ai-score-card"><div class="score-display"><span class="score-value">${
+                aiFeedbackPane.innerHTML = `<div id="ai-score-card"><div class="score-display"><span class="score-value">${
                   pageData.ai_score
                 }</span><span class="score-label">/ 30</span></div><div class="feedback-details"><div class="feedback-grid">${createFeedbackItem(
                   "Task Response",
@@ -1007,10 +757,10 @@
                   feedbackData.generalSuggestion
                 }</p></div></div></div>`;
               } else {
-                aiCardPlaceholder.innerHTML = `<div id="ai-score-card"><div class="score-display"><span class="score-value">${pageData.ai_score}</span><span class="score-label">/ 30</span></div><div class="feedback-details"><p>${pageData.ai_feedback}</p></div></div>`;
+                aiFeedbackPane.innerHTML = `<div id="ai-score-card"><div class="score-display"><span class="score-value">${pageData.ai_score}</span><span class="score-label">/ 30</span></div><div class="feedback-details"><p>${pageData.ai_feedback}</p></div></div>`;
               }
             } else {
-              aiCardPlaceholder.innerHTML = `<div id="ai-score-card"><div class="scoring-pending"><div class="spinner"></div><div class="main-text">AI Feedback is being generated...</div><div class="sub-text">This may take up to 30 seconds. The page will update automatically.</div></div></div>`;
+              aiFeedbackPane.innerHTML = `<div class="scoring-pending"><div class="spinner"></div><div class="main-text">AI Feedback is being generated...</div><div class="sub-text">This may take up to 30 seconds. The page will update automatically.</div></div>`;
               if (!pollingInterval) {
                 pollingInterval = setInterval(fetchAndRenderDetails, 5000);
               }
@@ -1018,7 +768,9 @@
           } catch (error) {
             console.error("Error loading submission details:", error);
             if (pollingInterval) clearInterval(pollingInterval);
-            reviewContentEl.innerHTML = `<div class="loading-state">An error occurred while loading. Please try again.</div>`;
+            document.getElementById(
+              "review-content"
+            ).innerHTML = `<div class="loading-state">An error occurred while loading. Please try again.</div>`;
           }
         };
 
@@ -1040,14 +792,59 @@
           });
         };
 
-        reviewBtn.addEventListener("click", handleToggleReview);
-        rewriteBtn.addEventListener("click", openRewriteModal);
-        cancelBtn.addEventListener("click", closeRewriteModal);
-        submitRewriteBtn.addEventListener("click", submitRewrite);
-        rewriteTextarea.addEventListener("input", (e) => {
-          const words = e.target.value.trim().match(/\S+/g)?.length || 0;
-          rewriteWordCountEl.textContent = `Words: ${words}`;
-        });
+        const handleToggleReview = async () => {
+          const reviewBtn = document.getElementById("review-toggle-btn");
+          reviewBtn.disabled = true;
+          try {
+            const response = await fetch(
+              `/api/responses/${historyId}/toggle-review`,
+              { method: "POST", headers: { Authorization: `Bearer ${token}` } }
+            );
+            if (!response.ok)
+              throw new Error("Failed to update review status.");
+            const result = await response.json();
+            updateReviewButton(result.is_for_review);
+          } catch (error) {
+            console.error("Error toggling review status:", error);
+            alert("Could not update review status. Please try again.");
+          } finally {
+            reviewBtn.disabled = false;
+          }
+        };
+
+        const updateReviewButton = (isInReview) => {
+          const reviewBtn = document.getElementById("review-toggle-btn");
+          const reviewBtnText = document.getElementById("review-btn-text");
+          const reviewIconAdd = document.getElementById("review-icon-add");
+          const reviewIconCheck = document.getElementById("review-icon-check");
+          if (isInReview) {
+            reviewBtn.classList.add("in-review");
+            reviewBtnText.textContent = "In Review List";
+            reviewIconAdd.style.display = "none";
+            reviewIconCheck.style.display = "inline";
+          } else {
+            reviewBtn.classList.remove("in-review");
+            reviewBtnText.textContent = "Add to Review List";
+            reviewIconAdd.style.display = "inline";
+            reviewIconCheck.style.display = "none";
+          }
+          reviewBtn.style.display = "inline-flex";
+        };
+
+        const modal = document.getElementById("rewrite-modal");
+        const cancelBtn = document.getElementById("cancel-rewrite-btn");
+        const submitRewriteBtn = document.getElementById("submit-rewrite-btn");
+        const rewriteTextarea = document.getElementById("rewrite-textarea");
+        if (cancelBtn) cancelBtn.addEventListener("click", closeRewriteModal);
+        if (submitRewriteBtn)
+          submitRewriteBtn.addEventListener("click", submitRewrite);
+        if (rewriteTextarea)
+          rewriteTextarea.addEventListener("input", (e) => {
+            const words = e.target.value.trim().match(/\S+/g)?.length || 0;
+            document.getElementById(
+              "rewrite-word-count"
+            ).textContent = `Words: ${words}`;
+          });
 
         fetchAndRenderDetails();
       });
