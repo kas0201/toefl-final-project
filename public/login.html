@@ -1,163 +1,166 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Login - TOEFL® Practice</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 
-        :root {
-            --bg-color: #f0f0f5;
-            --container-bg: #fff;
-            --text-primary: #1d1d1f;
-            --text-secondary: #6e6e73;
-            --accent-blue: #007aff;
-            --accent-blue-hover: #0060c5;
-            --accent-red: #ff453a;
-            --border-color: #d6d6d6
-        }
+      :root {
+        --bg-color: #f0f0f5;
+        --container-bg: #fff;
+        --text-primary: #1d1d1f;
+        --text-secondary: #6e6e73;
+        --accent-blue: #007aff;
+        --accent-blue-hover: #0060c5;
+        --accent-red: #ff453a;
+        --border-color: #d6d6d6;
+      }
 
-        body {
-            font-family: 'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-primary);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0
-        }
+      body {
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, Helvetica, Arial, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-primary);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        margin: 0;
+      }
 
-        .form-container {
-            width: 100%;
-            max-width: 400px;
-            background-color: var(--container-bg);
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 8px 24px rgba(0,0,0,.08)
-        }
+      .form-container {
+        width: 100%;
+        max-width: 400px;
+        background-color: var(--container-bg);
+        padding: 40px;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+      }
 
-        h1 {
-            font-size: 28px;
-            font-weight: 700;
-            text-align: center;
-            margin: 0 0 24px 0
-        }
+      h1 {
+        font-size: 28px;
+        font-weight: 700;
+        text-align: center;
+        margin: 0 0 24px 0;
+      }
 
-        .form-group {
-            margin-bottom: 20px
-        }
+      .form-group {
+        margin-bottom: 20px;
+      }
 
-        label {
-            display: block;
-            font-size: 14px;
-            font-weight: 500;
-            margin-bottom: 8px;
-            color: var(--text-secondary)
-        }
+      label {
+        display: block;
+        font-size: 14px;
+        font-weight: 500;
+        margin-bottom: 8px;
+        color: var(--text-secondary);
+      }
 
-        input {
-            width: 100%;
-            padding: 12px;
-            font-size: 16px;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            box-sizing: border-box
-        }
+      input {
+        width: 100%;
+        padding: 12px;
+        font-size: 16px;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        box-sizing: border-box;
+      }
 
-        button {
-            width: 100%;
-            padding: 14px;
-            font-size: 16px;
-            font-weight: 600;
-            color: #fff;
-            background-color: var(--accent-blue);
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background-color .2s ease
-        }
+      button {
+        width: 100%;
+        padding: 14px;
+        font-size: 16px;
+        font-weight: 600;
+        color: #fff;
+        background-color: var(--accent-blue);
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
 
-            button:hover {
-                background-color: var(--accent-blue-hover)
-            }
+      button:hover {
+        background-color: var(--accent-blue-hover);
+      }
 
-        .switch-form {
-            text-align: center;
-            margin-top: 24px;
-            font-size: 14px;
-            color: var(--text-secondary)
-        }
+      .switch-form {
+        text-align: center;
+        margin-top: 24px;
+        font-size: 14px;
+        color: var(--text-secondary);
+      }
 
-            .switch-form a {
-                color: var(--accent-blue);
-                text-decoration: none;
-                font-weight: 500
-            }
+      .switch-form a {
+        color: var(--accent-blue);
+        text-decoration: none;
+        font-weight: 500;
+      }
 
-        .error-message {
-            color: var(--accent-red);
-            font-size: 14px;
-            text-align: center;
-            margin-top: 16px;
-            height: 20px
-        }
+      .error-message {
+        color: var(--accent-red);
+        font-size: 14px;
+        text-align: center;
+        margin-top: 16px;
+        height: 20px;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="form-container">
-        <h1>Welcome Back</h1>
-        <form id="login-form">
-            <div class="form-group">
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" required>
-            </div>
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" required>
-            </div>
-            <button type="submit">Log In</button>
-        </form>
-        <p id="error-message" class="error-message"></p>
-        <p class="switch-form">
-            Don't have an account? <a href="/register.html">Sign up</a>
-        </p>
+      <h1>Welcome Back</h1>
+      <form id="login-form">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" required />
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required />
+        </div>
+        <button type="submit">Log In</button>
+      </form>
+      <p id="error-message" class="error-message"></p>
+
+      <p class="switch-form">
+        Don't have an account? <a href="/register.html">Sign up</a>
+      </p>
     </div>
 
     <script>
-        document.getElementById('login-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const errorMessage = document.getElementById('error-message');
-            errorMessage.textContent = '';
+      document
+        .getElementById("login-form")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const errorMessage = document.getElementById("error-message");
+          errorMessage.textContent = "";
 
-            const username = e.target.username.value;
-            const password = e.target.password.value;
+          const username = e.target.username.value;
+          const password = e.target.password.value;
 
-            try {
-                const response = await fetch('/api/auth/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
+          try {
+            const response = await fetch("/api/auth/login", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ username, password }),
+            });
 
-                const data = await response.json();
+            const data = await response.json();
 
-                if (!response.ok) {
-                    throw new Error(data.message || 'Login failed.');
-                }
-
-                // 登录成功！将通行证和用户信息存入 localStorage
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('user', JSON.stringify(data.user));
-
-                // 跳转到主页
-                window.location.href = '/';
-
-            } catch (error) {
-                errorMessage.textContent = error.message;
+            if (!response.ok) {
+              throw new Error(data.message || "Login failed.");
             }
+
+            // 登录成功！将通行证和用户信息存入 localStorage
+            localStorage.setItem("token", data.token);
+            localStorage.setItem("user", JSON.stringify(data.user));
+
+            // 跳转到主页
+            window.location.href = "/";
+          } catch (error) {
+            errorMessage.textContent = error.message;
+          }
         });
     </script>
-</body>
+  </body>
 </html>
