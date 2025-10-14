@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (FINAL, CORRECTED VERSION using Cloudflare Workers AI) ---
+﻿// --- START OF FILE server.js (DEFINITIVE FINAL VERSION with CORRECT AURA MODEL) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -19,19 +19,17 @@ cloudinary.config({
   secure: true,
 });
 
-// --- 【终极解决方案 V3.1】: 修正了读取 Cloudflare Token 的环境变量名 ---
 async function generateAudioInBackground(questionId) {
   console.log(
     `🎤 [BACKGROUND JOB - CF] Starting audio generation for question #${questionId}...`
   );
   try {
     const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-    // 【关键修复】: 从正确的环境变量中读取 Token
     const apiToken = process.env.CLOUDFLARE_API_TOKEN;
 
     if (!accountId || !apiToken) {
       console.error(
-        "❌ [BACKGROUND JOB - CF] Cloudflare credentials (ACCOUNT_ID or API_TOKEN) are not set in environment variables."
+        "❌ [BACKGROUND JOB - CF] Cloudflare credentials are not set."
       );
       return;
     }
@@ -51,7 +49,7 @@ async function generateAudioInBackground(questionId) {
         return;
       }
 
-      const textForTTS = question.lecture_script
+      const textForTTS = (question.lecture_script || "")
         .replace(/[\s\n\r]+/g, " ")
         .trim();
       if (!textForTTS) {
@@ -61,12 +59,13 @@ async function generateAudioInBackground(questionId) {
         return;
       }
 
-      const model = "@cf/facebook/mms-1-1024";
+      // --- 【最终修正】: 使用您指定的、正确的 AURA 模型名称 ---
+      const model = "@cf/aura/aura-1-en-us";
       const apiUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
       const requestBody = { text: textForTTS };
 
       console.log(
-        `[BACKGROUND JOB - CF] Sending POST request to Cloudflare AI...`
+        `[BACKGROUND JOB - CF] Sending POST request to Cloudflare AI with model ${model}...`
       );
 
       const response = await axios.post(apiUrl, requestBody, {
@@ -101,15 +100,16 @@ async function generateAudioInBackground(questionId) {
         [finalAudioUrl, questionId]
       );
       console.log(
-        `✅ [BACKGROUND JOB - CF] Success! Audio for question #${questionId} is ready.`
+        `✅ [BACKGROUND JOB - CF] Success! Audio for question #${questionId} is ready: ${finalAudioUrl}`
       );
     } finally {
       poolClient.release();
     }
   } catch (error) {
-    // 打印更详细的错误信息
     const errorMessage = error.response
-      ? `Status ${error.response.status}: ${error.response.data.toString()}`
+      ? `Status ${error.response.status}: ${Buffer.from(
+          error.response.data
+        ).toString()}`
       : error.message;
     console.error(
       `❌ [BACKGROUND JOB - CF] FAILED for question #${questionId}:`,
@@ -119,7 +119,7 @@ async function generateAudioInBackground(questionId) {
 }
 
 // --- 辅助函数 (保持不变) ---
-// (此处省略所有其他未改动的辅助函数，如 callAIPolishAPI, checkAndAwardAchievements 等)
+// (此处省略所有其他未改动的辅助函数)
 async function checkAndAwardAchievements(userId, responseId) {
   console.log(`🏆 [Achievement] Checking for user #${userId}...`);
   try {
