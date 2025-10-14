@@ -60,7 +60,7 @@ async function generateAudioInBackground(questionId) {
       }
 
       // --- 【最终修正】: 使用您指定的、正确的 AURA 模型名称 ---
-      const model = "@cf/aura/aura-1-en-us";
+      const model = "@cf/deepgram/aura-1";
       const apiUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
       const requestBody = { text: textForTTS };
 
