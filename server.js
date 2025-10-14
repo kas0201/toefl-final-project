@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Final Version with Data Validation for TTS) ---
+﻿// --- START OF FILE server.js (Final Version with Hugging Face TTS) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -11,6 +11,7 @@ const fs = require("fs");
 const path = require("path");
 const util = require("util");
 const englishWords = require("an-array-of-english-words");
+const { client } = require("@gradio/client"); // 【关键】: 引入 Gradio 客户端
 
 // --- 配置 Cloudinary ---
 cloudinary.config({
@@ -22,6 +23,7 @@ cloudinary.config({
 
 // --- 辅助函数 ---
 
+// ... (checkAndAwardAchievements, callAIPolishAPI, callAIScoringAPI, callAIAnalysisAPI 函数保持不变) ...
 async function checkAndAwardAchievements(userId, responseId) {
   console.log(`🏆 [Achievement] Checking for user #${userId}...`);
   try {
@@ -220,18 +222,14 @@ async function callAIAnalysisAPI(feedbacks) {
 
 function processTextForTTS(text) {
   if (!text) return "";
-  return text;
+  const cleanedText = text
+    .replace(/[\s\n\r]+/g, " ")
+    .replace(/[^\p{L}\p{N}\p{P}\p{Z}]/gu, "");
+  return cleanedText;
 }
 
+// 【关键修改】: 替换为调用 Hugging Face Space 的全新函数
 async function generateAudioIfNeeded(questionId) {
-  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-  const apiToken = process.env.CLOUDFLARE_API_TOKEN;
-  if (!accountId || !apiToken) {
-    console.log(
-      "🔊 [Cloudflare TTS] Audio generation skipped: Environment variables not configured."
-    );
-    return;
-  }
   try {
     const questionQuery = await pool.query(
       "SELECT lecture_script, lecture_audio_url, task_type FROM questions WHERE id = $1",
@@ -239,38 +237,55 @@ async function generateAudioIfNeeded(questionId) {
     );
     const question = questionQuery.rows[0];
 
-    // --- 【关键修改】: 增加对 lecture_script 是否为空或只有空格的检查 ---
+    // 检查是否需要生成音频
     if (
       !question ||
       question.task_type !== "integrated_writing" ||
-      question.lecture_audio_url ||
+      question.lecture_audio_url || // 如果已经有URL了，就不用再生成
       !question.lecture_script ||
-      question.lecture_script.trim() === "" // 新增的检查
+      question.lecture_script.trim() === ""
     ) {
-      // 如果没有听力稿或不满足其他条件，直接静默退出，不再尝试生成
+      return;
+    }
+
+    const textForTTS = processTextForTTS(question.lecture_script);
+    if (!textForTTS) {
+      console.log(
+        `[TTS Pre-check] Skipped audio generation for question #${questionId} because text is empty after cleaning.`
+      );
       return;
     }
 
     console.log(
-      `🎤 [Backend Task CF-Aura-TTS] Starting audio generation for question #${questionId}...`
+      `🎤 [Backend Task Gradio-XTTS] Starting audio generation for question #${questionId}...`
     );
-    const textForTTS = processTextForTTS(question.lecture_script);
-    const endpoint = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/deepgram/aura-1`;
-    const ttsResponse = await axios.post(
-      endpoint,
-      { text: textForTTS },
-      {
-        headers: {
-          Authorization: `Bearer ${apiToken}`,
-          "Content-Type": "application/json",
-        },
-        responseType: "arraybuffer",
-      }
-    );
-    const audioBuffer = Buffer.from(ttsResponse.data);
+
+    // 1. 连接到 Hugging Face Space 上的 XTTS 应用
+    const app = await client("coqui/xtts");
+    const result = await app.predict("/synthesize", [
+      textForTTS, // (string) Text to synthesize
+      "en", // (string) Language
+      "Aaron Dreschner", // (string) Voice selection. 您可以在 Space 页面找到更多选项
+      null, // (Audio) Whisper output (not used)
+      null, // (Audio) Prompt audio (not used)
+      null, // (string) Reference audio selection (not used)
+      true, // (boolean) Agree to license
+      0.9, // (number) Speed 【语速控制! 1.0是正常, 0.9是90%速度】
+    ]);
+
+    // 2. 从返回的临时 URL 下载音频文件
+    // @ts-ignore
+    const audioUrl = result.data[0].url;
+    const audioResponse = await axios.get(audioUrl, {
+      responseType: "arraybuffer",
+    });
+    const audioBuffer = Buffer.from(audioResponse.data);
+
     if (!audioBuffer || audioBuffer.length === 0) {
-      throw new Error("Cloudflare TTS generated an empty audio buffer.");
+      throw new Error("Gradio Space returned an empty audio buffer.");
     }
+
+    // 3. 将下载的音频上传到 Cloudinary
     const uploadPromise = new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         { resource_type: "video", folder: "toefl_lectures" },
@@ -282,26 +297,21 @@ async function generateAudioIfNeeded(questionId) {
       uploadStream.end(audioBuffer);
     });
     const uploadResult = await uploadPromise;
-    const audioUrl = uploadResult.secure_url;
+    // @ts-ignore
+    const finalAudioUrl = uploadResult.secure_url;
+
+    // 4. 将 Cloudinary 的 URL 更新回数据库
     await pool.query(
       "UPDATE questions SET lecture_audio_url = $1 WHERE id = $2",
-      [audioUrl, questionId]
+      [finalAudioUrl, questionId]
     );
     console.log(
-      `✅ [Backend Task CF-Aura-TTS] Audio for question #${questionId} has been generated and saved: ${audioUrl}`
+      `✅ [Backend Task Gradio-XTTS] Audio for question #${questionId} has been generated and saved: ${finalAudioUrl}`
     );
   } catch (error) {
-    let errorDetails = error.message;
-    if (error.response && error.response.data) {
-      try {
-        errorDetails = JSON.parse(Buffer.from(error.response.data).toString());
-      } catch (e) {
-        errorDetails = "Could not parse error response from Cloudflare.";
-      }
-    }
     console.error(
-      `❌ [Backend Task CF-Aura-TTS] Error during audio generation for question #${questionId}:`,
-      errorDetails
+      `❌ [Backend Task Gradio-XTTS] Error during audio generation for question #${questionId}:`,
+      error
     );
   }
 }
@@ -333,6 +343,7 @@ const authenticateToken = (req, res, next) => {
   );
 };
 
+// ... (所有 API 路由，如 /api/auth/register 等，都保持不变) ...
 // --- API 路由 ---
 
 app.post("/api/auth/register", async (req, res) => {
@@ -411,7 +422,7 @@ app.get("/api/questions", authenticateToken, async (req, res) => {
   }
 });
 
-app.get("/api/questions/:id", async (req, res) => {
+app.get("/api/questions/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
   try {
     generateAudioIfNeeded(id);
@@ -426,7 +437,7 @@ app.get("/api/questions/:id", async (req, res) => {
   }
 });
 
-app.get("/api/writing-test", async (req, res) => {
+app.get("/api/writing-test", authenticateToken, async (req, res) => {
   try {
     const sql = `(SELECT * FROM questions WHERE task_type = 'integrated_writing' ORDER BY RANDOM() LIMIT 1) UNION ALL (SELECT * FROM questions WHERE task_type = 'academic_discussion' ORDER BY RANDOM() LIMIT 1);`;
     const result = await pool.query(sql);
@@ -808,30 +819,6 @@ app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
   } catch (err) {
     console.error("❌ Failed to get writing analysis data:", err);
     res.status(500).json({ message: "Internal server error." });
-  }
-});
-
-app.post("/api/generate-audio/:id", authenticateToken, async (req, res) => {
-  const { id } = req.params;
-  try {
-    await generateAudioIfNeeded(id);
-    const result = await pool.query(
-      "SELECT lecture_audio_url FROM questions WHERE id = $1",
-      [id]
-    );
-    if (result.rows.length > 0 && result.rows[0].lecture_audio_url) {
-      res.json({
-        message: "Audio generated successfully!",
-        url: result.rows[0].lecture_audio_url,
-      });
-    } else {
-      res
-        .status(404)
-        .json({ message: "Question not found or audio still processing." });
-    }
-  } catch (error) {
-    console.error("Manual audio generation failed:", error);
-    res.status(500).json({ message: "Failed to generate audio." });
   }
 });
 
