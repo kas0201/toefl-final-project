@@ -174,17 +174,17 @@
         startTimer(180, renderLecturePhase);
       }
 
-      // 【关键修复】: 将函数变为 async 并在开始时重新获取题目数据
       async function renderLecturePhase() {
         phaseTitleEl.textContent = "Phase 2: Lecture";
-        mainContainer.style.gridTemplateColumns = "1fr"; // Single column for focus
+        mainContainer.style.gridTemplateColumns = "1fr";
         mainContainer.innerHTML = `<div class="content-panel" style="display:flex; flex-direction:column; align-items:center; justify-content:center;"><p style="font-size: 18px;">Loading lecture...</p></div>`;
 
         try {
-          // 在播放前重新获取题目数据，以确保获得最新的 audio_url
-          const response = await fetch(`/api/questions/${currentQuestion.id}`);
+          const response = await fetch(`/api/questions/${currentQuestion.id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
           if (response.ok) {
-            currentQuestion = await response.json(); // 更新全局的题目数据
+            currentQuestion = await response.json();
           } else {
             console.error("Failed to re-fetch question data for lecture.");
           }
@@ -198,12 +198,10 @@
           phaseTimerEl.textContent = "Playing...";
           audioEl.onended = renderWritingPhase;
           audioEl.onerror = () => {
-            // 如果音频加载失败，则显示文本作为后备
             mainContainer.innerHTML = `<div class="content-panel"><h2>Lecture Script (Audio Failed)</h2><p>${currentQuestion.lecture_script}</p></div>`;
-            startTimer(120, renderWritingPhase); // Fallback to a timer
+            startTimer(120, renderWritingPhase);
           };
         } else {
-          // 如果没有音频URL，则显示文本并开始计时
           mainContainer.innerHTML = `<div class="content-panel"><h2>Lecture Script</h2><p>${currentQuestion.lecture_script}</p></div>`;
           startTimer(120, renderWritingPhase);
         }
@@ -211,7 +209,7 @@
 
       function renderWritingPhase() {
         phaseTitleEl.textContent = "Phase 3: Writing";
-        mainContainer.style.gridTemplateColumns = "1fr 1fr"; // Back to two columns
+        mainContainer.style.gridTemplateColumns = "1fr 1fr";
         mainContainer.innerHTML = `
                 <div class="content-panel"><h2>Reading Passage Reference</h2><p>${currentQuestion.reading_passage}</p></div>
                 <div class="writing-panel" id="writing-panel"></div>`;
@@ -300,7 +298,12 @@
           return;
         }
         try {
-          const response = await fetch(`/api/questions/${questionId}`);
+          // 【关键修复】: 在 fetch 请求中加入 Authorization header
+          const response = await fetch(`/api/questions/${questionId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
           if (!response.ok)
             throw new Error("Failed to fetch question details.");
           currentQuestion = await response.json();

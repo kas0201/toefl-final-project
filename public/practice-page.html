@@ -295,7 +295,12 @@
           return;
         }
         try {
-          const response = await fetch(`/api/questions/${questionId}`);
+          // 【关键修复】: 在 fetch 请求中加入 Authorization header
+          const response = await fetch(`/api/questions/${questionId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
           if (!response.ok)
             throw new Error("Failed to fetch question details.");
           currentQuestion = await response.json();
@@ -329,7 +334,6 @@
           });
           const result = await response.json();
           if (!response.ok) throw new Error(result.message);
-          // --- 【修正】: 跳转到成功页面 ---
           window.location.href = `/submission-success.html?id=${result.id}`;
         } catch (error) {
           statusMessageEl.textContent = `✗ ${error.message}`;

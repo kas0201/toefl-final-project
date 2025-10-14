@@ -197,7 +197,9 @@
 
       async function startTest() {
         try {
-          const response = await fetch("/api/writing-test");
+          const response = await fetch("/api/writing-test", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
           if (!response.ok) throw new Error("Could not load the writing test.");
           let tasks = await response.json();
           tasks.sort((a, b) => {
@@ -246,19 +248,21 @@
           renderCurrentScreen();
         });
       }
-      // 【关键修复】: 将函数变为 async 并在开始时重新获取题目数据
+
       async function renderIntegratedLecture(task) {
         phaseTitleEl.textContent = "Task 1: Integrated Writing (Lecture)";
         mainContainer.style.gridTemplateColumns = "1fr";
         mainContainer.innerHTML = `<div class="content-panel" style="display:flex; flex-direction:column; align-items:center; justify-content:center;"><p style="font-size: 18px;">Loading lecture...</p></div>`;
 
         try {
-          // 在播放前重新获取题目数据，以确保获得最新的 audio_url
-          const response = await fetch(`/api/questions/${task.id}`);
+          // 【关键修复】: 在 fetch 请求中加入 Authorization header
+          const response = await fetch(`/api/questions/${task.id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
           if (response.ok) {
             const updatedTask = await response.json();
-            writingTasks[0] = updatedTask; // 更新任务数组中的数据
-            task = updatedTask; // 更新当前函数的任务变量
+            writingTasks[0] = updatedTask;
+            task = updatedTask;
           } else {
             console.error("Failed to re-fetch task data for lecture.");
           }
@@ -275,7 +279,6 @@
             renderCurrentScreen();
           };
           audioEl.onerror = () => {
-            // 后备方案
             mainContainer.innerHTML = `<div class="content-panel"><h2>Lecture Script (Audio Failed)</h2><p>${task.lecture_script}</p></div>`;
             startTimer(120, () => {
               currentIntegratedPhase++;
@@ -283,7 +286,6 @@
             });
           };
         } else {
-          // 无音频URL的后备方案
           mainContainer.innerHTML = `<div class="content-panel"><h2>Lecture Script</h2><p>${task.lecture_script}</p></div>`;
           startTimer(120, () => {
             currentIntegratedPhase++;
