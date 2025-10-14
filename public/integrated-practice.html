@@ -1,4 +1,4 @@
-﻿<!-- START OF FILE public/integrated-practice.html (FINAL VERSION with Polling) -->
+﻿<!-- START OF FILE public/integrated-practice.html (FINAL OPTIMIZED VERSION with Pre-loading) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -182,14 +182,39 @@
       let pollingInterval;
       let currentQuestion = null;
 
+      // --- 【优化 1/3】: 新增一个函数，专门用来在后台悄悄地触发音频生成 ---
+      const preloadAudio = async () => {
+        // 如果题目数据中已经有音频URL，或者没有题目数据，就什么都不做
+        if (!currentQuestion || currentQuestion.lecture_audio_url) {
+          return;
+        }
+        console.log("Preloading audio in the background...");
+        try {
+          // 向后台发送“开始生成音频”的命令，“发射后不管”
+          await fetch(
+            `/api/questions/${currentQuestion.id}/trigger-audio-generation`,
+            {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+        } catch (error) {
+          console.error("Failed to trigger audio preloading:", error);
+          // 预加载失败也没关系，听力阶段会再次尝试
+        }
+      };
+
       function renderReadingPhase() {
         phaseTitleEl.textContent = "Phase 1: Reading";
         mainContainer.style.gridTemplateColumns = "1fr 1fr";
         mainContainer.innerHTML = `<div class="content-panel"><h2>Reading Passage</h2><p>${currentQuestion.reading_passage}</p></div><div class="writing-panel inactive"><p class="inactive-message">You will be able to write after the lecture.</p></div>`;
+
+        // --- 【优化 2/3】: 在阅读计时开始的同时，调用预加载函数 ---
+        preloadAudio();
+
         startTimer(180, renderLecturePhase);
       }
 
-      // --- 【架构重构 4/4】: 实现了轮询逻辑的全新 renderLecturePhase 函数 ---
       async function renderLecturePhase() {
         phaseTitleEl.textContent = "Phase 2: Lecture";
         mainContainer.style.gridTemplateColumns = "1fr";
@@ -218,7 +243,7 @@
                   headers: { Authorization: `Bearer ${token}` },
                 }
               );
-              if (!statusResponse.ok) return; // Continue polling on error
+              if (!statusResponse.ok) return;
               const statusData = await statusResponse.json();
               if (statusData.lecture_audio_url) {
                 clearInterval(pollingInterval);
@@ -229,35 +254,44 @@
             } catch (error) {
               console.error("Polling error:", error);
             }
-          }, 5000); // Poll every 5 seconds
+          }, 5000);
         };
 
-        if (currentQuestion.lecture_audio_url) {
-          renderAudioPlayer(currentQuestion.lecture_audio_url);
-        } else {
-          // Trigger the background generation task
-          try {
-            const triggerResponse = await fetch(
+        // --- 【优化 3/3】: 听力阶段开始时，先直接检查一次音频状态 ---
+        // 因为很可能在阅读的三分钟内，音频已经生成好了！
+        try {
+          const initialStatusCheck = await fetch(
+            `/api/questions/${currentQuestion.id}/audio-status`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+          const initialData = await initialStatusCheck.json();
+          if (initialData.lecture_audio_url) {
+            // 太棒了，音频已经准备好了，直接播放！
+            currentQuestion.lecture_audio_url = initialData.lecture_audio_url;
+            renderAudioPlayer(initialData.lecture_audio_url);
+          } else {
+            // 如果音频还没好，那就开始轮询（并确保触发命令被再次发送以防万一）
+            await fetch(
               `/api/questions/${currentQuestion.id}/trigger-audio-generation`,
               {
                 method: "POST",
                 headers: { Authorization: `Bearer ${token}` },
               }
             );
-            if (triggerResponse.status === 202) {
-              startPollingForAudio(); // Trigger was successful, start polling
-            } else {
-              throw new Error("Failed to trigger audio generation.");
-            }
-          } catch (error) {
-            console.error("Trigger error:", error);
-            mainContainer.innerHTML = `<div class="content-panel"><h2>Lecture Script (Audio Service Unavailable)</h2><p>${currentQuestion.lecture_script}</p></div>`;
-            startTimer(120, renderWritingPhase);
+            startPollingForAudio();
           }
+        } catch (error) {
+          console.error(
+            "Initial audio check failed, falling back to script:",
+            error
+          );
+          mainContainer.innerHTML = `<div class="content-panel"><h2>Lecture Script (Audio Service Unavailable)</h2><p>${currentQuestion.lecture_script}</p></div>`;
+          startTimer(120, renderWritingPhase);
         }
       }
 
-      // ... (所有其他函数 renderWritingPhase, startTimer, submitResponse 等保持原样)
       function renderWritingPhase() {
         phaseTitleEl.textContent = "Phase 3: Writing";
         mainContainer.style.gridTemplateColumns = "1fr 1fr";
@@ -336,7 +370,7 @@
           if (!response.ok) throw new Error(result.message);
           window.location.href = `/submission-success.html?id=${result.id}`;
         } catch (error) {
-          statusMessageEl.innerHTML = `<span style="color: var(--accent-red);">✗ ${error.message}</span>`;
+          statusMessageEl.innerHTML = `<span style="color: var(--accent-red);_EXCLAMATION_">✗ ${error.message}</span>`;
           submitBtn.disabled = false;
         }
       }
