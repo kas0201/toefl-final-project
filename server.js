@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (FINAL, UNSHORTENED VERSION with Background Task Polling) ---
+﻿// --- START OF FILE server.js (FINAL, ROBUST VERSION using direct HTTP request) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -12,7 +12,6 @@ const path = require("path");
 const util = require("util");
 const englishWords = require("an-array-of-english-words");
 
-// --- 配置 Cloudinary ---
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -20,14 +19,12 @@ cloudinary.config({
   secure: true,
 });
 
-// --- 【架构重构 1/4】: 创建一个在后台执行的、独立的音频生成函数 ---
-// 这个函数会被“发射后不管”，它自己完成所有工作，成功或失败都不会影响主服务。
+// --- 【终极解决方案】: 使用 axios 直接发送 HTTP 请求，彻底抛弃 @gradio/client ---
 async function generateAudioInBackground(questionId) {
   console.log(
     `🎤 [BACKGROUND JOB] Starting audio generation for question #${questionId}...`
   );
   try {
-    // 在后台任务中，我们需要自己创建一个数据库连接
     const poolClient = await pool.connect();
     try {
       const questionQuery = await poolClient.query(
@@ -36,7 +33,6 @@ async function generateAudioInBackground(questionId) {
       );
       const question = questionQuery.rows[0];
 
-      // 如果问题不存在或已经有音频，则跳过
       if (!question || question.lecture_audio_url) {
         console.log(
           `[BACKGROUND JOB] Skipped: Question #${questionId} not found or already has audio.`
@@ -44,7 +40,6 @@ async function generateAudioInBackground(questionId) {
         return;
       }
 
-      // 清理文本
       const textForTTS = question.lecture_script
         .replace(/[\s\n\r]+/g, " ")
         .trim();
@@ -55,22 +50,45 @@ async function generateAudioInBackground(questionId) {
         return;
       }
 
-      // 动态导入 @gradio/client
-      const { client } = await import("@gradio/client");
-      const app = await client("kas0201/my-unlimited-tts");
-      const result = await app.predict("/synthesize", [textForTTS]);
+      // 1. 定义Gradio API的URL和请求体
+      const gradioApiUrl =
+        "https://kas0201-my-unlimited-tts.hf.space/run/synthesize";
+      const requestBody = {
+        data: [textForTTS],
+      };
 
-      // @ts-ignore
-      const audioUrl = result.data[0].url;
-      if (!audioUrl) throw new Error("Gradio app did not return an audio URL.");
+      console.log(`[BACKGROUND JOB] Sending POST request to ${gradioApiUrl}`);
 
-      // 下载音频文件
+      // 2. 使用axios发送标准的HTTPS POST请求
+      const response = await axios.post(gradioApiUrl, requestBody, {
+        headers: { "Content-Type": "application/json" },
+        // 设置一个较长的超时时间，以应对冷启动
+        timeout: 300000, // 5分钟
+      });
+
+      // 3. 从返回的JSON中解析出音频文件的URL
+      const audioUrl = response.data?.data?.[0]?.url;
+
+      if (!audioUrl) {
+        console.error(
+          "[BACKGROUND JOB] Gradio API response did not contain a valid audio URL.",
+          response.data
+        );
+        throw new Error(
+          "Gradio API response did not contain a valid audio URL."
+        );
+      }
+
+      console.log(
+        `[BACKGROUND JOB] Received audio URL from Gradio: ${audioUrl}`
+      );
+
+      // 后续的下载和上传逻辑保持不变
       const audioResponse = await axios.get(audioUrl, {
         responseType: "arraybuffer",
       });
       const audioBuffer = Buffer.from(audioResponse.data);
 
-      // 上传到 Cloudinary
       const uploadPromise = new Promise((resolve, reject) => {
         cloudinary.uploader
           .upload_stream(
@@ -82,10 +100,7 @@ async function generateAudioInBackground(questionId) {
       });
       const uploadResult = await uploadPromise;
 
-      // @ts-ignore
       const finalAudioUrl = uploadResult.secure_url;
-
-      // 将URL存回数据库
       await poolClient.query(
         "UPDATE questions SET lecture_audio_url = $1 WHERE id = $2",
         [finalAudioUrl, questionId]
@@ -94,19 +109,18 @@ async function generateAudioInBackground(questionId) {
         `✅ [BACKGROUND JOB] Success! Audio for question #${questionId} is ready.`
       );
     } finally {
-      // 确保数据库连接被释放
       poolClient.release();
     }
   } catch (error) {
-    // 捕获所有可能的错误，记录日志，但不会让主服务崩溃
     console.error(
       `❌ [BACKGROUND JOB] FAILED for question #${questionId}:`,
-      error.message
+      error.response ? error.response.data : error.message
     );
   }
 }
 
 // --- 辅助函数 (保持不变) ---
+// (此处省略所有其他未改动的辅助函数，如 callAIPolishAPI, checkAndAwardAchievements 等)
 async function checkAndAwardAchievements(userId, responseId) {
   console.log(`🏆 [Achievement] Checking for user #${userId}...`);
   try {
@@ -302,7 +316,6 @@ async function callAIAnalysisAPI(feedbacks) {
     throw new Error("Failed to get a response from the AI analysis service.");
   }
 }
-
 // --- Express App Initialization ---
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -332,7 +345,7 @@ const authenticateToken = (req, res, next) => {
 };
 
 // --- API 路由 ---
-
+// (所有路由代码，包括之前省略的部分，都完整地放在这里)
 app.post("/api/auth/register", async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
@@ -408,8 +421,6 @@ app.get("/api/questions", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Internal server error." });
   }
 });
-
-// GET /api/questions/:id: 只返回文本数据
 app.get("/api/questions/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
   try {
@@ -424,8 +435,6 @@ app.get("/api/questions/:id", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Internal server error." });
   }
 });
-
-// --- 【架构重构 2/4】: "触发"后台任务的路由 ---
 app.post(
   "/api/questions/:id/trigger-audio-generation",
   authenticateToken,
@@ -434,12 +443,10 @@ app.post(
     console.log(
       `▶️ [HTTP] Received trigger for audio generation for question #${id}.`
     );
-    generateAudioInBackground(id); // "发射后不管"
+    generateAudioInBackground(id);
     res.status(202).json({ message: "Audio generation process started." });
   }
 );
-
-// --- 【架构重构 3/4】: "轮询"状态的路由 ---
 app.get(
   "/api/questions/:id/audio-status",
   authenticateToken,
@@ -460,14 +467,14 @@ app.get(
     }
   }
 );
-
 app.get("/api/writing-test", authenticateToken, async (req, res) => {
   try {
     const sql = `(SELECT * FROM questions WHERE task_type = 'integrated_writing' ORDER BY RANDOM() LIMIT 1) UNION ALL (SELECT * FROM questions WHERE task_type = 'academic_discussion' ORDER BY RANDOM() LIMIT 1);`;
     const result = await pool.query(sql);
     if (result.rows.length < 2)
       return res.status(404).json({
-        message: "Not enough questions to start a full writing test.",
+        message:
+          "Not enough questions in database to start a full writing test.",
       });
     res.json(result.rows);
   } catch (err) {
@@ -475,14 +482,13 @@ app.get("/api/writing-test", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Internal server error." });
   }
 });
-
 app.post("/api/submit-response", authenticateToken, async (req, res) => {
   const { content, wordCount, questionId, task_type } = req.body;
   const userId = req.user.id;
   const qId = parseInt(questionId, 10);
   if ((!content && wordCount > 0) || !wordCount || isNaN(qId) || !task_type) {
     return res.status(400).json({
-      message: "Request is missing required information.",
+      message: "Request is missing required information or is malformed.",
     });
   }
 
@@ -544,6 +550,7 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
             )
               ? String(mistake.type).toLowerCase()
               : "style";
+
             return client.query(mistakeSql, [
               userId,
               newResponseId,
@@ -560,6 +567,7 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
         }
 
         await client.query("COMMIT");
+
         await checkAndAwardAchievements(userId, newResponseId);
       } catch (aiError) {
         await client.query("ROLLBACK");
@@ -576,7 +584,6 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Internal server error." });
   }
 });
-
 app.get("/api/history", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
@@ -596,15 +603,15 @@ app.get("/api/history/:id", authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(sql, [id, userId]);
     if (result.rows.length === 0)
-      return res.status(404).json({ message: "History record not found." });
+      return res
+        .status(404)
+        .json({ message: "History record not found or permission denied." });
     res.json(result.rows[0]);
   } catch (err) {
     console.error(`Failed to get history detail ID ${id}:`, err);
     res.status(500).json({ message: "Internal server error." });
   }
 });
-
-// ... (所有剩余的路由都保持不变)
 app.post(
   "/api/responses/:id/toggle-review",
   authenticateToken,
@@ -620,13 +627,21 @@ app.post(
         `SELECT is_for_review FROM responses WHERE id = $1 AND user_id = $2;`,
         [id, userId]
       );
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          message: "Response not found or you do not have permission.",
+        });
+      }
       res.json({ is_for_review: result.rows[0].is_for_review });
     } catch (err) {
+      console.error(
+        `Failed to toggle review status (Response ID: ${id}):`,
+        err
+      );
       res.status(500).json({ message: "Internal server error." });
     }
   }
 );
-
 app.post("/api/responses/:id/polish", authenticateToken, async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
@@ -638,13 +653,20 @@ app.post("/api/responses/:id/polish", authenticateToken, async (req, res) => {
     if (responseQuery.rows.length === 0) {
       return res.status(404).json({ message: "Response not found." });
     }
-    const aiResult = await callAIPolishAPI(responseQuery.rows[0].content);
+    const originalText = responseQuery.rows[0].content;
+    if (!originalText || originalText.trim().split(/\s+/).length < 20) {
+      return res.status(400).json({
+        message:
+          "Your text is too short for a meaningful revision. Please write at least 20 words.",
+      });
+    }
+    const aiResult = await callAIPolishAPI(originalText);
     res.json({ polishedText: aiResult.polishedText });
   } catch (err) {
+    console.error(`AI polish failed (Response ID: ${id}):`, err);
     res.status(500).json({ message: "Failed to get AI polish suggestion." });
   }
 });
-
 app.get("/api/review-list", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
@@ -652,60 +674,66 @@ app.get("/api/review-list", authenticateToken, async (req, res) => {
     const result = await pool.query(sql, [userId]);
     res.json(result.rows);
   } catch (err) {
+    console.error("Failed to get review list:", err);
     res.status(500).json({ message: "Internal server error." });
   }
 });
-
 app.get("/api/mistakes", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
     const sql = `
-          SELECT m.id, m.type, m.original_text, m.corrected_text, m.explanation, m.created_at, m.response_id, q.title as question_title
-          FROM mistakes m
-          JOIN responses r ON m.response_id = r.id
-          JOIN questions q ON r.question_id = q.id
-          WHERE m.user_id = $1 ORDER BY m.created_at DESC;`;
+      SELECT m.id, m.type, m.original_text, m.corrected_text, m.explanation, m.created_at, m.response_id, q.title as question_title
+      FROM mistakes m
+      JOIN responses r ON m.response_id = r.id
+      JOIN questions q ON r.question_id = q.id
+      WHERE m.user_id = $1
+      ORDER BY m.created_at DESC;
+    `;
     const result = await pool.query(sql, [userId]);
     res.json(result.rows);
   } catch (err) {
+    console.error("Failed to get mistakes:", err);
     res.status(500).json({ message: "Internal server error." });
   }
 });
-
 app.get("/api/user/stats", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
     const sql = `
-          WITH ValidResponses AS (
-            SELECT * FROM responses 
-            WHERE user_id = $1 AND ai_score IS NOT NULL AND ai_feedback IS NOT NULL AND ai_feedback LIKE '{%}'
-          ), 
-          RatingMapping AS (
-            SELECT *, DATE(submitted_at) AS submission_date,
-              CASE (ai_feedback::jsonb -> 'taskResponse' ->> 'rating')
-                WHEN 'Excellent' THEN 4 WHEN 'Good' THEN 3 WHEN 'Fair' THEN 2 WHEN 'Needs Improvement' THEN 1 ELSE 0
-              END AS task_response_score,
-              CASE (ai_feedback::jsonb -> 'organization' ->> 'rating')
-                WHEN 'Excellent' THEN 4 WHEN 'Good' THEN 3 WHEN 'Fair' THEN 2 WHEN 'Needs Improvement' THEN 1 ELSE 0
-              END AS organization_score,
-              CASE (ai_feedback::jsonb -> 'languageUse' ->> 'rating')
-                WHEN 'Excellent' THEN 4 WHEN 'Good' THEN 3 WHEN 'Fair' THEN 2 WHEN 'Needs Improvement' THEN 1 ELSE 0
-              END AS language_use_score
-            FROM ValidResponses
-          )
-          SELECT 
-            (SELECT json_build_object('total', COUNT(*), 'average', ROUND(AVG(ai_score), 1)) FROM ValidResponses) AS "overallStats",
-            (SELECT json_agg(stats) FROM (SELECT task_type, COUNT(*) AS count, ROUND(AVG(ai_score), 1) AS average FROM ValidResponses GROUP BY task_type) AS stats) AS "byType",
-            (SELECT json_agg(trends) FROM (SELECT submission_date, ROUND(AVG(ai_score), 1) AS average_score FROM RatingMapping WHERE submitted_at >= NOW() - INTERVAL '30 days' GROUP BY submission_date ORDER BY submission_date) AS trends) AS "scoreTrend",
-            (SELECT json_build_object('taskResponse', ROUND(AVG(task_response_score), 2), 'organization', ROUND(AVG(organization_score), 2), 'languageUse', ROUND(AVG(language_use_score), 2)) FROM RatingMapping WHERE task_response_score > 0) AS "feedbackBreakdown";
-        `;
+      WITH ValidResponses AS (
+        SELECT * FROM responses 
+        WHERE user_id = $1 AND ai_score IS NOT NULL AND ai_feedback IS NOT NULL AND ai_feedback LIKE '{%}'
+      ), 
+      RatingMapping AS (
+        SELECT *, 
+          DATE(submitted_at) AS submission_date,
+          CASE (ai_feedback::jsonb -> 'taskResponse' ->> 'rating')
+            WHEN 'Excellent' THEN 4 WHEN 'Good' THEN 3 WHEN 'Fair' THEN 2 WHEN 'Needs Improvement' THEN 1
+            ELSE 0
+          END AS task_response_score,
+          CASE (ai_feedback::jsonb -> 'organization' ->> 'rating')
+            WHEN 'Excellent' THEN 4 WHEN 'Good' THEN 3 WHEN 'Fair' THEN 2 WHEN 'Needs Improvement' THEN 1
+            ELSE 0
+          END AS organization_score,
+          CASE (ai_feedback::jsonb -> 'languageUse' ->> 'rating')
+            WHEN 'Excellent' THEN 4 WHEN 'Good' THEN 3 WHEN 'Fair' THEN 2 WHEN 'Needs Improvement' THEN 1
+            ELSE 0
+          END AS language_use_score
+        FROM ValidResponses
+      )
+      SELECT 
+        (SELECT json_build_object('total', COUNT(*), 'average', ROUND(AVG(ai_score), 1)) FROM ValidResponses) AS "overallStats",
+        (SELECT json_agg(stats) FROM (SELECT task_type, COUNT(*) AS count, ROUND(AVG(ai_score), 1) AS average FROM ValidResponses GROUP BY task_type) AS stats) AS "byType",
+        (SELECT json_agg(trends) FROM (SELECT submission_date, ROUND(AVG(ai_score), 1) AS average_score FROM RatingMapping WHERE submitted_at >= NOW() - INTERVAL '30 days' GROUP BY submission_date ORDER BY submission_date) AS trends) AS "scoreTrend",
+        (SELECT json_build_object('taskResponse', ROUND(AVG(task_response_score), 2), 'organization', ROUND(AVG(organization_score), 2), 'languageUse', ROUND(AVG(language_use_score), 2)) FROM RatingMapping WHERE task_response_score > 0) AS "feedbackBreakdown";
+    `;
     const result = await pool.query(sql, [userId]);
     res.json(result.rows[0]);
   } catch (err) {
+    console.error("Failed to get user stats data:", err);
     res.status(500).json({ message: "Internal server error." });
   }
 });
-
 app.get("/api/user/achievements", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
@@ -713,10 +741,10 @@ app.get("/api/user/achievements", authenticateToken, async (req, res) => {
     const result = await pool.query(sql, [userId]);
     res.json(result.rows);
   } catch (err) {
+    console.error("Failed to get user achievements:", err);
     res.status(500).json({ message: "Internal server error." });
   }
 });
-
 app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
@@ -724,17 +752,65 @@ app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
       "SELECT content, ai_feedback FROM responses WHERE user_id = $1 AND content IS NOT NULL AND content != '' AND ai_feedback IS NOT NULL AND ai_feedback LIKE '{%}'",
       [userId]
     );
+
     if (responsesQuery.rows.length < 3) {
-      return res
-        .status(404)
-        .json({ message: "Not enough practice data for analysis." });
+      return res.status(404).json({
+        message:
+          "Not enough practice data for a meaningful analysis. Please complete at least 3 practices.",
+      });
     }
-    // Word Cloud Logic (simplified for brevity)
+
+    const wordSet = new Set(englishWords);
+    const checkWord = (word) => wordSet.has(word);
+
+    const stopWords = new Set([
+      "a",
+      "an",
+      "the",
+      "and",
+      "but",
+      "or",
+      "in",
+      "on",
+      "at",
+      "to",
+      "for",
+      "of",
+      "is",
+      "are",
+      "was",
+      "were",
+      "it",
+      "i",
+      "you",
+      "he",
+      "she",
+      "they",
+      "we",
+      "that",
+      "this",
+      "with",
+      "as",
+      "not",
+      "be",
+      "has",
+      "have",
+      "do",
+      "does",
+      "did",
+      "from",
+      "by",
+      "about",
+      "can",
+      "will",
+    ]);
     const wordCounts = {};
     responsesQuery.rows.forEach((row) => {
       const words = row.content.toLowerCase().match(/\b[a-z]{3,}\b/g) || [];
       words.forEach((word) => {
-        wordCounts[word] = (wordCounts[word] || 0) + 1;
+        if (!stopWords.has(word) && checkWord(word)) {
+          wordCounts[word] = (wordCounts[word] || 0) + 1;
+        }
       });
     });
     const wordCloudData = Object.entries(wordCounts)
@@ -747,8 +823,15 @@ app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
     );
     const aiAnalysis = await callAIAnalysisAPI(feedbacks);
 
-    res.json({ wordCloud: wordCloudData, commonMistakes: aiAnalysis.analysis });
+    const responseData = {
+      wordCloud: wordCloudData,
+      commonMistakes: aiAnalysis.analysis,
+    };
+    console.log(`✅ [Analysis API] Success for user #${userId}.`);
+
+    res.json(responseData);
   } catch (err) {
+    console.error("❌ Failed to get writing analysis data:", err);
     res.status(500).json({ message: "Internal server error." });
   }
 });
