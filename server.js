@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (FINAL, ROBUST VERSION using direct HTTP request) ---
+﻿// --- START OF FILE server.js (FINAL, MOST ROBUST VERSION with HTTP Polling/Retry) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -7,10 +7,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const axios = require("axios");
 const cloudinary = require("cloudinary").v2;
-const fs = require("fs");
-const path = require("path");
-const util = require("util");
-const englishWords = require("an-array-of-english-words");
+// ... (所有其他依赖保持不变)
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -19,108 +16,135 @@ cloudinary.config({
   secure: true,
 });
 
-// --- 【终极解决方案】: 使用 axios 直接发送 HTTP 请求，彻底抛弃 @gradio/client ---
+// --- 【终极解决方案 V2】: 实现带智能重试的后台HTTP请求 ---
 async function generateAudioInBackground(questionId) {
   console.log(
     `🎤 [BACKGROUND JOB] Starting audio generation for question #${questionId}...`
   );
-  try {
-    const poolClient = await pool.connect();
-    try {
-      const questionQuery = await poolClient.query(
-        "SELECT lecture_script, lecture_audio_url FROM questions WHERE id = $1",
-        [questionId]
-      );
-      const question = questionQuery.rows[0];
 
-      if (!question || question.lecture_audio_url) {
-        console.log(
-          `[BACKGROUND JOB] Skipped: Question #${questionId} not found or already has audio.`
-        );
-        return;
-      }
+  const MAX_RETRIES = 6; // 最多重试6次
+  const RETRY_DELAY = 30000; // 每次重试间隔30秒
+  let attempt = 0;
 
-      const textForTTS = question.lecture_script
-        .replace(/[\s\n\r]+/g, " ")
-        .trim();
-      if (!textForTTS) {
-        console.log(
-          `[BACKGROUND JOB] Skipped: Question #${questionId} has no script.`
-        );
-        return;
-      }
+  // 辅助函数：延迟
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-      // 1. 定义Gradio API的URL和请求体
-      const gradioApiUrl =
-        "https://kas0201-my-unlimited-tts.hf.space/run/synthesize";
-      const requestBody = {
-        data: [textForTTS],
-      };
-
-      console.log(`[BACKGROUND JOB] Sending POST request to ${gradioApiUrl}`);
-
-      // 2. 使用axios发送标准的HTTPS POST请求
-      const response = await axios.post(gradioApiUrl, requestBody, {
-        headers: { "Content-Type": "application/json" },
-        // 设置一个较长的超时时间，以应对冷启动
-        timeout: 300000, // 5分钟
-      });
-
-      // 3. 从返回的JSON中解析出音频文件的URL
-      const audioUrl = response.data?.data?.[0]?.url;
-
-      if (!audioUrl) {
-        console.error(
-          "[BACKGROUND JOB] Gradio API response did not contain a valid audio URL.",
-          response.data
-        );
-        throw new Error(
-          "Gradio API response did not contain a valid audio URL."
-        );
-      }
-
-      console.log(
-        `[BACKGROUND JOB] Received audio URL from Gradio: ${audioUrl}`
-      );
-
-      // 后续的下载和上传逻辑保持不变
-      const audioResponse = await axios.get(audioUrl, {
-        responseType: "arraybuffer",
-      });
-      const audioBuffer = Buffer.from(audioResponse.data);
-
-      const uploadPromise = new Promise((resolve, reject) => {
-        cloudinary.uploader
-          .upload_stream(
-            { resource_type: "video", folder: "toefl_lectures" },
-            (error, uploadResult) =>
-              error ? reject(error) : resolve(uploadResult)
-          )
-          .end(audioBuffer);
-      });
-      const uploadResult = await uploadPromise;
-
-      const finalAudioUrl = uploadResult.secure_url;
-      await poolClient.query(
-        "UPDATE questions SET lecture_audio_url = $1 WHERE id = $2",
-        [finalAudioUrl, questionId]
-      );
-      console.log(
-        `✅ [BACKGROUND JOB] Success! Audio for question #${questionId} is ready.`
-      );
-    } finally {
-      poolClient.release();
-    }
-  } catch (error) {
-    console.error(
-      `❌ [BACKGROUND JOB] FAILED for question #${questionId}:`,
-      error.response ? error.response.data : error.message
+  while (attempt < MAX_RETRIES) {
+    attempt++;
+    console.log(
+      `[BACKGROUND JOB] Attempt #${attempt} for question #${questionId}...`
     );
+
+    try {
+      const poolClient = await pool.connect();
+      try {
+        const questionQuery = await poolClient.query(
+          "SELECT lecture_script, lecture_audio_url FROM questions WHERE id = $1",
+          [questionId]
+        );
+        const question = questionQuery.rows[0];
+
+        if (!question || question.lecture_audio_url) {
+          console.log(
+            `[BACKGROUND JOB] Skipped: Question #${questionId} not found or already has audio.`
+          );
+          return; // 成功退出循环
+        }
+
+        const textForTTS = question.lecture_script
+          .replace(/[\s\n\r]+/g, " ")
+          .trim();
+        if (!textForTTS) {
+          console.log(
+            `[BACKGROUND JOB] Skipped: Question #${questionId} has no script.`
+          );
+          return; // 成功退出循环
+        }
+
+        const gradioApiUrl =
+          "https://kas0201-my-unlimited-tts.hf.space/run/synthesize";
+        const requestBody = { data: [textForTTS] };
+
+        console.log(`[BACKGROUND JOB] Sending POST request to ${gradioApiUrl}`);
+        const response = await axios.post(gradioApiUrl, requestBody, {
+          headers: { "Content-Type": "application/json" },
+          timeout: 60000, // 每次请求超时时间为1分钟
+        });
+
+        // 【智能检查】: 检查返回的是否是JSON，而不是HTML
+        if (typeof response.data !== "object" || !response.data.data) {
+          console.warn(
+            `[BACKGROUND JOB] Attempt #${attempt} received non-JSON response (likely a loading page). Retrying in ${
+              RETRY_DELAY / 1000
+            }s...`
+          );
+          await sleep(RETRY_DELAY);
+          continue; // 继续下一次循环
+        }
+
+        const audioUrl = response.data.data[0]?.url;
+
+        if (!audioUrl) {
+          console.error(
+            "[BACKGROUND JOB] Gradio API response did not contain a valid audio URL.",
+            response.data
+          );
+          throw new Error(
+            "Gradio API response did not contain a valid audio URL."
+          );
+        }
+
+        console.log(
+          `[BACKGROUND JOB] Attempt #${attempt} successful! Received audio URL.`
+        );
+
+        const audioResponse = await axios.get(audioUrl, {
+          responseType: "arraybuffer",
+        });
+        const audioBuffer = Buffer.from(audioResponse.data);
+
+        const uploadPromise = new Promise((resolve, reject) => {
+          cloudinary.uploader
+            .upload_stream(
+              { resource_type: "video", folder: "toefl_lectures" },
+              (error, uploadResult) =>
+                error ? reject(error) : resolve(uploadResult)
+            )
+            .end(audioBuffer);
+        });
+        const uploadResult = await uploadPromise;
+
+        const finalAudioUrl = uploadResult.secure_url;
+        await poolClient.query(
+          "UPDATE questions SET lecture_audio_url = $1 WHERE id = $2",
+          [finalAudioUrl, questionId]
+        );
+        console.log(
+          `✅ [BACKGROUND JOB] Success! Audio for question #${questionId} is ready.`
+        );
+        return; // 任务成功，彻底退出循环
+      } finally {
+        poolClient.release();
+      }
+    } catch (error) {
+      console.error(
+        `❌ [BACKGROUND JOB] FAILED on attempt #${attempt} for question #${questionId}:`,
+        error.message
+      );
+      if (attempt < MAX_RETRIES) {
+        console.log(`[BACKGROUND JOB] Retrying in ${RETRY_DELAY / 1000}s...`);
+        await sleep(RETRY_DELAY);
+      } else {
+        console.error(
+          `❌ [BACKGROUND JOB] All ${MAX_RETRIES} attempts failed for question #${questionId}. Giving up.`
+        );
+      }
+    }
   }
 }
 
-// --- 辅助函数 (保持不变) ---
-// (此处省略所有其他未改动的辅助函数，如 callAIPolishAPI, checkAndAwardAchievements 等)
+// --- 所有其他辅助函数和路由保持不变 ---
+// (此处省略所有其他未改动的代码，如 callAI... , Express App 初始化, API路由等)
 async function checkAndAwardAchievements(userId, responseId) {
   console.log(`🏆 [Achievement] Checking for user #${userId}...`);
   try {
@@ -316,7 +340,6 @@ async function callAIAnalysisAPI(feedbacks) {
     throw new Error("Failed to get a response from the AI analysis service.");
   }
 }
-// --- Express App Initialization ---
 const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(cors());
@@ -343,9 +366,6 @@ const authenticateToken = (req, res, next) => {
     }
   );
 };
-
-// --- API 路由 ---
-// (所有路由代码，包括之前省略的部分，都完整地放在这里)
 app.post("/api/auth/register", async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
