@@ -1,4 +1,4 @@
-﻿<!-- START OF FILE public/history-detail.html (FINAL SPLIT-SCREEN LAYOUT - COMPLETE & UNABRIDGED) -->
+﻿<!-- START OF FILE public/history-detail.html (FIXED & COMPLETE VERSION) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -69,7 +69,6 @@
         justify-content: center;
         gap: 12px;
       }
-
       .split-layout-container {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -114,7 +113,6 @@
         color: var(--text-secondary);
         white-space: pre-wrap;
       }
-
       .review-panel {
         display: flex;
         flex-direction: column;
@@ -169,7 +167,6 @@
           opacity: 1;
         }
       }
-
       #ai-score-card {
         background: none;
         border: none;
@@ -237,6 +234,7 @@
         border-radius: 50%;
         animation: spin 1s linear infinite;
       }
+      .loading-state,
       .scoring-pending,
       .essay-generating {
         width: 100%;
@@ -248,6 +246,7 @@
         padding: 32px 0;
         text-align: center;
       }
+      .loading-state,
       .scoring-pending .main-text,
       .essay-generating .main-text {
         font-size: 16px;
@@ -560,6 +559,128 @@
         let pollingInterval = null;
         let rewriteTimer;
 
+        // --- [修复开始] ---
+        // 重新添加所有与“定时重写”弹窗相关的辅助函数定义
+        const openRewriteModal = () => {
+          if (!pageData) return;
+          const rewriteReferenceEl =
+            document.getElementById("rewrite-reference");
+          rewriteReferenceEl.innerHTML = "";
+          const promptContainer = document.createElement("div");
+          let promptHTML = "<h3>Original Prompt</h3>";
+          if (pageData.task_type === "integrated_writing") {
+            promptHTML += `<div class="post"><h4>Reading Passage</h4><p class="post-content">${pageData.reading_passage}</p></div><div class="post"><h4>Lecture Script</h4><p class="post-content">${pageData.lecture_script}</p></div>`;
+          } else {
+            promptHTML += `<div class="post"><p class="post-author">${pageData.professor_author}</p><p class="post-content">${pageData.professor_prompt}</p></div><div class="post"><p class="post-author">${pageData.student1_author}</p><p class="post-content">${pageData.student1_post}</p></div><div class="post"><p class="post-author">${pageData.student2_author}</p><p class="post-content">${pageData.student2_post}</p></div>`;
+          }
+          promptContainer.innerHTML = promptHTML;
+          rewriteReferenceEl.appendChild(promptContainer);
+
+          const originalResponseCard = document
+            .querySelector(".user-response-content")
+            ?.cloneNode(true);
+          if (originalResponseCard) {
+            const responseContainer = document.createElement("div");
+            responseContainer.innerHTML = "<h3>Your Previous Response</h3>";
+            const postDiv = document.createElement("div");
+            postDiv.className = "post";
+            postDiv.appendChild(originalResponseCard);
+            responseContainer.appendChild(postDiv);
+            rewriteReferenceEl.appendChild(responseContainer);
+          }
+
+          const aiCard = document
+            .getElementById("ai-score-card")
+            ?.cloneNode(true);
+          if (aiCard) {
+            const aiContainer = document.createElement("div");
+            aiContainer.innerHTML = "<h3>AI Feedback</h3>";
+            aiContainer.appendChild(aiCard);
+            rewriteReferenceEl.appendChild(aiContainer);
+          }
+
+          const timeLimit =
+            pageData.task_type === "integrated_writing" ? 1200 : 600;
+          startTimer(
+            timeLimit,
+            document.getElementById("rewrite-timer"),
+            () => {
+              alert("Time's up! Submitting your rewrite.");
+              submitRewrite();
+            }
+          );
+          document.getElementById("rewrite-modal").style.display = "block";
+        };
+
+        const closeRewriteModal = () => {
+          clearInterval(rewriteTimer);
+          document.getElementById("rewrite-textarea").value = "";
+          document.getElementById("rewrite-word-count").textContent =
+            "Words: 0";
+          document.getElementById("rewrite-modal").style.display = "none";
+          const refContainer = document.getElementById("reference-container");
+          if (refContainer) refContainer.removeAttribute("open");
+        };
+
+        const startTimer = (duration, display, onComplete) => {
+          clearInterval(rewriteTimer);
+          let timer = duration;
+          const update = () => {
+            const minutes = parseInt(timer / 60, 10)
+              .toString()
+              .padStart(2, "0");
+            const seconds = parseInt(timer % 60, 10)
+              .toString()
+              .padStart(2, "0");
+            display.textContent = `${minutes}:${seconds}`;
+            if (--timer < 0) {
+              clearInterval(rewriteTimer);
+              if (onComplete) onComplete();
+            }
+          };
+          update();
+          rewriteTimer = setInterval(update, 1000);
+        };
+
+        const submitRewrite = async () => {
+          const submitRewriteBtn =
+            document.getElementById("submit-rewrite-btn");
+          submitRewriteBtn.disabled = true;
+          submitRewriteBtn.textContent = "Submitting...";
+          const content = document.getElementById("rewrite-textarea").value;
+          const wordCount = content.trim().match(/\S+/g)?.length || 0;
+          if (wordCount === 0) {
+            alert("Cannot submit an empty rewrite.");
+            submitRewriteBtn.disabled = false;
+            submitRewriteBtn.textContent = "Submit Rewrite";
+            return;
+          }
+          try {
+            const response = await fetch("/api/submit-response", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                content,
+                wordCount,
+                questionId: pageData.question_id,
+                task_type: pageData.task_type,
+              }),
+            });
+            const result = await response.json();
+            if (!response.ok)
+              throw new Error(result.message || "Submission failed.");
+            window.location.href = `/submission-success.html?id=${result.id}`;
+          } catch (error) {
+            alert(`Error: ${error.message}`);
+            submitRewriteBtn.disabled = false;
+            submitRewriteBtn.textContent = "Submit Rewrite";
+          }
+        };
+        // --- [修复结束] ---
+
         const handleGenerateEssay = async (event) => {
           const button = event.target;
           const contentDiv = document.getElementById("model-essay-pane");
@@ -829,9 +950,9 @@
             reviewIconCheck.style.display = "none";
           }
           reviewBtn.style.display = "inline-flex";
+          document.getElementById("rewrite-btn").style.display = "inline-flex";
         };
 
-        const modal = document.getElementById("rewrite-modal");
         const cancelBtn = document.getElementById("cancel-rewrite-btn");
         const submitRewriteBtn = document.getElementById("submit-rewrite-btn");
         const rewriteTextarea = document.getElementById("rewrite-textarea");
