@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Final Version with ESM import fix) ---
+﻿// --- START OF FILE server.js (Final Version with a more stable HF Space) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -11,7 +11,6 @@ const fs = require("fs");
 const path = require("path");
 const util = require("util");
 const englishWords = require("an-array-of-english-words");
-// 【关键修改 1/2】: 我们不再在这里用 require() 加载 @gradio/client
 
 // --- 配置 Cloudinary ---
 cloudinary.config({
@@ -258,23 +257,26 @@ async function generateAudioIfNeeded(questionId) {
       `🎤 [Backend Task Gradio-XTTS] Starting audio generation for question #${questionId}...`
     );
 
-    // 【关键修改 2/2】: 使用动态 import() 来加载 ESM 模块
     const { client } = await import("@gradio/client");
 
-    const app = await client("coqui/xtts");
-    const result = await app.predict("/synthesize", [
-      textForTTS,
-      "en",
-      "Aaron Dreschner",
-      null,
-      null,
-      null,
-      true,
-      0.9,
+    // 【关键修改】: 换用一个更稳定的公共 Space
+    const app = await client("Gradio-Blocks/XTTS");
+    const result = await app.predict("/predict", [
+      textForTTS, // parameter 0
+      "en", // parameter 1
+      "Standard", // parameter 2
+      null, // parameter 3
     ]);
 
     // @ts-ignore
-    const audioUrl = result.data[0].url;
+    const audioData = result.data[1];
+    // Gradio 返回的音频数据是一个包含格式和内容的对象，我们需要提取实际的音频部分
+    const audioUrl = audioData.url;
+
+    if (!audioUrl) {
+      throw new Error("Gradio Space did not return an audio URL.");
+    }
+
     const audioResponse = await axios.get(audioUrl, {
       responseType: "arraybuffer",
     });
