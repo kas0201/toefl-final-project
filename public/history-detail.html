@@ -1,4 +1,4 @@
-﻿<!-- START OF FILE public/history-detail.html (Final Version with "No Change" UI) -->
+﻿<!-- START OF FILE public/history-detail.html (UPDATED with AI Model Essay Generation) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -9,7 +9,6 @@
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
       @import url("https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@500&display=swap");
-
       :root {
         --bg-color: #f5f5f7;
         --card-bg: #fff;
@@ -98,6 +97,29 @@
         margin-bottom: 20px;
         border-bottom: 1px solid var(--border-color);
         padding-bottom: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .section-header button {
+        background: transparent;
+        border: 1px solid var(--accent-blue);
+        color: var(--accent-blue);
+        font-size: 13px;
+        padding: 4px 12px;
+        border-radius: 99px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .section-header button:hover:not(:disabled) {
+        background-color: var(--accent-blue);
+        color: white;
+      }
+      .section-header button:disabled {
+        border-color: #d2d2d7;
+        color: #d2d2d7;
+        cursor: not-allowed;
       }
       .user-response-card {
         border-left: 4px solid var(--accent-blue);
@@ -248,7 +270,8 @@
         border-radius: 50%;
         animation: spin 1s linear infinite;
       }
-      .scoring-pending {
+      .scoring-pending,
+      .essay-generating {
         width: 100%;
         display: flex;
         flex-direction: column;
@@ -258,12 +281,14 @@
         padding: 32px 0;
         text-align: center;
       }
-      .scoring-pending .main-text {
+      .scoring-pending .main-text,
+      .essay-generating .main-text {
         font-size: 16px;
         font-weight: 500;
         color: var(--text-primary);
       }
-      .scoring-pending .sub-text {
+      .scoring-pending .sub-text,
+      .essay-generating .sub-text {
         font-size: 14px;
         color: var(--text-secondary);
       }
@@ -312,7 +337,6 @@
         background-color: rgba(52, 199, 89, 0.2);
         color: #0d6928;
       }
-      /* --- 【新增样式】: 为 "无需修改" 提示卡片添加样式 --- */
       .no-change-card {
         background-color: #e4f8e9;
         border: 1px solid #a3e9a4;
@@ -555,7 +579,6 @@
         <div class="loading-state">Loading...</div>
       </div>
     </div>
-
     <div id="rewrite-modal" class="modal">
       <div class="modal-content">
         <div class="modal-header">
@@ -622,7 +645,6 @@
         const openRewriteModal = () => {
           if (!pageData) return;
           rewriteReferenceEl.innerHTML = "";
-
           const promptContainer = document.createElement("div");
           let promptHTML = "<h3>Original Prompt</h3>";
           if (pageData.task_type === "integrated_writing") {
@@ -632,7 +654,6 @@
           }
           promptContainer.innerHTML = promptHTML;
           rewriteReferenceEl.appendChild(promptContainer);
-
           const originalResponseCard = document
             .querySelector(".user-response-card")
             ?.cloneNode(true);
@@ -642,7 +663,6 @@
             responseContainer.appendChild(originalResponseCard);
             rewriteReferenceEl.appendChild(responseContainer);
           }
-
           const aiCard = document
             .getElementById("ai-score-card")
             ?.cloneNode(true);
@@ -652,17 +672,14 @@
             aiContainer.appendChild(aiCard);
             rewriteReferenceEl.appendChild(aiContainer);
           }
-
           const timeLimit =
             pageData.task_type === "integrated_writing" ? 1200 : 600;
           startTimer(timeLimit, rewriteTimerEl, () => {
             alert("Time's up! Submitting your rewrite.");
             submitRewrite();
           });
-
           modal.style.display = "block";
         };
-
         const closeRewriteModal = () => {
           clearInterval(rewriteTimer);
           rewriteTextarea.value = "";
@@ -671,7 +688,6 @@
           const refContainer = document.getElementById("reference-container");
           if (refContainer) refContainer.removeAttribute("open");
         };
-
         const startTimer = (duration, display, onComplete) => {
           clearInterval(rewriteTimer);
           let timer = duration;
@@ -691,20 +707,17 @@
           update();
           rewriteTimer = setInterval(update, 1000);
         };
-
         const submitRewrite = async () => {
           submitRewriteBtn.disabled = true;
           submitRewriteBtn.textContent = "Submitting...";
           const content = rewriteTextarea.value;
           const wordCount = content.trim().match(/\S+/g)?.length || 0;
-
           if (wordCount === 0) {
             alert("Cannot submit an empty rewrite.");
             submitRewriteBtn.disabled = false;
             submitRewriteBtn.textContent = "Submit Rewrite";
             return;
           }
-
           try {
             const response = await fetch("/api/submit-response", {
               method: "POST",
@@ -719,11 +732,9 @@
                 task_type: pageData.task_type,
               }),
             });
-
             const result = await response.json();
             if (!response.ok)
               throw new Error(result.message || "Submission failed.");
-
             window.location.href = `/submission-success.html?id=${result.id}`;
           } catch (error) {
             alert(`Error: ${error.message}`);
@@ -731,7 +742,6 @@
             submitRewriteBtn.textContent = "Submit Rewrite";
           }
         };
-
         const handleAIPolish = async () => {
           polishBtn.disabled = true;
           polishBtn.textContent = "Polishing...";
@@ -748,7 +758,6 @@
             if (!response.ok) {
               throw new Error(result.message);
             }
-
             if (!resultSection) {
               resultSection = document.createElement("div");
               resultSection.id = "polish-section";
@@ -760,23 +769,9 @@
                 );
               }
             }
-
-            // --- 【关键修改】: 检查润色前后文本是否相同 ---
             if (pageData.user_response.trim() === result.polishedText.trim()) {
-              // 如果相同，显示 "无需修改" 提示
-              resultSection.innerHTML = `
-                    <h2 class="section-header">AI Polish Result</h2>
-                    <div class="no-change-card">
-                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <div>
-                            <h4>Excellent Writing!</h4>
-                            <p>Our AI reviewed your text and found no necessary corrections. Great job!</p>
-                        </div>
-                    </div>`;
+              resultSection.innerHTML = ` <h2 class="section-header">AI Polish Result</h2> <div class="no-change-card"> <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /> </svg> <div> <h4>Excellent Writing!</h4> <p>Our AI reviewed your text and found no necessary corrections. Great job!</p> </div> </div>`;
             } else {
-              // 如果不同，才显示 diff 对比视图
               const diff = Diff.diffSentences(
                 pageData.user_response,
                 result.polishedText
@@ -795,7 +790,6 @@
               const legendHTML = `<div class="legend"><div class="legend-item"><span class="deleted-color"></span> Original Text</div><div class="legend-item"><span class="added-color"></span> AI Polished Version</div></div>`;
               resultSection.innerHTML = `<h2 class="section-header">AI Polish Result</h2><div id="polish-result-container">${legendHTML}<div class="diff-result">${html}</div></div>`;
             }
-
             resultSection.style.display = "block";
             resultSection.scrollIntoView({
               behavior: "smooth",
@@ -808,7 +802,6 @@
             polishBtn.textContent = "AI Polish & Compare";
           }
         };
-
         const handleToggleReview = async () => {
           reviewBtn.disabled = true;
           try {
@@ -827,7 +820,6 @@
             reviewBtn.disabled = false;
           }
         };
-
         const updateReviewButton = (isInReview) => {
           const reviewBtnText = document.getElementById("review-btn-text");
           const reviewIconAdd = document.getElementById("review-icon-add");
@@ -846,6 +838,67 @@
           reviewBtn.style.display = "inline-flex";
         };
 
+        const renderModelEssaySection = () => {
+          const placeholder = document.getElementById("model-essay-section");
+          if (!placeholder) return;
+          let buttonHTML = "";
+          let contentHTML = "";
+          if (pageData && pageData.model_essay) {
+            buttonHTML = `<button id="regenerate-essay-btn">Regenerate with AI</button>`;
+            contentHTML = `<div class="post"><p class="post-content">${pageData.model_essay}</p></div>`;
+          } else {
+            buttonHTML = `<button id="generate-essay-btn">Generate with AI</button>`;
+            contentHTML = `<div class="post"><p class="post-content" style="text-align: center; color: var(--text-secondary);">Click the button to generate a high-scoring model essay using AI.</p></div>`;
+          }
+          placeholder.innerHTML = `
+                <div class="section-header">
+                    <span>High-Scoring Model Essay</span>
+                    ${buttonHTML}
+                </div>
+                <div id="model-essay-content">${contentHTML}</div>`;
+          const generateBtn = document.getElementById("generate-essay-btn");
+          const regenerateBtn = document.getElementById("regenerate-essay-btn");
+          if (generateBtn) {
+            generateBtn.addEventListener("click", handleGenerateEssay);
+          }
+          if (regenerateBtn) {
+            regenerateBtn.addEventListener("click", handleGenerateEssay);
+          }
+        };
+
+        const handleGenerateEssay = async (event) => {
+          const button = event.target;
+          const contentDiv = document.getElementById("model-essay-content");
+          button.disabled = true;
+          button.textContent = "Generating...";
+          contentDiv.innerHTML = `
+                <div class="essay-generating">
+                    <div class="spinner"></div>
+                    <div class="main-text">AI is writing the model essay...</div>
+                    <div class="sub-text">This may take up to 30 seconds.</div>
+                </div>`;
+          try {
+            const response = await fetch(
+              `/api/questions/${pageData.question_id}/generate-model-essay`,
+              {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
+            const result = await response.json();
+            if (!response.ok) {
+              throw new Error(result.message || "Failed to generate essay.");
+            }
+            pageData.model_essay = result.modelEssay;
+            renderModelEssaySection();
+          } catch (error) {
+            console.error("Error generating model essay:", error);
+            contentDiv.innerHTML = `<div class="post"><p class="post-content" style="color: var(--accent-red-ui);">${error.message}</p></div>`;
+            button.disabled = false;
+            button.textContent = "Try Again";
+          }
+        };
+
         const fetchAndRenderDetails = async () => {
           try {
             const response = await fetch(`/api/history/${historyId}`, {
@@ -859,6 +912,7 @@
             if (!response.ok)
               throw new Error("Failed to fetch submission details.");
             pageData = await response.json();
+
             if (initialLoad) {
               const submittedDate = new Date(
                 pageData.submitted_at
@@ -871,15 +925,27 @@
               updateReviewButton(pageData.is_for_review);
               rewriteBtn.style.display = "inline-flex";
               polishBtn.style.display = "inline-flex";
+
               let promptHTML = "";
               if (pageData.task_type === "integrated_writing") {
                 promptHTML = `<div class="post"><h4>Reading Passage</h4><p class="post-content">${pageData.reading_passage}</p></div><div class="post"><h4>Lecture Script</h4><p class="post-content">${pageData.lecture_script}</p></div>`;
               } else {
                 promptHTML = `<div class="post"><p class="post-author">${pageData.professor_author}</p><p class="post-content">${pageData.professor_prompt}</p></div><div class="post"><p class="post-author">${pageData.student1_author}</p><p class="post-content">${pageData.student1_post}</p></div><div class="post"><p class="post-author">${pageData.student2_author}</p><p class="post-content">${pageData.student2_post}</p></div>`;
               }
-              reviewContentEl.innerHTML = `<div id="ai-card-placeholder"></div> <h2 class="section-header">Your Response</h2><div class="user-response-card"><p class="user-response-content">${pageData.user_response}</p></div><h2 class="section-header">Original Prompt</h2>${promptHTML}`;
+
+              reviewContentEl.innerHTML = `
+                <div id="ai-card-placeholder"></div>
+                <h2 class="section-header">Your Response</h2>
+                <div class="user-response-card"><p class="user-response-content">${pageData.user_response}</p></div>
+                <div id="model-essay-section"></div> 
+                <h2 class="section-header">Original Prompt</h2>
+                ${promptHTML}`;
+
+              renderModelEssaySection();
+
               initialLoad = false;
             }
+
             const aiCardPlaceholder = document.getElementById(
               "ai-card-placeholder"
             );

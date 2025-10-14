@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (UPDATED with Enhanced Logging) ---
+﻿// --- START OF FILE server.js (UPDATED with On-Demand Model Essay Generation) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -338,6 +338,56 @@ async function callAIAnalysisAPI(feedbacks) {
     throw new Error("Failed to get a response from the AI analysis service.");
   }
 }
+
+// --- [NEW] AI Helper function to generate a model essay ---
+async function callAIGenerateEssayAPI(promptText, taskType) {
+  console.log(`🤖 [AI] Model Essay generation started (Task: ${taskType})...`);
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) throw new Error("AI service is not configured.");
+  const endpoint = "https://api.deepseek.com/chat/completions";
+
+  const taskTypeName =
+    taskType === "integrated_writing"
+      ? "Integrated Writing"
+      : "Academic Discussion";
+
+  const systemPrompt = `You are an expert TOEFL test-taker aiming for a perfect score of 30. Your task is to write a high-scoring, well-structured, and coherent essay based on the provided prompt. 
+- For an '${taskTypeName}' task, ensure your response directly addresses the prompt, uses sophisticated vocabulary and complex sentence structures, and is logically organized.
+- Adhere to typical word count guidelines (around 225-300 for Integrated, 100+ for Academic Discussion).
+- Your output must be ONLY the essay text. Do not include any headings, explanations, or comments.`;
+
+  const userPrompt = `## TASK TYPE ##\n${taskTypeName}\n\n## PROMPT ##\n${promptText}\n\n## YOUR ESSAY ##`;
+
+  try {
+    const response = await axios.post(
+      endpoint,
+      {
+        model: "deepseek-reasoner",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.7, // A bit more creative for essay writing
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    return { essayText: response.data.choices[0].message.content };
+  } catch (error) {
+    console.error(
+      "AI Model Essay API Error:",
+      error.response ? error.response.data : error.message
+    );
+    throw new Error(
+      "Failed to get a response from the AI essay generation service."
+    );
+  }
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(cors());
@@ -364,6 +414,7 @@ const authenticateToken = (req, res, next) => {
     }
   );
 };
+
 app.post("/api/auth/register", async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
@@ -485,6 +536,66 @@ app.get(
     }
   }
 );
+
+// --- [NEW] API Endpoint to generate and save a model essay ---
+app.post(
+  "/api/questions/:id/generate-model-essay",
+  authenticateToken,
+  async (req, res) => {
+    const { id } = req.params;
+    console.log(
+      `▶️ [MODEL ESSAY API] Received request to generate essay for question #${id}.`
+    );
+
+    try {
+      const questionResult = await pool.query(
+        "SELECT * FROM questions WHERE id = $1",
+        [id]
+      );
+      if (questionResult.rows.length === 0) {
+        return res.status(404).json({ message: "Question not found." });
+      }
+      const question = questionResult.rows[0];
+
+      // Construct the full prompt for the AI
+      let promptText =
+        question.task_type === "integrated_writing"
+          ? `Reading: ${question.reading_passage}\nLecture: ${question.lecture_script}`
+          : `Professor's Prompt: ${question.professor_prompt}\n${question.student1_author}'s Post: ${question.student1_post}\n${question.student2_author}'s Post: ${question.student2_post}`;
+
+      // Call the AI to generate the essay
+      const aiResult = await callAIGenerateEssayAPI(
+        promptText,
+        question.task_type
+      );
+      const newModelEssay = aiResult.essayText;
+
+      if (!newModelEssay || newModelEssay.trim() === "") {
+        throw new Error("AI returned an empty essay.");
+      }
+
+      // Save the new essay to the database
+      await pool.query("UPDATE questions SET model_essay = $1 WHERE id = $2", [
+        newModelEssay,
+        id,
+      ]);
+
+      console.log(
+        `✅ [MODEL ESSAY API] Successfully generated and saved new essay for question #${id}.`
+      );
+
+      // Return the new essay to the frontend
+      res.json({ modelEssay: newModelEssay });
+    } catch (err) {
+      console.error(
+        `❌ [MODEL ESSAY API] Failed to generate essay for question #${id}:`,
+        err.message
+      );
+      res.status(500).json({ message: "Failed to generate AI model essay." });
+    }
+  }
+);
+
 app.get("/api/writing-test", authenticateToken, async (req, res) => {
   try {
     const sql = `(SELECT * FROM questions WHERE task_type = 'integrated_writing' ORDER BY RANDOM() LIMIT 1) UNION ALL (SELECT * FROM questions WHERE task_type = 'academic_discussion' ORDER BY RANDOM() LIMIT 1);`;
@@ -525,7 +636,6 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
       .status(201)
       .json({ message: "Submission successful!", id: newResponseId });
 
-    // --- [ADDED] --- Start log for the background task
     console.log(
       `▶️ [BACKGROUND] Starting AI processing for new response #${newResponseId}...`
     );
@@ -557,7 +667,6 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
           `UPDATE responses SET ai_score = $1, ai_feedback = $2 WHERE id = $3`,
           [aiResult.score, aiResult.feedback, newResponseId]
         );
-        // --- [ADDED] --- Log after scoring is complete
         console.log(
           `ℹ️ [BACKGROUND] AI scoring complete for response #${newResponseId}. Score: ${aiResult.score}`
         );
@@ -597,7 +706,6 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
 
         await checkAndAwardAchievements(userId, newResponseId);
 
-        // --- [ADDED] --- Final success log for the entire background task
         console.log(
           `✅ [BACKGROUND] Successfully finished all AI processing for response #${newResponseId}.`
         );
@@ -677,7 +785,6 @@ app.post(
 app.post("/api/responses/:id/polish", authenticateToken, async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
-  // --- [ADDED] --- Start log for the polish API request
   console.log(
     `▶️ [POLISH API] Starting AI polish for response #${id} by user #${userId}...`
   );
@@ -698,11 +805,9 @@ app.post("/api/responses/:id/polish", authenticateToken, async (req, res) => {
     }
     const aiResult = await callAIPolishAPI(originalText);
 
-    // --- [ADDED] --- Success log for the polish API request
     console.log(`✅ [POLISH API] Successfully polished response #${id}.`);
     res.json({ polishedText: aiResult.polishedText });
   } catch (err) {
-    // --- [MODIFIED] --- Enhanced error log
     console.error(
       `❌ [POLISH API] AI polish failed for response #${id}:`,
       err.message
@@ -811,7 +916,6 @@ app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
 
 app.post("/api/user/writing-analysis", authenticateToken, async (req, res) => {
   const userId = req.user.id;
-  // --- [ADDED] --- Start log for the analysis generation API request
   console.log(`▶️ [ANALYSIS API] Starting new analysis for user #${userId}...`);
   try {
     const responsesQuery = await pool.query(
@@ -900,13 +1004,11 @@ app.post("/api/user/writing-analysis", authenticateToken, async (req, res) => {
       [JSON.stringify(responseData), userId]
     );
 
-    // --- [MODIFIED] --- Changed log message to be more specific
     console.log(
       `✅ [ANALYSIS API] Generated and saved new analysis for user #${userId}.`
     );
     res.json(responseData);
   } catch (err) {
-    // --- [ADDED] --- Enhanced error log for analysis generation
     console.error(
       `❌ [ANALYSIS API] Failed to generate writing analysis for user #${userId}:`,
       err.message
