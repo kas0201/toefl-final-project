@@ -365,24 +365,29 @@ const authenticateToken = (req, res, next) => {
   );
 };
 app.post("/api/auth/register", async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
+  const { username, password, email } = req.body; // <-- 添加 email
+  if (!username || !password || !email) {
+    // <-- 添加 email 检查
     return res
       .status(400)
-      .json({ message: "Username and password are required." });
+      .json({ message: "Username, password, and email are required." });
   }
   try {
+    // 检查用户名或邮箱是否已存在
     const userCheck = await pool.query(
-      "SELECT * FROM users WHERE username = $1",
-      [username]
+      "SELECT * FROM users WHERE username = $1 OR email = $2",
+      [username, email]
     );
     if (userCheck.rows.length > 0) {
-      return res.status(409).json({ message: "Username already exists." });
+      return res
+        .status(409)
+        .json({ message: "Username or email already exists." });
     }
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-    const sql = `INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username`;
-    const newUser = await pool.query(sql, [username, hashedPassword]);
+    // 在 INSERT 语句中加入 email
+    const sql = `INSERT INTO users (username, password_hash, email) VALUES ($1, $2, $3) RETURNING id, username`;
+    const newUser = await pool.query(sql, [username, hashedPassword, email]);
     res
       .status(201)
       .json({ message: "Registration successful!", user: newUser.rows[0] });
