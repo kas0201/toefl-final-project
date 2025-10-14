@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Final Version with a more stable HF Space) ---
+﻿// --- START OF FILE server.js (Final Version with Stable SpeechT5 TTS) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -22,7 +22,6 @@ cloudinary.config({
 
 // --- 辅助函数 ---
 
-// ... (checkAndAwardAchievements, callAIPolishAPI, callAIScoringAPI, callAIAnalysisAPI 函数保持不变) ...
 async function checkAndAwardAchievements(userId, responseId) {
   console.log(`🏆 [Achievement] Checking for user #${userId}...`);
   try {
@@ -227,6 +226,7 @@ function processTextForTTS(text) {
   return cleanedText;
 }
 
+// --- 【关键更新】: 使用稳定可靠的 Microsoft SpeechT5 模型 ---
 async function generateAudioIfNeeded(questionId) {
   try {
     const questionQuery = await pool.query(
@@ -238,7 +238,7 @@ async function generateAudioIfNeeded(questionId) {
     if (
       !question ||
       question.task_type !== "integrated_writing" ||
-      question.lecture_audio_url ||
+      question.lecture_audio_url || // 如果已经有音频，则跳过
       !question.lecture_script ||
       question.lecture_script.trim() === ""
     ) {
@@ -248,34 +248,32 @@ async function generateAudioIfNeeded(questionId) {
     const textForTTS = processTextForTTS(question.lecture_script);
     if (!textForTTS) {
       console.log(
-        `[TTS Pre-check] Skipped audio generation for question #${questionId} because text is empty after cleaning.`
+        `[TTS Pre-check] Skipped audio generation for question #${questionId} due to empty text.`
       );
       return;
     }
 
+    // --- 【关键修改】: 调用新的、稳定的、无限制的TTS Space ---
     console.log(
-      `🎤 [Backend Task Gradio-XTTS] Starting audio generation for question #${questionId}...`
+      `🎤 [Backend Task SpeechT5] Starting audio generation for question #${questionId}...`
     );
 
     const { client } = await import("@gradio/client");
 
-    // 【关键修改】: 换用一个更稳定的公共 Space
-    const app = await client("Gradio-Blocks/XTTS");
-    const result = await app.predict("/predict", [
-      textForTTS, // parameter 0
-      "en", // parameter 1
-      "Standard", // parameter 2
-      null, // parameter 3
+    // 1. 将地址指向您最新的、使用SpeechT5的Space
+    const app = await client("kas0201/my-unlimited-tts");
+
+    // 2. 调用新的API，它只接收一个文本参数，能够处理长文本
+    const result = await app.predict("/synthesize", [
+      textForTTS, // text_to_synthesize
     ]);
 
     // @ts-ignore
-    const audioData = result.data[1];
-    // Gradio 返回的音频数据是一个包含格式和内容的对象，我们需要提取实际的音频部分
-    const audioUrl = audioData.url;
-
+    const audioUrl = result.data[0].url;
     if (!audioUrl) {
-      throw new Error("Gradio Space did not return an audio URL.");
+      throw new Error("SpeechT5 Space did not return an audio URL.");
     }
+    // --- 修改结束 ---
 
     const audioResponse = await axios.get(audioUrl, {
       responseType: "arraybuffer",
@@ -283,7 +281,7 @@ async function generateAudioIfNeeded(questionId) {
     const audioBuffer = Buffer.from(audioResponse.data);
 
     if (!audioBuffer || audioBuffer.length === 0) {
-      throw new Error("Gradio Space returned an empty audio buffer.");
+      throw new Error("TTS Space returned an empty audio buffer.");
     }
 
     const uploadPromise = new Promise((resolve, reject) => {
@@ -305,11 +303,11 @@ async function generateAudioIfNeeded(questionId) {
       [finalAudioUrl, questionId]
     );
     console.log(
-      `✅ [Backend Task Gradio-XTTS] Audio for question #${questionId} has been generated and saved: ${finalAudioUrl}`
+      `✅ [Backend Task SpeechT5] Audio for question #${questionId} saved: ${finalAudioUrl}`
     );
   } catch (error) {
     console.error(
-      `❌ [Backend Task Gradio-XTTS] Error during audio generation for question #${questionId}:`,
+      `❌ [Backend Task SpeechT5] Error for question #${questionId}:`,
       error
     );
   }
@@ -342,8 +340,7 @@ const authenticateToken = (req, res, next) => {
   );
 };
 
-// ... (所有 API 路由都保持不变) ...
-// --- API 路由 ---
+// --- API 路由 (保持不变) ---
 
 app.post("/api/auth/register", async (req, res) => {
   const { username, password } = req.body;
@@ -424,7 +421,7 @@ app.get("/api/questions", authenticateToken, async (req, res) => {
 app.get("/api/questions/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
   try {
-    generateAudioIfNeeded(id);
+    generateAudioIfNeeded(id); // 在返回问题详情前，触发音频生成（如果需要）
     const sql = `SELECT * FROM questions WHERE id = $1`;
     const result = await pool.query(sql, [id]);
     if (result.rows.length === 0)
@@ -483,6 +480,7 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
       .status(201)
       .json({ message: "Submission successful!", id: newResponseId });
 
+    // 异步执行AI评分和成就检查
     (async () => {
       const client = await pool.connect();
       try {
@@ -557,6 +555,7 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
     })();
   } catch (err) {
     console.error("Database insertion failed:", err);
+    res.status(500).json({ message: "Internal server error." });
   }
 });
 
