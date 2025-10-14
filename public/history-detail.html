@@ -1,4 +1,4 @@
-﻿<!-- START OF FILE public/history-detail.html (UPDATED with AI Model Essay Generation) -->
+﻿<!-- START OF FILE public/history-detail.html (FINAL & COMPLETE VERSION with Tabbed Interface) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -69,8 +69,7 @@
         justify-content: center;
         gap: 12px;
       }
-      .post,
-      .user-response-card {
+      .post {
         background-color: var(--card-bg);
         border-radius: 16px;
         padding: 24px;
@@ -100,29 +99,6 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-      }
-      .section-header button {
-        background: transparent;
-        border: 1px solid var(--accent-blue);
-        color: var(--accent-blue);
-        font-size: 13px;
-        padding: 4px 12px;
-        border-radius: 99px;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.2s ease;
-      }
-      .section-header button:hover:not(:disabled) {
-        background-color: var(--accent-blue);
-        color: white;
-      }
-      .section-header button:disabled {
-        border-color: #d2d2d7;
-        color: #d2d2d7;
-        cursor: not-allowed;
-      }
-      .user-response-card {
-        border-left: 4px solid var(--accent-blue);
       }
       .loading-state {
         text-align: center;
@@ -220,8 +196,7 @@
         color: #0052cc;
       }
       #review-toggle-btn,
-      #rewrite-btn,
-      #polish-btn {
+      #rewrite-btn {
         background-color: transparent;
         border: 2px solid var(--accent-blue);
         color: var(--accent-blue);
@@ -236,15 +211,9 @@
         transition: all 0.2s ease;
       }
       #review-toggle-btn:hover,
-      #rewrite-btn:hover,
-      #polish-btn:hover:not(:disabled) {
+      #rewrite-btn:hover {
         background-color: var(--accent-blue);
         color: white;
-      }
-      #polish-btn:disabled {
-        border-color: #d2d2d7;
-        color: #d2d2d7;
-        cursor: not-allowed;
       }
       #review-toggle-btn.in-review {
         background-color: var(--accent-yellow);
@@ -293,10 +262,6 @@
         color: var(--text-secondary);
       }
       #polish-result-container {
-        background-color: var(--card-bg);
-        border: 1px solid var(--border-color);
-        border-radius: 16px;
-        padding: 24px;
         line-height: 1.7;
         font-size: 16px;
         white-space: pre-wrap;
@@ -328,14 +293,16 @@
         background-color: rgba(52, 199, 89, 0.2);
       }
       #polish-result-container .diff-result del {
-        text-decoration: line-through;
+        text-decoration: none;
         background-color: rgba(255, 59, 48, 0.2);
-        color: var(--accent-red-ui);
+        border-radius: 3px;
+        padding: 1px 0;
       }
       #polish-result-container .diff-result ins {
         text-decoration: none;
         background-color: rgba(52, 199, 89, 0.2);
-        color: #0d6928;
+        border-radius: 3px;
+        padding: 1px 0;
       }
       .no-change-card {
         background-color: #e4f8e9;
@@ -362,6 +329,80 @@
       .no-change-card p {
         margin: 0;
         font-size: 15px;
+      }
+      .tab-nav {
+        display: flex;
+        gap: 8px;
+        border-bottom: 1px solid var(--border-color);
+        margin-bottom: -1px;
+      }
+      .tab-btn {
+        padding: 12px 20px;
+        border: none;
+        background-color: transparent;
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        cursor: pointer;
+        border-bottom: 3px solid transparent;
+        transition: all 0.2s ease;
+      }
+      .tab-btn:hover {
+        color: var(--text-primary);
+      }
+      .tab-btn.active {
+        color: var(--accent-blue);
+        font-weight: 600;
+        border-bottom-color: var(--accent-blue);
+      }
+      .tab-btn#ai-polish-tab {
+        display: none;
+      }
+      .tab-content-container {
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 0 0 16px 16px;
+        padding: 24px;
+      }
+      .tab-pane {
+        display: none;
+      }
+      .tab-pane.active {
+        display: block;
+        animation: fadeIn 0.3s ease;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      .model-essay-actions {
+        display: flex;
+        justify-content: center;
+        margin-top: 24px;
+      }
+      .model-essay-actions button {
+        background: transparent;
+        border: 1px solid var(--accent-blue);
+        color: var(--accent-blue);
+        font-size: 14px;
+        padding: 6px 16px;
+        border-radius: 99px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .model-essay-actions button:hover:not(:disabled) {
+        background-color: var(--accent-blue);
+        color: white;
+      }
+      .model-essay-actions button:disabled {
+        border-color: #d2d2d7;
+        color: #d2d2d7;
+        cursor: not-allowed;
       }
       .modal {
         display: none;
@@ -569,9 +610,6 @@
             </svg>
             <span id="review-btn-text">Add to Review List</span>
           </button>
-          <button id="polish-btn" style="display: none">
-            AI Polish & Compare
-          </button>
           <button id="rewrite-btn" style="display: none">Timed Rewrite</button>
         </div>
       </div>
@@ -630,7 +668,6 @@
         const reviewSubtitleEl = document.getElementById("review-subtitle");
         const reviewContentEl = document.getElementById("review-content");
         const reviewBtn = document.getElementById("review-toggle-btn");
-        const polishBtn = document.getElementById("polish-btn");
         const rewriteBtn = document.getElementById("rewrite-btn");
 
         const modal = document.getElementById("rewrite-modal");
@@ -654,15 +691,20 @@
           }
           promptContainer.innerHTML = promptHTML;
           rewriteReferenceEl.appendChild(promptContainer);
+
           const originalResponseCard = document
-            .querySelector(".user-response-card")
+            .querySelector(".user-response-content")
             ?.cloneNode(true);
           if (originalResponseCard) {
             const responseContainer = document.createElement("div");
             responseContainer.innerHTML = "<h3>Your Previous Response</h3>";
-            responseContainer.appendChild(originalResponseCard);
+            const postDiv = document.createElement("div");
+            postDiv.className = "post";
+            postDiv.appendChild(originalResponseCard);
+            responseContainer.appendChild(postDiv);
             rewriteReferenceEl.appendChild(responseContainer);
           }
+
           const aiCard = document
             .getElementById("ai-score-card")
             ?.cloneNode(true);
@@ -672,6 +714,7 @@
             aiContainer.appendChild(aiCard);
             rewriteReferenceEl.appendChild(aiContainer);
           }
+
           const timeLimit =
             pageData.task_type === "integrated_writing" ? 1200 : 600;
           startTimer(timeLimit, rewriteTimerEl, () => {
@@ -680,6 +723,7 @@
           });
           modal.style.display = "block";
         };
+
         const closeRewriteModal = () => {
           clearInterval(rewriteTimer);
           rewriteTextarea.value = "";
@@ -688,6 +732,7 @@
           const refContainer = document.getElementById("reference-container");
           if (refContainer) refContainer.removeAttribute("open");
         };
+
         const startTimer = (duration, display, onComplete) => {
           clearInterval(rewriteTimer);
           let timer = duration;
@@ -698,7 +743,7 @@
             const seconds = parseInt(timer % 60, 10)
               .toString()
               .padStart(2, "0");
-            display.textContent = minutes + ":" + seconds;
+            display.textContent = `${minutes}:${seconds}`;
             if (--timer < 0) {
               clearInterval(rewriteTimer);
               if (onComplete) onComplete();
@@ -707,6 +752,7 @@
           update();
           rewriteTimer = setInterval(update, 1000);
         };
+
         const submitRewrite = async () => {
           submitRewriteBtn.disabled = true;
           submitRewriteBtn.textContent = "Submitting...";
@@ -742,66 +788,7 @@
             submitRewriteBtn.textContent = "Submit Rewrite";
           }
         };
-        const handleAIPolish = async () => {
-          polishBtn.disabled = true;
-          polishBtn.textContent = "Polishing...";
-          let resultSection = document.getElementById("polish-section");
-          if (resultSection) {
-            resultSection.style.display = "none";
-          }
-          try {
-            const response = await fetch(`/api/responses/${historyId}/polish`, {
-              method: "POST",
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            const result = await response.json();
-            if (!response.ok) {
-              throw new Error(result.message);
-            }
-            if (!resultSection) {
-              resultSection = document.createElement("div");
-              resultSection.id = "polish-section";
-              const userCard = document.querySelector(".user-response-card");
-              if (userCard) {
-                userCard.parentNode.insertBefore(
-                  resultSection,
-                  userCard.nextSibling
-                );
-              }
-            }
-            if (pageData.user_response.trim() === result.polishedText.trim()) {
-              resultSection.innerHTML = ` <h2 class="section-header">AI Polish Result</h2> <div class="no-change-card"> <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /> </svg> <div> <h4>Excellent Writing!</h4> <p>Our AI reviewed your text and found no necessary corrections. Great job!</p> </div> </div>`;
-            } else {
-              const diff = Diff.diffSentences(
-                pageData.user_response,
-                result.polishedText
-              );
-              let html = "";
-              diff.forEach((part) => {
-                const value = part.value.replace(/\n/g, "<br>");
-                if (part.added) {
-                  html += `<ins>${value}</ins>`;
-                } else if (part.removed) {
-                  html += `<del>${value}</del>`;
-                } else {
-                  html += value;
-                }
-              });
-              const legendHTML = `<div class="legend"><div class="legend-item"><span class="deleted-color"></span> Original Text</div><div class="legend-item"><span class="added-color"></span> AI Polished Version</div></div>`;
-              resultSection.innerHTML = `<h2 class="section-header">AI Polish Result</h2><div id="polish-result-container">${legendHTML}<div class="diff-result">${html}</div></div>`;
-            }
-            resultSection.style.display = "block";
-            resultSection.scrollIntoView({
-              behavior: "smooth",
-              block: "start",
-            });
-          } catch (error) {
-            alert(`Could not get AI revision: ${error.message}`);
-          } finally {
-            polishBtn.disabled = false;
-            polishBtn.textContent = "AI Polish & Compare";
-          }
-        };
+
         const handleToggleReview = async () => {
           reviewBtn.disabled = true;
           try {
@@ -820,6 +807,7 @@
             reviewBtn.disabled = false;
           }
         };
+
         const updateReviewButton = (isInReview) => {
           const reviewBtnText = document.getElementById("review-btn-text");
           const reviewIconAdd = document.getElementById("review-icon-add");
@@ -838,45 +826,12 @@
           reviewBtn.style.display = "inline-flex";
         };
 
-        const renderModelEssaySection = () => {
-          const placeholder = document.getElementById("model-essay-section");
-          if (!placeholder) return;
-          let buttonHTML = "";
-          let contentHTML = "";
-          if (pageData && pageData.model_essay) {
-            buttonHTML = `<button id="regenerate-essay-btn">Regenerate with AI</button>`;
-            contentHTML = `<div class="post"><p class="post-content">${pageData.model_essay}</p></div>`;
-          } else {
-            buttonHTML = `<button id="generate-essay-btn">Generate with AI</button>`;
-            contentHTML = `<div class="post"><p class="post-content" style="text-align: center; color: var(--text-secondary);">Click the button to generate a high-scoring model essay using AI.</p></div>`;
-          }
-          placeholder.innerHTML = `
-                <div class="section-header">
-                    <span>High-Scoring Model Essay</span>
-                    ${buttonHTML}
-                </div>
-                <div id="model-essay-content">${contentHTML}</div>`;
-          const generateBtn = document.getElementById("generate-essay-btn");
-          const regenerateBtn = document.getElementById("regenerate-essay-btn");
-          if (generateBtn) {
-            generateBtn.addEventListener("click", handleGenerateEssay);
-          }
-          if (regenerateBtn) {
-            regenerateBtn.addEventListener("click", handleGenerateEssay);
-          }
-        };
-
         const handleGenerateEssay = async (event) => {
           const button = event.target;
-          const contentDiv = document.getElementById("model-essay-content");
+          const contentDiv = document.getElementById("model-essay-pane");
           button.disabled = true;
           button.textContent = "Generating...";
-          contentDiv.innerHTML = `
-                <div class="essay-generating">
-                    <div class="spinner"></div>
-                    <div class="main-text">AI is writing the model essay...</div>
-                    <div class="sub-text">This may take up to 30 seconds.</div>
-                </div>`;
+          contentDiv.innerHTML = `<div class="essay-generating"><div class="spinner"></div><div class="main-text">AI is writing the model essay...</div><div class="sub-text">This may take up to 30 seconds.</div></div>`;
           try {
             const response = await fetch(
               `/api/questions/${pageData.question_id}/generate-model-essay`,
@@ -890,12 +845,68 @@
               throw new Error(result.message || "Failed to generate essay.");
             }
             pageData.model_essay = result.modelEssay;
-            renderModelEssaySection();
+            renderModelEssayPane();
           } catch (error) {
             console.error("Error generating model essay:", error);
-            contentDiv.innerHTML = `<div class="post"><p class="post-content" style="color: var(--accent-red-ui);">${error.message}</p></div>`;
-            button.disabled = false;
-            button.textContent = "Try Again";
+            contentDiv.innerHTML = `<p class="post-content" style="color: var(--accent-red-ui);">${error.message}</p><div class="model-essay-actions"><button id="generate-essay-btn">Try Again</button></div>`;
+            document
+              .getElementById("generate-essay-btn")
+              .addEventListener("click", handleGenerateEssay);
+          }
+        };
+
+        const renderModelEssayPane = () => {
+          const pane = document.getElementById("model-essay-pane");
+          if (!pane) return;
+          if (pageData && pageData.model_essay) {
+            pane.innerHTML = `<p class="post-content">${pageData.model_essay}</p><div class="model-essay-actions"><button id="regenerate-essay-btn">Regenerate with AI</button></div>`;
+            document
+              .getElementById("regenerate-essay-btn")
+              .addEventListener("click", handleGenerateEssay);
+          } else {
+            pane.innerHTML = `<p class="post-content" style="text-align: center; color: var(--text-secondary);">Click the button to generate a high-scoring model essay using AI.</p><div class="model-essay-actions"><button id="generate-essay-btn">Generate with AI</button></div>`;
+            document
+              .getElementById("generate-essay-btn")
+              .addEventListener("click", handleGenerateEssay);
+          }
+        };
+
+        const handleAIPolish = async () => {
+          const polishTabBtn = document.getElementById("ai-polish-tab");
+          polishTabBtn.textContent = "AI Polish (Polishing...)";
+          polishTabBtn.style.display = "inline-block";
+          polishTabBtn.click();
+          const polishPane = document.getElementById("ai-polish-pane");
+          polishPane.innerHTML = `<div class="essay-generating"><div class="spinner"></div><div class="main-text">AI is polishing your text...</div></div>`;
+          try {
+            const response = await fetch(`/api/responses/${historyId}/polish`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message);
+            if (pageData.user_response.trim() === result.polishedText.trim()) {
+              polishPane.innerHTML = `<div class="no-change-card"><svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><div><h4>Excellent Writing!</h4><p>Our AI reviewed your text and found no necessary corrections. Great job!</p></div></div>`;
+            } else {
+              const diff = Diff.diffWords(
+                pageData.user_response,
+                result.polishedText
+              );
+              let html = "";
+              diff.forEach((part) => {
+                html += part.added
+                  ? `<ins>${part.value}</ins>`
+                  : part.removed
+                  ? `<del>${part.value}</del>`
+                  : part.value;
+              });
+              const legendHTML = `<div class="legend"><div class="legend-item"><span class="deleted-color"></span> Original Text</div><div class="legend-item"><span class="added-color"></span> AI Polished Version</div></div>`;
+              polishPane.innerHTML = `<div id="polish-result-container">${legendHTML}<div class="diff-result">${html}</div></div>`;
+            }
+            polishTabBtn.textContent = "AI Polish";
+          } catch (error) {
+            polishPane.innerHTML = `<p class="post-content" style="color: var(--accent-red-ui);">${error.message}</p>`;
+            polishTabBtn.textContent = "AI Polish (Error)";
           }
         };
 
@@ -924,7 +935,6 @@
               reviewSubtitleEl.textContent = `Submitted on ${submittedDate} • ${pageData.word_count} words`;
               updateReviewButton(pageData.is_for_review);
               rewriteBtn.style.display = "inline-flex";
-              polishBtn.style.display = "inline-flex";
 
               let promptHTML = "";
               if (pageData.task_type === "integrated_writing") {
@@ -935,14 +945,29 @@
 
               reviewContentEl.innerHTML = `
                 <div id="ai-card-placeholder"></div>
-                <h2 class="section-header">Your Response</h2>
-                <div class="user-response-card"><p class="user-response-content">${pageData.user_response}</p></div>
-                <div id="model-essay-section"></div> 
-                <h2 class="section-header">Original Prompt</h2>
+                <div class="tab-nav">
+                    <button class="tab-btn active" data-target="#your-response-pane">Your Response</button>
+                    <button class="tab-btn" data-target="#model-essay-pane">Model Essay</button>
+                    <button class="tab-btn" id="ai-polish-tab" data-target="#ai-polish-pane">AI Polish</button>
+                </div>
+                <div class="tab-content-container">
+                    <div id="your-response-pane" class="tab-pane active">
+                        <p class="user-response-content">${pageData.user_response}</p>
+                        <div class="model-essay-actions" style="margin-top: 24px;">
+                            <button id="polish-btn">Polish with AI & Compare</button>
+                        </div>
+                    </div>
+                    <div id="model-essay-pane" class="tab-pane"></div>
+                    <div id="ai-polish-pane" class="tab-pane"></div>
+                </div>
+                <div class="section-header" style="margin-top: 24px; border-top: 1px solid var(--border-color); padding-top: 24px;"><span>Original Prompt</span></div>
                 ${promptHTML}`;
 
-              renderModelEssaySection();
-
+              document
+                .getElementById("polish-btn")
+                .addEventListener("click", handleAIPolish);
+              renderModelEssayPane();
+              setupTabs();
               initialLoad = false;
             }
 
@@ -997,7 +1022,24 @@
           }
         };
 
-        polishBtn.addEventListener("click", handleAIPolish);
+        const setupTabs = () => {
+          const tabNav = document.querySelector(".tab-nav");
+          if (!tabNav) return;
+          tabNav.addEventListener("click", (e) => {
+            if (e.target.classList.contains("tab-btn")) {
+              const targetPaneId = e.target.dataset.target;
+              document
+                .querySelectorAll(".tab-btn")
+                .forEach((btn) => btn.classList.remove("active"));
+              document
+                .querySelectorAll(".tab-pane")
+                .forEach((pane) => pane.classList.remove("active"));
+              e.target.classList.add("active");
+              document.querySelector(targetPaneId).classList.add("active");
+            }
+          });
+        };
+
         reviewBtn.addEventListener("click", handleToggleReview);
         rewriteBtn.addEventListener("click", openRewriteModal);
         cancelBtn.addEventListener("click", closeRewriteModal);
