@@ -143,6 +143,35 @@
         font-weight: 500;
         height: 20px;
       }
+      /* --- 【新增样式】: 为音频生成状态添加 --- */
+      .audio-generation-status {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        text-align: center;
+      }
+      .audio-generation-status p {
+        font-size: 18px;
+        color: var(--text-secondary);
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+      .spinner {
+        width: 32px;
+        height: 32px;
+        border: 4px solid rgba(0, 0, 0, 0.1);
+        border-left-color: var(--accent-blue);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
     </style>
   </head>
   <body>
@@ -174,36 +203,65 @@
         startTimer(180, renderLecturePhase);
       }
 
+      // --- 【关键架构重构 3/3】: 完全重写 renderLecturePhase 函数 ---
       async function renderLecturePhase() {
         phaseTitleEl.textContent = "Phase 2: Lecture";
         mainContainer.style.gridTemplateColumns = "1fr";
-        mainContainer.innerHTML = `<div class="content-panel" style="display:flex; flex-direction:column; align-items:center; justify-content:center;"><p style="font-size: 18px;">Loading lecture...</p></div>`;
 
-        try {
-          const response = await fetch(`/api/questions/${currentQuestion.id}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (response.ok) {
-            currentQuestion = await response.json();
-          } else {
-            console.error("Failed to re-fetch question data for lecture.");
-          }
-        } catch (error) {
-          console.error("Error re-fetching question:", error);
-        }
+        const renderAudioPlayer = (audioUrl) => {
+          mainContainer.innerHTML = `
+                <div class="content-panel" style="display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                    <p style="font-size: 18px;">Listen carefully to the lecture.</p>
+                    <audio id="lecture-audio" src="${audioUrl}" controls autoplay></audio>
+                </div>`;
 
-        if (currentQuestion.lecture_audio_url) {
-          mainContainer.innerHTML = `<div class="content-panel" style="display:flex; flex-direction:column; align-items:center; justify-content:center;"><p style="font-size: 18px;">Listen carefully to the lecture.</p><audio id="lecture-audio" src="${currentQuestion.lecture_audio_url}" controls autoplay></audio></div>`;
           const audioEl = document.getElementById("lecture-audio");
           phaseTimerEl.textContent = "Playing...";
           audioEl.onended = renderWritingPhase;
+          // 如果音频文件本身有问题，也提供备用方案
           audioEl.onerror = () => {
             mainContainer.innerHTML = `<div class="content-panel"><h2>Lecture Script (Audio Failed)</h2><p>${currentQuestion.lecture_script}</p></div>`;
             startTimer(120, renderWritingPhase);
           };
+        };
+
+        const showGeneratingState = () => {
+          mainContainer.innerHTML = `
+                <div class="content-panel audio-generation-status">
+                    <div class="spinner"></div>
+                    <p>Generating lecture audio...<br>This may take up to a minute for the first time.</p>
+                </div>`;
+          phaseTimerEl.textContent = "Waiting...";
+        };
+
+        // 检查题目数据中是否已经有音频URL
+        if (currentQuestion.lecture_audio_url) {
+          renderAudioPlayer(currentQuestion.lecture_audio_url);
         } else {
-          mainContainer.innerHTML = `<div class="content-panel"><h2>Lecture Script</h2><p>${currentQuestion.lecture_script}</p></div>`;
-          startTimer(120, renderWritingPhase);
+          // 如果没有，显示“正在生成”并向新API发起请求
+          showGeneratingState();
+          try {
+            const audioResponse = await fetch(
+              `/api/questions/${currentQuestion.id}/generate-audio`,
+              {
+                method: "POST",
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
+
+            if (!audioResponse.ok) {
+              throw new Error("Failed to generate audio from server.");
+            }
+
+            const audioData = await audioResponse.json();
+            currentQuestion.lecture_audio_url = audioData.lecture_audio_url; // 更新当前问题对象
+            renderAudioPlayer(audioData.lecture_audio_url);
+          } catch (error) {
+            console.error("Error generating or fetching audio:", error);
+            // 如果音频生成失败，显示文本作为备用方案
+            mainContainer.innerHTML = `<div class="content-panel"><h2>Lecture Script (Audio Generation Failed)</h2><p>${currentQuestion.lecture_script}</p></div>`;
+            startTimer(120, renderWritingPhase);
+          }
         }
       }
 
@@ -298,7 +356,6 @@
           return;
         }
         try {
-          // 【关键修复】: 在 fetch 请求中加入 Authorization header
           const response = await fetch(`/api/questions/${questionId}`, {
             headers: {
               Authorization: `Bearer ${token}`,

@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (Final Version with Stable SpeechT5 TTS) ---
+﻿// --- START OF FILE server.js (Final Version with Robust Two-Step Audio Generation) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -12,7 +12,6 @@ const path = require("path");
 const util = require("util");
 const englishWords = require("an-array-of-english-words");
 
-// --- 配置 Cloudinary ---
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -20,8 +19,8 @@ cloudinary.config({
   secure: true,
 });
 
-// --- 辅助函数 ---
-
+// --- 辅助函数 (callAI... 函数等保持不变) ---
+// ... (此处省略了 callAIPolishAPI, callAIScoringAPI, callAIAnalysisAPI, checkAndAwardAchievements 函数，它们保持原样)
 async function checkAndAwardAchievements(userId, responseId) {
   console.log(`🏆 [Achievement] Checking for user #${userId}...`);
   try {
@@ -220,97 +219,9 @@ async function callAIAnalysisAPI(feedbacks) {
 
 function processTextForTTS(text) {
   if (!text) return "";
-  const cleanedText = text
+  return text
     .replace(/[\s\n\r]+/g, " ")
     .replace(/[^\p{L}\p{N}\p{P}\p{Z}]/gu, "");
-  return cleanedText;
-}
-
-// --- 【关键更新】: 使用稳定可靠的 Microsoft SpeechT5 模型 ---
-async function generateAudioIfNeeded(questionId) {
-  try {
-    const questionQuery = await pool.query(
-      "SELECT lecture_script, lecture_audio_url, task_type FROM questions WHERE id = $1",
-      [questionId]
-    );
-    const question = questionQuery.rows[0];
-
-    if (
-      !question ||
-      question.task_type !== "integrated_writing" ||
-      question.lecture_audio_url || // 如果已经有音频，则跳过
-      !question.lecture_script ||
-      question.lecture_script.trim() === ""
-    ) {
-      return;
-    }
-
-    const textForTTS = processTextForTTS(question.lecture_script);
-    if (!textForTTS) {
-      console.log(
-        `[TTS Pre-check] Skipped audio generation for question #${questionId} due to empty text.`
-      );
-      return;
-    }
-
-    // --- 【关键修改】: 调用新的、稳定的、无限制的TTS Space ---
-    console.log(
-      `🎤 [Backend Task SpeechT5] Starting audio generation for question #${questionId}...`
-    );
-
-    const { client } = await import("@gradio/client");
-
-    // 1. 将地址指向您最新的、使用SpeechT5的Space
-    const app = await client("kas0201/my-unlimited-tts");
-
-    // 2. 调用新的API，它只接收一个文本参数，能够处理长文本
-    const result = await app.predict("/synthesize", [
-      textForTTS, // text_to_synthesize
-    ]);
-
-    // @ts-ignore
-    const audioUrl = result.data[0].url;
-    if (!audioUrl) {
-      throw new Error("SpeechT5 Space did not return an audio URL.");
-    }
-    // --- 修改结束 ---
-
-    const audioResponse = await axios.get(audioUrl, {
-      responseType: "arraybuffer",
-    });
-    const audioBuffer = Buffer.from(audioResponse.data);
-
-    if (!audioBuffer || audioBuffer.length === 0) {
-      throw new Error("TTS Space returned an empty audio buffer.");
-    }
-
-    const uploadPromise = new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        { resource_type: "video", folder: "toefl_lectures" },
-        (error, result) => {
-          if (error) return reject(error);
-          resolve(result);
-        }
-      );
-      uploadStream.end(audioBuffer);
-    });
-    const uploadResult = await uploadPromise;
-    // @ts-ignore
-    const finalAudioUrl = uploadResult.secure_url;
-
-    await pool.query(
-      "UPDATE questions SET lecture_audio_url = $1 WHERE id = $2",
-      [finalAudioUrl, questionId]
-    );
-    console.log(
-      `✅ [Backend Task SpeechT5] Audio for question #${questionId} saved: ${finalAudioUrl}`
-    );
-  } catch (error) {
-    console.error(
-      `❌ [Backend Task SpeechT5] Error for question #${questionId}:`,
-      error
-    );
-  }
 }
 
 const app = express();
@@ -340,8 +251,9 @@ const authenticateToken = (req, res, next) => {
   );
 };
 
-// --- API 路由 (保持不变) ---
+// --- API 路由 ---
 
+// ... (注册和登录路由保持不变)
 app.post("/api/auth/register", async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
@@ -418,10 +330,12 @@ app.get("/api/questions", authenticateToken, async (req, res) => {
   }
 });
 
+// --- 【关键架构重构 1/3】: 修改 GET /api/questions/:id 路由 ---
+// 这个路由现在只负责快速返回数据库中的文本数据，不再触发音频生成。
 app.get("/api/questions/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
   try {
-    generateAudioIfNeeded(id); // 在返回问题详情前，触发音频生成（如果需要）
+    // 移除了 generateAudioIfNeeded(id) 调用
     const sql = `SELECT * FROM questions WHERE id = $1`;
     const result = await pool.query(sql, [id]);
     if (result.rows.length === 0)
@@ -433,6 +347,91 @@ app.get("/api/questions/:id", authenticateToken, async (req, res) => {
   }
 });
 
+// --- 【关键架构重构 2/3】: 新增专门用于生成音频的路由 ---
+// 这个新路由会处理耗时的TTS任务，并且有自己的错误处理，不会搞垮主服务。
+app.post(
+  "/api/questions/:id/generate-audio",
+  authenticateToken,
+  async (req, res) => {
+    const { id } = req.params;
+    try {
+      const questionQuery = await pool.query(
+        "SELECT lecture_script, lecture_audio_url FROM questions WHERE id = $1",
+        [id]
+      );
+      const question = questionQuery.rows[0];
+
+      if (!question) {
+        return res.status(404).json({ message: "Question not found." });
+      }
+      // 如果音频已经存在，直接返回URL
+      if (question.lecture_audio_url) {
+        return res.json({ lecture_audio_url: question.lecture_audio_url });
+      }
+      // 如果没有lecture script，则无法生成
+      const textForTTS = processTextForTTS(question.lecture_script);
+      if (!textForTTS) {
+        return res
+          .status(400)
+          .json({ message: "No lecture script available to generate audio." });
+      }
+
+      console.log(
+        `🎤 [Backend Task SpeechT5] Starting audio generation for question #${id}...`
+      );
+      const { client } = await import("@gradio/client");
+      const app = await client("kas0201/my-unlimited-tts");
+      const result = await app.predict("/synthesize", [textForTTS]);
+
+      // @ts-ignore
+      const audioUrl = result.data[0].url;
+      if (!audioUrl) {
+        throw new Error("SpeechT5 Space did not return an audio URL.");
+      }
+
+      const audioResponse = await axios.get(audioUrl, {
+        responseType: "arraybuffer",
+      });
+      const audioBuffer = Buffer.from(audioResponse.data);
+
+      const uploadPromise = new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          { resource_type: "video", folder: "toefl_lectures" },
+          (error, cloudinaryResult) => {
+            if (error) return reject(error);
+            resolve(cloudinaryResult);
+          }
+        );
+        uploadStream.end(audioBuffer);
+      });
+
+      const uploadResult = await uploadPromise;
+      // @ts-ignore
+      const finalAudioUrl = uploadResult.secure_url;
+
+      // 将新生成的URL存回数据库
+      await pool.query(
+        "UPDATE questions SET lecture_audio_url = $1 WHERE id = $2",
+        [finalAudioUrl, id]
+      );
+
+      console.log(
+        `✅ [Backend Task SpeechT5] Audio for question #${id} saved: ${finalAudioUrl}`
+      );
+      // 将新URL返回给前端
+      res.json({ lecture_audio_url: finalAudioUrl });
+    } catch (error) {
+      console.error(
+        `❌ [Backend Task SpeechT5] Error for question #${id}:`,
+        error.message
+      );
+      res.status(502).json({
+        message: "Failed to generate or retrieve audio from the TTS service.",
+      });
+    }
+  }
+);
+
 app.get("/api/writing-test", authenticateToken, async (req, res) => {
   try {
     const sql = `(SELECT * FROM questions WHERE task_type = 'integrated_writing' ORDER BY RANDOM() LIMIT 1) UNION ALL (SELECT * FROM questions WHERE task_type = 'academic_discussion' ORDER BY RANDOM() LIMIT 1);`;
@@ -442,12 +441,7 @@ app.get("/api/writing-test", authenticateToken, async (req, res) => {
         message:
           "Not enough questions in database to start a full writing test.",
       });
-    const integratedTask = result.rows.find(
-      (q) => q.task_type === "integrated_writing"
-    );
-    if (integratedTask) {
-      generateAudioIfNeeded(integratedTask.id);
-    }
+    // 不再预生成音频，让前端按需请求
     res.json(result.rows);
   } catch (err) {
     console.error("Failed to get writing test questions:", err);
@@ -455,6 +449,7 @@ app.get("/api/writing-test", authenticateToken, async (req, res) => {
   }
 });
 
+// ... (所有其他路由如 /api/submit-response, /api/history 等都保持原样)
 app.post("/api/submit-response", authenticateToken, async (req, res) => {
   const { content, wordCount, questionId, task_type } = req.body;
   const userId = req.user.id;
