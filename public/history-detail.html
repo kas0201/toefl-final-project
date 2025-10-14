@@ -1,4 +1,4 @@
-﻿<!-- START OF FILE public/history-detail.html (FIXED & COMPLETE VERSION) -->
+﻿<!-- START OF FILE public/history-detail.html (FINAL, FIXED & COMPLETE VERSION) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -173,22 +173,91 @@
         padding: 0;
         margin: 0;
         display: flex;
+        flex-direction: column;
         gap: 24px;
-        align-items: flex-start;
       }
-      .score-display {
+      .score-display-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 24px;
+      }
+      .score-circle {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
         flex-shrink: 0;
+        transition: background-color 0.3s ease;
+      }
+      .score-circle .score-value {
+        font-size: 44px;
+        font-weight: 700;
+        color: #fff;
+        line-height: 1;
+      }
+      .score-circle .score-label {
+        font-size: 14px;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.8);
+        margin-top: 2px;
+      }
+      .score-excellent {
+        background-color: var(--accent-green);
+      }
+      .score-good {
+        background-color: var(--accent-blue);
+      }
+      .score-fair {
+        background-color: var(--accent-orange);
+      }
+      .score-poor {
+        background-color: var(--accent-red-ui);
+      }
+      .score-summary-text {
+        font-size: 16px;
+        line-height: 1.6;
       }
       .feedback-grid {
         display: grid;
         gap: 20px;
       }
-      .feedback-item {
-        border-left: none;
-        padding-left: 0;
+      .feedback-item h4 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 0;
+        margin-bottom: 8px;
+        font-size: 16px;
       }
-      .general-suggestion {
-        margin-top: 24px;
+      .rating-badge {
+        font-size: 12px;
+        font-weight: 600;
+        padding: 3px 8px;
+        border-radius: 99px;
+        color: #fff;
+      }
+      .rating-badge.excellent {
+        background-color: var(--accent-green);
+      }
+      .rating-badge.good {
+        background-color: var(--accent-blue);
+      }
+      .rating-badge.fair {
+        background-color: var(--accent-orange);
+      }
+      .rating-badge.needs-improvement {
+        background-color: var(--accent-red-ui);
+      }
+      .feedback-item p {
+        font-size: 15px;
+        line-height: 1.6;
+        color: var(--text-secondary);
+        margin: 0;
       }
       #review-toggle-btn,
       #rewrite-btn {
@@ -559,8 +628,6 @@
         let pollingInterval = null;
         let rewriteTimer;
 
-        // --- [修复开始] ---
-        // 重新添加所有与“定时重写”弹窗相关的辅助函数定义
         const openRewriteModal = () => {
           if (!pageData) return;
           const rewriteReferenceEl =
@@ -679,7 +746,6 @@
             submitRewriteBtn.textContent = "Submit Rewrite";
           }
         };
-        // --- [修复结束] ---
 
         const handleGenerateEssay = async (event) => {
           const button = event.target;
@@ -767,11 +833,6 @@
             const response = await fetch(`/api/history/${historyId}`, {
               headers: { Authorization: `Bearer ${token}` },
             });
-            if (response.status === 401 || response.status === 403) {
-              clearInterval(pollingInterval);
-              window.location.href = "/login.html";
-              return;
-            }
             if (!response.ok)
               throw new Error("Failed to fetch submission details.");
             pageData = await response.json();
@@ -857,28 +918,49 @@
                 feedbackData = null;
               }
               if (feedbackData) {
+                const getScoreColorClass = (score) => {
+                  if (score >= 25) return "score-excellent";
+                  if (score >= 20) return "score-good";
+                  if (score >= 15) return "score-fair";
+                  return "score-poor";
+                };
+                const scoreColorClass = getScoreColorClass(pageData.ai_score);
                 const createFeedbackItem = (title, feedbackObj) => {
                   const ratingClass = (feedbackObj.rating || "")
                     .toLowerCase()
                     .replace(" ", "-");
-                  return `<div class="feedback-item"><div class="feedback-item-header"><h4>${title}</h4><span class="rating-badge ${ratingClass}">${feedbackObj.rating}</span></div><p>${feedbackObj.comment}</p></div>`;
+                  return `<div class="feedback-item"><h4>${title}<span class="rating-badge ${ratingClass}">${feedbackObj.rating}</span></h4><p>${feedbackObj.comment}</p></div>`;
                 };
-                aiFeedbackPane.innerHTML = `<div id="ai-score-card"><div class="score-display"><span class="score-value">${
-                  pageData.ai_score
-                }</span><span class="score-label">/ 30</span></div><div class="feedback-details"><div class="feedback-grid">${createFeedbackItem(
-                  "Task Response",
-                  feedbackData.taskResponse
-                )}${createFeedbackItem(
-                  "Organization & Development",
-                  feedbackData.organization
-                )}${createFeedbackItem(
-                  "Language Use",
-                  feedbackData.languageUse
-                )}</div><div class="general-suggestion"><p><strong>General Suggestion:</strong> ${
-                  feedbackData.generalSuggestion
-                }</p></div></div></div>`;
+                aiFeedbackPane.innerHTML = `
+                    <div id="ai-score-card">
+                        <div class="score-display-wrapper">
+                            <div class="score-circle ${scoreColorClass}">
+                                <span class="score-value">${
+                                  pageData.ai_score
+                                }</span>
+                                <span class="score-label">/ 30</span>
+                            </div>
+                            <p class="score-summary-text">${
+                              feedbackData.generalSuggestion
+                            }</p>
+                        </div>
+                        <div class="feedback-grid">
+                            ${createFeedbackItem(
+                              "Task Response",
+                              feedbackData.taskResponse
+                            )}
+                            ${createFeedbackItem(
+                              "Organization & Development",
+                              feedbackData.organization
+                            )}
+                            ${createFeedbackItem(
+                              "Language Use",
+                              feedbackData.languageUse
+                            )}
+                        </div>
+                    </div>`;
               } else {
-                aiFeedbackPane.innerHTML = `<div id="ai-score-card"><div class="score-display"><span class="score-value">${pageData.ai_score}</span><span class="score-label">/ 30</span></div><div class="feedback-details"><p>${pageData.ai_feedback}</p></div></div>`;
+                aiFeedbackPane.innerHTML = `<div class="scoring-pending"><p>Could not parse AI feedback.</p></div>`;
               }
             } else {
               aiFeedbackPane.innerHTML = `<div class="scoring-pending"><div class="spinner"></div><div class="main-text">AI Feedback is being generated...</div><div class="sub-text">This may take up to 30 seconds. The page will update automatically.</div></div>`;
