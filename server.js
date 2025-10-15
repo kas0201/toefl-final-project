@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (UPDATED with Granular Mistake Analysis - FULLY UNABRIDGED) ---
+﻿// --- START OF FILE server.js (UPDATED with Strict Scoring and Forensic Error Analysis - FULLY UNABRIDGED) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -231,26 +231,36 @@ async function callAIPolishAPI(responseText) {
 }
 
 async function callAIScoringAPI(responseText, promptText, taskType) {
-  console.log(`🤖 [AI] Granular scoring started (Task: ${taskType})...`);
+  console.log(
+    `🤖 [AI] Strict scoring and forensic analysis started (Task: ${taskType})...`
+  );
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error("AI service is not configured.");
   const endpoint = "https://api.deepseek.com/chat/completions";
 
-  const systemPrompt = `You are an expert ETS-trained evaluator for the TOEFL iBT Writing section. Your task is twofold:
-1.  **Provide Holistic Feedback**: Evaluate the user's response based on official rubrics and provide a score and structured feedback.
-2.  **Extract Specific Mistakes**: Identify and list individual errors with fine-grained categorization.
+  const systemPrompt = `You are a strict, official ETS rater for the TOEFL iBT Writing section. Your only goal is to emulate the official scoring rubric with maximum precision and identify every single error.
 
-Follow these steps precisely:
-1.  In a <thinking> block, analyze the user's response.
-2.  Provide your final answer ONLY as a single, valid JSON object. Do not include any text before or after the JSON block.
+Your job has two parts.
 
-**JSON Output Format & Mistake Categories:**
+**PART 1: HOLISTIC SCORING**
+Evaluate the user's response against the official TOEFL rubrics for the specified task type ('Integrated Writing' or 'Academic Discussion'). Provide a holistic score from 0-30 and detailed feedback for each dimension. Be critical and justify your ratings with specific examples from the user's text.
+
+**PART 2: FORENSIC MISTAKE ANALYSIS**
+This is equally critical. Perform a forensic-level analysis of the text to identify **every single error**, no matter how minor. Your goal is to be exhaustive.
+- For each error, you must categorize it using the provided "type" and "sub_type" lists.
+- Do not group multiple errors. Each distinct issue should be its own object in the 'mistakes' array.
+- The 'mistakes' array must be a comprehensive list of all identifiable issues. Be meticulous.
+
+**FINAL OUTPUT INSTRUCTIONS:**
+Before generating the JSON, you MUST use a <thinking> block to outline your step-by-step evaluation process, including your reasoning for the score and the list of errors you've found. After the <thinking> block, your final output **MUST BE ONLY** a single, valid JSON object and nothing else.
+
+**JSON OUTPUT FORMAT & MISTAKE CATEGORIES:**
 {
   "overallScore": <integer from 0 to 30>,
   "feedback": {
-    "taskResponse": { "rating": "<string>", "comment": "<string>" },
-    "organization": { "rating": "<string>", "comment": "<string>" },
-    "languageUse": { "rating": "<string>", "comment": "<string>" },
+    "taskResponse": { "rating": "<'Excellent'|'Good'|'Fair'|'Needs Improvement'>", "comment": "<string>" },
+    "organization": { "rating": "<'Excellent'|'Good'|'Fair'|'Needs Improvement'>", "comment": "<string>" },
+    "languageUse": { "rating": "<'Excellent'|'Good'|'Fair'|'Needs Improvement'>", "comment": "<string>" },
     "generalSuggestion": "<string>"
   },
   "mistakes": [
@@ -259,7 +269,7 @@ Follow these steps precisely:
       "sub_type": "<CHOOSE ONE from the list below>",
       "original": "<The exact incorrect phrase from user's text>",
       "corrected": "<The suggested correct phrase>",
-      "explanation": "<A brief, clear explanation of the error>"
+      "explanation": "<A brief, clear explanation of why it was wrong>"
     }
   ]
 }
@@ -303,7 +313,7 @@ Follow these steps precisely:
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: 0.5,
+        temperature: 0.3,
       },
       {
         headers: {
