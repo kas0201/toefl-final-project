@@ -1,4 +1,4 @@
-﻿// --- START OF FILE server.js (UPDATED with On-Demand Model Essay Generation) ---
+﻿// --- START OF FILE server.js (UPDATED with Granular Mistake Analysis - FULLY UNABRIDGED) ---
 
 const express = require("express");
 const { Pool } = require("pg");
@@ -231,21 +231,20 @@ async function callAIPolishAPI(responseText) {
 }
 
 async function callAIScoringAPI(responseText, promptText, taskType) {
-  console.log(
-    `🤖 [AI] Scoring started (Task: ${taskType}) with mistake extraction...`
-  );
+  console.log(`🤖 [AI] Granular scoring started (Task: ${taskType})...`);
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error("AI service is not configured.");
   const endpoint = "https://api.deepseek.com/chat/completions";
+
   const systemPrompt = `You are an expert ETS-trained evaluator for the TOEFL iBT Writing section. Your task is twofold:
 1.  **Provide Holistic Feedback**: Evaluate the user's response based on official rubrics and provide a score and structured feedback.
-2.  **Extract Specific Mistakes**: Identify and list individual grammar, spelling, punctuation, and vocabulary errors.
+2.  **Extract Specific Mistakes**: Identify and list individual errors with fine-grained categorization.
 
 Follow these steps precisely:
-1.  In a <thinking> block, analyze the user's response against the relevant rubric (Integrated or Academic Discussion).
-2.  After your analysis, provide your final answer ONLY as a single, valid JSON object. Do not include any text before or after the JSON block.
+1.  In a <thinking> block, analyze the user's response.
+2.  Provide your final answer ONLY as a single, valid JSON object. Do not include any text before or after the JSON block.
 
-**JSON Output Format:**
+**JSON Output Format & Mistake Categories:**
 {
   "overallScore": <integer from 0 to 30>,
   "feedback": {
@@ -257,12 +256,39 @@ Follow these steps precisely:
   "mistakes": [
     {
       "type": "<'grammar'|'spelling'|'punctuation'|'vocabulary'|'style'>",
+      "sub_type": "<CHOOSE ONE from the list below>",
       "original": "<The exact incorrect phrase from user's text>",
       "corrected": "<The suggested correct phrase>",
       "explanation": "<A brief, clear explanation of the error>"
     }
   ]
-}`;
+}
+
+**MISTAKE SUB-TYPE LIST (Choose ONE for each mistake):**
+- **For 'grammar' type:**
+  - 'verb_tense': Incorrect tense usage.
+  - 'subject_verb_agreement': Subject and verb do not agree.
+  - 'article_usage': Incorrect use of a/an/the or missing article.
+  - 'preposition': Incorrect preposition (in, on, at, etc.).
+  - 'sentence_structure': e.g., run-on sentence, fragment, incorrect word order.
+  - 'pronoun_error': Incorrect pronoun usage or agreement.
+  - 'pluralization': Incorrect use of singular/plural nouns.
+  - 'grammar_other': Any other grammatical error.
+- **For 'vocabulary' type:**
+  - 'word_choice': A grammatically correct but unsuitable or less precise word.
+  - 'word_form': Using the wrong form of a word (e.g., noun instead of adjective).
+  - 'idiom_error': An unnatural or incorrect idiomatic expression.
+  - 'vocabulary_other': Any other vocabulary error.
+- **For 'style' type:**
+  - 'wordiness': The phrase is too long or contains redundant words.
+  - 'awkward_phrasing': The sentence is grammatically correct but sounds unnatural.
+  - 'repetition': Repetitive use of words or sentence structures.
+  - 'tone': The language is too informal or inappropriate for an academic essay.
+  - 'style_other': Any other stylistic issue.
+- **For 'spelling' and 'punctuation' types:**
+  - Use 'spelling' or 'punctuation' as the sub_type respectively.
+`;
+
   const taskTypeName =
     taskType === "integrated_writing"
       ? "Integrated Writing"
@@ -339,7 +365,6 @@ async function callAIAnalysisAPI(feedbacks) {
   }
 }
 
-// --- [NEW] AI Helper function to generate a model essay ---
 async function callAIGenerateEssayAPI(promptText, taskType) {
   console.log(`🤖 [AI] Model Essay generation started (Task: ${taskType})...`);
   const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -367,7 +392,7 @@ async function callAIGenerateEssayAPI(promptText, taskType) {
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: 0.7, // A bit more creative for essay writing
+        temperature: 0.7,
       },
       {
         headers: {
@@ -400,6 +425,7 @@ pool.connect((err) => {
   if (err) return console.error("❌ Database connection failed:", err);
   console.log("✅ Successfully connected to PostgreSQL database!");
 });
+
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
@@ -490,6 +516,7 @@ app.get("/api/questions", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Internal server error." });
   }
 });
+
 app.get("/api/questions/:id", authenticateToken, async (req, res) => {
   const { id } = req.params;
   try {
@@ -504,6 +531,7 @@ app.get("/api/questions/:id", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Internal server error." });
   }
 });
+
 app.post(
   "/api/questions/:id/trigger-audio-generation",
   authenticateToken,
@@ -516,6 +544,7 @@ app.post(
     res.status(202).json({ message: "Audio generation process started." });
   }
 );
+
 app.get(
   "/api/questions/:id/audio-status",
   authenticateToken,
@@ -537,7 +566,6 @@ app.get(
   }
 );
 
-// --- [NEW] API Endpoint to generate and save a model essay ---
 app.post(
   "/api/questions/:id/generate-model-essay",
   authenticateToken,
@@ -557,13 +585,11 @@ app.post(
       }
       const question = questionResult.rows[0];
 
-      // Construct the full prompt for the AI
       let promptText =
         question.task_type === "integrated_writing"
           ? `Reading: ${question.reading_passage}\nLecture: ${question.lecture_script}`
           : `Professor's Prompt: ${question.professor_prompt}\n${question.student1_author}'s Post: ${question.student1_post}\n${question.student2_author}'s Post: ${question.student2_post}`;
 
-      // Call the AI to generate the essay
       const aiResult = await callAIGenerateEssayAPI(
         promptText,
         question.task_type
@@ -574,7 +600,6 @@ app.post(
         throw new Error("AI returned an empty essay.");
       }
 
-      // Save the new essay to the database
       await pool.query("UPDATE questions SET model_essay = $1 WHERE id = $2", [
         newModelEssay,
         id,
@@ -584,7 +609,6 @@ app.post(
         `✅ [MODEL ESSAY API] Successfully generated and saved new essay for question #${id}.`
       );
 
-      // Return the new essay to the frontend
       res.json({ modelEssay: newModelEssay });
     } catch (err) {
       console.error(
@@ -611,6 +635,7 @@ app.get("/api/writing-test", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Internal server error." });
   }
 });
+
 app.post("/api/submit-response", authenticateToken, async (req, res) => {
   const { content, wordCount, questionId, task_type } = req.body;
   const userId = req.user.id;
@@ -620,7 +645,6 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
       message: "Request is missing required information or is malformed.",
     });
   }
-
   try {
     const responseSql = `INSERT INTO responses (content, word_count, question_id, task_type, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING id`;
     const responseResult = await pool.query(responseSql, [
@@ -631,15 +655,12 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
       userId,
     ]);
     const newResponseId = responseResult.rows[0].id;
-
     res
       .status(201)
       .json({ message: "Submission successful!", id: newResponseId });
-
     console.log(
       `▶️ [BACKGROUND] Starting AI processing for new response #${newResponseId}...`
     );
-
     (async () => {
       const client = await pool.connect();
       try {
@@ -651,18 +672,15 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
         if (questionRes.rows.length === 0)
           throw new Error(`Question with ID ${qId} not found.`);
         const questionData = questionRes.rows[0];
-
         let promptText =
           task_type === "integrated_writing"
             ? `Reading: ${questionData.reading_passage}\nLecture: ${questionData.lecture_script}`
             : `Professor's Prompt: ${questionData.professor_prompt}\n${questionData.student1_author}'s Post: ${questionData.student1_post}\n${questionData.student2_author}'s Post: ${questionData.student2_post}`;
-
         const aiResult = await callAIScoringAPI(
           content || "",
           promptText,
           task_type
         );
-
         await client.query(
           `UPDATE responses SET ai_score = $1, ai_feedback = $2 WHERE id = $3`,
           [aiResult.score, aiResult.feedback, newResponseId]
@@ -673,7 +691,7 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
 
         if (aiResult.mistakes && aiResult.mistakes.length > 0) {
           const mistakeInsertPromises = aiResult.mistakes.map((mistake) => {
-            const mistakeSql = `INSERT INTO mistakes (user_id, response_id, type, original_text, corrected_text, explanation) VALUES ($1, $2, $3, $4, $5, $6)`;
+            const mistakeSql = `INSERT INTO mistakes (user_id, response_id, type, sub_type, original_text, corrected_text, explanation) VALUES ($1, $2, $3, $4, $5, $6, $7)`;
             const validTypes = [
               "grammar",
               "spelling",
@@ -686,11 +704,12 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
             )
               ? String(mistake.type).toLowerCase()
               : "style";
-
+            const mistakeSubType = mistake.sub_type || "other";
             return client.query(mistakeSql, [
               userId,
               newResponseId,
               mistakeType,
+              mistakeSubType,
               mistake.original,
               mistake.corrected,
               mistake.explanation,
@@ -698,14 +717,11 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
           });
           await Promise.all(mistakeInsertPromises);
           console.log(
-            `✅ [BACKGROUND] Saved ${aiResult.mistakes.length} mistakes for response #${newResponseId}`
+            `✅ [BACKGROUND] Saved ${aiResult.mistakes.length} granular mistakes for response #${newResponseId}`
           );
         }
-
         await client.query("COMMIT");
-
         await checkAndAwardAchievements(userId, newResponseId);
-
         console.log(
           `✅ [BACKGROUND] Successfully finished all AI processing for response #${newResponseId}.`
         );
@@ -724,6 +740,7 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Internal server error." });
   }
 });
+
 app.get("/api/history", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
@@ -752,6 +769,7 @@ app.get("/api/history/:id", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Internal server error." });
   }
 });
+
 app.post(
   "/api/responses/:id/toggle-review",
   authenticateToken,
@@ -782,6 +800,7 @@ app.post(
     }
   }
 );
+
 app.post("/api/responses/:id/polish", authenticateToken, async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
@@ -815,6 +834,7 @@ app.post("/api/responses/:id/polish", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Failed to get AI polish suggestion." });
   }
 });
+
 app.get("/api/review-list", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
@@ -826,11 +846,12 @@ app.get("/api/review-list", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Internal server error." });
   }
 });
+
 app.get("/api/mistakes", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
     const sql = `
-      SELECT m.id, m.type, m.original_text, m.corrected_text, m.explanation, m.created_at, m.response_id, q.title as question_title
+      SELECT m.id, m.type, m.sub_type, m.original_text, m.corrected_text, m.explanation, m.created_at, m.response_id, q.title as question_title
       FROM mistakes m
       JOIN responses r ON m.response_id = r.id
       JOIN questions q ON r.question_id = q.id
@@ -844,6 +865,7 @@ app.get("/api/mistakes", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Internal server error." });
   }
 });
+
 app.get("/api/user/stats", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
@@ -882,6 +904,7 @@ app.get("/api/user/stats", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Internal server error." });
   }
 });
+
 app.get("/api/user/achievements", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
@@ -1019,7 +1042,6 @@ app.post("/api/user/writing-analysis", authenticateToken, async (req, res) => {
   }
 });
 
-// --- 启动服务器 ---
 app.use(express.static("public"));
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
