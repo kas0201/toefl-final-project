@@ -162,18 +162,7 @@
         border-color: var(--accent-red);
         color: var(--accent-red);
       }
-      .status-filter {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 16px;
-      }
-      .status-filter select {
-        padding: 8px 12px;
-        border-radius: 999px;
-        border: 1px solid var(--border-color);
-        font-family: inherit;
-      }
+      /* status filter removed */
       .mistake-actions {
         display: flex;
         gap: 8px;
@@ -263,17 +252,7 @@
         <button class="tab-btn" data-filter="style">Style</button>
       </div>
 
-      <div class="status-filter" style="padding-left:12px">
-        <span style="font-weight: 500; color: var(--text-secondary)"
-          >Progress:</span
-        >
-        <select id="status-filter">
-          <option value="all">All</option>
-          <option value="new">New</option>
-          <option value="reviewing">Reviewing</option>
-          <option value="mastered">Mastered</option>
-        </select>
-      </div>
+      <!-- Progress filter removed -->
 
       <div class="mistake-list" id="mistake-list">
         <div class="loading-state">Loading your mistake book...</div>
@@ -290,11 +269,9 @@
         }
 
         const listContainer = document.getElementById("mistake-list");
-        const statusFilter = document.getElementById("status-filter");
         const tabButtons = document.querySelectorAll(".tab-btn");
         let allMistakes = [];
         let currentTypeFilter = "all";
-        let currentStatusFilter = "all";
 
         const updateMistakeStatus = async (id, status) => {
           try {
@@ -323,13 +300,9 @@
         const renderMistakes = () => {
           listContainer.innerHTML = "";
 
-          const filteredMistakes = allMistakes.filter((m) => {
-            const typeMatch =
-              currentTypeFilter === "all" || m.type === currentTypeFilter;
-            const statusMatch =
-              currentStatusFilter === "all" || m.status === currentStatusFilter;
-            return typeMatch && statusMatch;
-          });
+          const filteredMistakes = allMistakes.filter((m) =>
+            currentTypeFilter === "all" || m.type === currentTypeFilter
+          );
 
           if (filteredMistakes.length === 0) {
             const message =
@@ -409,10 +382,7 @@
           });
         });
 
-        statusFilter.addEventListener("change", () => {
-          currentStatusFilter = statusFilter.value;
-          renderMistakes();
-        });
+        // status filter removed
 
         try {
           const response = await fetch("/api/mistakes", {

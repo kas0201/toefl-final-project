@@ -88,30 +88,6 @@
         border-bottom: 1px solid var(--border-color);
         margin-bottom: 32px;
       }
-      .filter-bar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 16px;
-        align-items: flex-end;
-        margin-bottom: 24px;
-      }
-      .filter-group {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
-      .filter-group label {
-        font-size: 13px;
-        color: var(--text-secondary);
-        font-weight: 600;
-      }
-      .filter-group select {
-        padding: 10px 12px;
-        border-radius: 999px;
-        border: 1px solid var(--border-color);
-        background-color: #fff;
-        font-family: inherit;
-      }
       .tab-btn {
         padding: 12px 20px;
         border: none;
@@ -231,27 +207,7 @@
       <h1>Practice Center</h1>
       <p class="subtitle">Choose a topic for targeted practice.</p>
 
-      <div class="filter-bar">
-        <div class="filter-group">
-          <label for="difficulty-filter">Difficulty</label>
-          <select id="difficulty-filter">
-            <option value="">All</option>
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label for="tag-filter">Tag</label>
-          <select id="tag-filter">
-            <option value="">All</option>
-          </select>
-        </div>
-        <label style="display:flex; align-items:center; gap:8px;">
-          <input type="checkbox" id="unseen-only" />
-          Show only unseen tasks
-        </label>
-      </div>
+      <!-- filter bar removed -->
 
       <div class="tab-nav">
         <button class="tab-btn active" data-target="#academic-content">
@@ -307,9 +263,6 @@
         const integratedList = document.getElementById(
           "integrated-writing-list"
         );
-        const difficultyFilter = document.getElementById("difficulty-filter");
-        const tagFilter = document.getElementById("tag-filter");
-        const unseenToggle = document.getElementById("unseen-only");
         const emptyStateContainer = document.getElementById(
           "empty-state-container"
         );
@@ -332,26 +285,13 @@
                </div>`
             : "";
 
-          const tagsMarkup =
-            question.tags && question.tags.length
-              ? `<div class="badge-group">${question.tags
-                  .map((tag) => `<span class="topic-badge">${tag}</span>`)
-                  .join("")}</div>`
-              : "";
-
           card.innerHTML = `
             ${completedBadgeHTML}
             <div class="card-content">
               <h2>${question.title}</h2>
               <div class="badge-group">
                 <span class="topic-badge">${question.topic}</span>
-                ${
-                  question.difficulty
-                    ? `<span class="topic-badge">${question.difficulty}</span>`
-                    : ""
-                }
               </div>
-              ${tagsMarkup}
             </div>
             <a href="${url}" class="start-button">${
             question.has_completed ? "Practice Again" : "Start Practice"
@@ -397,65 +337,30 @@
           }
         };
 
-        const loadTags = async () => {
-          try {
-            const response = await fetch("/api/questions/meta/tags", {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            if (!response.ok) return;
-            const tags = await response.json();
-            tagFilter.innerHTML =
-              '<option value="">All</option>' +
-              tags.map((tag) => `<option value="${tag}">${tag}</option>`).join("");
-          } catch (error) {
-            console.error("Failed to load tags:", error);
-          }
-        };
-
-        const fetchQuestions = async () => {
-          const params = new URLSearchParams();
-          if (difficultyFilter.value) {
-            params.append("difficulty", difficultyFilter.value);
-          }
-          if (tagFilter.value) {
-            params.append("tag", tagFilter.value);
-          }
-          if (unseenToggle.checked) {
-            params.append("onlyUnseen", "true");
-          }
-          const query = params.toString() ? `?${params.toString()}` : "";
-          try {
-            const response = await fetch(`/api/questions${query}`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            if (!response.ok) {
-              if (response.status === 401 || response.status === 403) {
-                window.location.href = "/login.html";
-              }
-              throw new Error("Failed to fetch questions.");
+        try {
+          const response = await fetch("/api/questions", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!response.ok) {
+            if (response.status === 401 || response.status === 403) {
+              window.location.href = "/login.html";
             }
-            const allQuestions = await response.json();
-            const academicQuestions = allQuestions.filter(
-              (q) => q.task_type === "academic_discussion"
-            );
-            const integratedQuestions = allQuestions.filter(
-              (q) => q.task_type === "integrated_writing"
-            );
-            renderQuestions(academicQuestions, integratedQuestions);
-          } catch (error) {
-            console.error("Error fetching questions:", error);
-            academicList.innerHTML =
-              '<div class="loading-state">Error loading questions.</div>';
-            integratedList.innerHTML = "";
+            throw new Error("Failed to fetch questions.");
           }
-        };
-
-        difficultyFilter.addEventListener("change", fetchQuestions);
-        tagFilter.addEventListener("change", fetchQuestions);
-        unseenToggle.addEventListener("change", fetchQuestions);
-
-        loadTags();
-        fetchQuestions();
+          const allQuestions = await response.json();
+          const academicQuestions = allQuestions.filter(
+            (q) => q.task_type === "academic_discussion"
+          );
+          const integratedQuestions = allQuestions.filter(
+            (q) => q.task_type === "integrated_writing"
+          );
+          renderQuestions(academicQuestions, integratedQuestions);
+        } catch (error) {
+          console.error("Error fetching questions:", error);
+          academicList.innerHTML =
+            '<div class="loading-state">Error loading questions.</div>';
+          integratedList.innerHTML = "";
+        }
       });
     </script>
   </body>
