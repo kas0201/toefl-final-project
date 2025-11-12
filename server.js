@@ -12,6 +12,7 @@ const fs = require("fs");
 const path = require("path");
 const util = require("util");
 const englishWords = require("an-array-of-english-words");
+const { version: appVersion } = require("./package.json");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -451,19 +452,23 @@ if (!/sslmode=require/i.test(connectionString)) {
 }
 
 const pool = new Pool(poolConfig);
-pool
-  .connect()
-  .then((client) => {
-    console.log("✅ Successfully connected to PostgreSQL database!");
-    client.release();
-  })
-  .catch((err) => {
-    console.error("❌ Database connection failed:", err);
-    console.error(
-      "Render will restart this service automatically once the database becomes available."
-    );
-    setTimeout(() => process.exit(1), 1000);
-  });
+if (process.env.NODE_ENV !== "test") {
+  pool
+    .connect()
+    .then((client) => {
+      console.log("? Successfully connected to PostgreSQL database!");
+      client.release();
+    })
+    .catch((err) => {
+      console.error("? Database connection failed:", err);
+      console.error(
+        "Render will restart this service automatically once the database becomes available."
+      );
+      setTimeout(() => process.exit(1), 1000);
+    });
+} else {
+  console.log("? Skipping PostgreSQL connection verification in test mode.");
+}
 
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
@@ -1081,21 +1086,60 @@ app.post("/api/user/writing-analysis", authenticateToken, async (req, res) => {
   }
 });
 
-app.use(express.static("public"));
-app.listen(PORT, () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`==> Your service is live ✨`);
-  console.log(`==>`);
-  console.log(
-    `==> //////////////////////////////////////////////////////////////`
-  );
-  console.log(`==>`);
-  console.log(
-    `==> Available at your primary URL: https://toefl-final-project.onrender.com`
-  );
-  console.log(`==>`);
-  console.log(
-    `==> //////////////////////////////////////////////////////////////`
-  );
-  console.log(`==>`);
+app.get("/health", async (req, res) => {
+  const payload = {
+    status: "ok",
+
+    version: appVersion,
+
+    uptime: process.uptime(),
+
+    timestamp: new Date().toISOString(),
+  };
+
+  try {
+    await pool.query("SELECT 1");
+
+    payload.database = "connected";
+
+    res.json(payload);
+  } catch (error) {
+    payload.database = "error";
+
+    payload.error = error.message;
+
+    res.status(503).json(payload);
+  }
 });
+
+app.use(express.static("public"));
+
+if (process.env.NODE_ENV !== "test") {
+  app.listen(PORT, () => {
+    console.log(`?? Server is running on port ${PORT}`);
+
+    console.log(`==> Your service is live ?`);
+
+    console.log(`==>`);
+
+    console.log(
+      `==> //////////////////////////////////////////////////////////////`
+    );
+
+    console.log(`==>`);
+
+    console.log(
+      `==> Available at your primary URL: https://toefl-final-project.onrender.com`
+    );
+
+    console.log(`==>`);
+
+    console.log(
+      `==> //////////////////////////////////////////////////////////////`
+    );
+
+    console.log(`==>`);
+  });
+}
+
+module.exports = { app, pool };
