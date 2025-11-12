@@ -427,14 +427,42 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
-pool.connect((err) => {
-  if (err) return console.error("❌ Database connection failed:", err);
-  console.log("✅ Successfully connected to PostgreSQL database!");
-});
+
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  console.error(
+    "❌ DATABASE_URL is not set. Please configure your database connection string."
+  );
+  console.error(
+    "  - Render: add DATABASE_URL in the Environment tab and redeploy."
+  );
+  console.error(
+    "  - Local dev: set DATABASE_URL in your shell or a .env file before starting the server."
+  );
+  process.exit(1);
+}
+
+const poolConfig = { connectionString };
+if (!/sslmode=require/i.test(connectionString)) {
+  // Supabase already enforces SSL via sslmode=require; only disable verification when absent.
+  poolConfig.ssl = { rejectUnauthorized: false };
+}
+
+const pool = new Pool(poolConfig);
+pool
+  .connect()
+  .then((client) => {
+    console.log("✅ Successfully connected to PostgreSQL database!");
+    client.release();
+  })
+  .catch((err) => {
+    console.error("❌ Database connection failed:", err);
+    console.error(
+      "Render will restart this service automatically once the database becomes available."
+    );
+    setTimeout(() => process.exit(1), 1000);
+  });
 
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
