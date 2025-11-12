@@ -58,6 +58,84 @@
         justify-content: space-between;
         align-items: center;
       }
+      .section-card {
+        background-color: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 24px;
+      }
+      .settings-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 24px;
+      }
+      .settings-card {
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 20px;
+        background: #fff;
+      }
+      .settings-card h3 {
+        margin: 0 0 16px 0;
+        font-size: 18px;
+      }
+      .form-group label {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        margin-bottom: 6px;
+        display: block;
+      }
+      .form-group input,
+      .form-group textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 1px solid var(--border-color);
+        font-size: 15px;
+        box-sizing: border-box;
+        font-family: inherit;
+      }
+      .form-group textarea {
+        resize: vertical;
+        min-height: 90px;
+      }
+      .form-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 12px;
+        gap: 12px;
+      }
+      .form-actions button {
+        background-color: var(--accent-blue);
+        color: #fff;
+        padding: 10px 18px;
+        border: none;
+        border-radius: 999px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
+      .form-actions button:hover {
+        background-color: var(--accent-blue-hover);
+      }
+      .status-pill {
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+      .status-pill.success {
+        color: var(--accent-blue);
+      }
+      .status-pill.error {
+        color: #ff3b30;
+      }
+      .meta-row {
+        font-size: 13px;
+        color: var(--text-secondary);
+        margin-top: 12px;
+      }
       .header-actions button {
         background: transparent;
         border: 1px solid var(--accent-blue);
@@ -202,6 +280,73 @@
   <body>
     <div class="navbar"></div>
     <div class="main-container">
+      <div class="section-card">
+        <h2 style="margin-top: 0">Account Settings</h2>
+        <div class="settings-grid">
+          <form id="profile-form" class="settings-card">
+            <h3>Profile Details</h3>
+            <div class="form-group">
+              <label for="profile-username">Username</label>
+              <input id="profile-username" name="username" required />
+            </div>
+            <div class="form-group">
+              <label for="profile-email">Email</label>
+              <input type="email" id="profile-email" name="email" required />
+            </div>
+            <div class="form-group">
+              <label for="profile-avatar">Avatar URL</label>
+              <input
+                type="url"
+                id="profile-avatar"
+                name="avatarUrl"
+                placeholder="https://"
+              />
+            </div>
+            <div class="form-group">
+              <label for="profile-bio">Short Bio</label>
+              <textarea
+                id="profile-bio"
+                name="bio"
+                placeholder="Share your learning goals or strengths..."
+              ></textarea>
+            </div>
+            <div class="meta-row">
+              <span id="email-status" class="status-pill"></span>
+              <span id="last-login" class="status-pill"></span>
+            </div>
+            <div class="form-actions">
+              <span id="profile-status" class="status-pill"></span>
+              <button type="submit">Save Profile</button>
+            </div>
+          </form>
+          <form id="password-form" class="settings-card">
+            <h3>Change Password</h3>
+            <div class="form-group">
+              <label for="current-password">Current Password</label>
+              <input
+                type="password"
+                id="current-password"
+                name="currentPassword"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label for="new-password">New Password</label>
+              <input
+                type="password"
+                id="new-password"
+                name="newPassword"
+                required
+              />
+            </div>
+            <div class="form-actions">
+              <span id="password-status" class="status-pill"></span>
+              <button type="submit">Update Password</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
       <div class="section-header">
         <span>Writing Analysis</span>
         <div class="header-actions" id="analysis-actions" style="display: none">
@@ -240,6 +385,114 @@
         const analysisTimestamp = document.getElementById("analysis-timestamp");
         const rerunBtn = document.getElementById("rerun-analysis-btn");
         const achievementsGrid = document.getElementById("achievements-grid");
+        const profileForm = document.getElementById("profile-form");
+        const passwordForm = document.getElementById("password-form");
+        const profileStatus = document.getElementById("profile-status");
+        const passwordStatus = document.getElementById("password-status");
+        const emailStatus = document.getElementById("email-status");
+        const lastLoginEl = document.getElementById("last-login");
+
+        const loadProfile = async () => {
+          if (!profileForm) return;
+          profileStatus.textContent = "Loading profile...";
+          try {
+            const response = await fetch("/api/user/profile", {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!response.ok) {
+              throw new Error("Unable to load profile.");
+            }
+            const data = await response.json();
+            profileForm.username.value = data.username || "";
+            profileForm.email.value = data.email || "";
+            profileForm.avatarUrl.value = data.avatar_url || "";
+            profileForm.bio.value = data.bio || "";
+            emailStatus.textContent = data.email_verified
+              ? "Email verified"
+              : "Email pending verification";
+            lastLoginEl.textContent = data.last_login_at
+              ? `Last login: ${new Date(
+                  data.last_login_at
+                ).toLocaleString()}`
+              : "Welcome! Let's get started.";
+            profileStatus.textContent = "";
+          } catch (error) {
+            profileStatus.textContent = error.message;
+          }
+        };
+
+        if (profileForm) {
+          profileForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            profileStatus.textContent = "Saving...";
+            profileStatus.className = "status-pill";
+            const payload = {
+              username: profileForm.username.value.trim(),
+              email: profileForm.email.value.trim(),
+              avatarUrl: profileForm.avatarUrl.value.trim(),
+              bio: profileForm.bio.value.trim(),
+            };
+            try {
+              const response = await fetch("/api/user/profile", {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(payload),
+              });
+              const data = await response.json();
+              if (!response.ok) {
+                throw new Error(data.message || "Failed to update profile.");
+              }
+              emailStatus.textContent = data.profile.email_verified
+                ? "Email verified"
+                : "Email pending verification";
+              lastLoginEl.textContent = data.profile.last_login_at
+                ? `Last login: ${new Date(
+                    data.profile.last_login_at
+                  ).toLocaleString()}`
+                : lastLoginEl.textContent;
+              profileStatus.textContent = "Profile saved!";
+              profileStatus.classList.add("success");
+            } catch (error) {
+              profileStatus.textContent = error.message;
+              profileStatus.classList.add("error");
+            }
+          });
+        }
+
+        if (passwordForm) {
+          passwordForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            passwordStatus.textContent = "Updating...";
+            passwordStatus.className = "status-pill";
+            const payload = {
+              currentPassword: passwordForm.currentPassword.value,
+              newPassword: passwordForm.newPassword.value,
+            };
+            try {
+              const response = await fetch("/api/auth/change-password", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(payload),
+              });
+              const data = await response.json();
+              if (!response.ok) {
+                throw new Error(data.message || "Failed to change password.");
+              }
+              passwordStatus.textContent = data.message;
+              passwordStatus.classList.add("success");
+              passwordForm.reset();
+            } catch (error) {
+              passwordStatus.textContent = error.message;
+              passwordStatus.classList.add("error");
+            }
+          });
+        }
 
         // --- [MODIFICATION 1/4]: Function to display the analysis data ---
         const displayAnalysisData = (data) => {
@@ -376,6 +629,7 @@
 
         rerunBtn.addEventListener("click", runNewAnalysis);
 
+        loadProfile();
         loadInitialData();
         renderAchievements();
       });

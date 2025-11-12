@@ -111,8 +111,14 @@
       <h1>Welcome Back</h1>
       <form id="login-form">
         <div class="form-group">
-          <label for="username">Username</label>
-          <input type="text" id="username" name="username" required />
+          <label for="username">Username or Email</label>
+          <input
+            type="text"
+            id="username"
+            name="username"
+            placeholder="yourname or you@example.com"
+            required
+          />
         </div>
         <div class="form-group">
           <label for="password">Password</label>
@@ -122,6 +128,9 @@
       </form>
       <p id="error-message" class="error-message"></p>
 
+      <p class="switch-form">
+        <a href="/forgot-password.html">Forgot your password?</a>
+      </p>
       <p class="switch-form">
         Don't have an account? <a href="/register.html">Sign up</a>
       </p>
@@ -142,6 +151,7 @@
             const response = await fetch("/api/auth/login", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
+              credentials: "include",
               body: JSON.stringify({ username, password }),
             });
 
@@ -153,6 +163,9 @@
 
             // 登录成功！将通行证和用户信息存入 localStorage
             localStorage.setItem("token", data.token);
+            if (data.refreshToken) {
+              localStorage.setItem("refreshToken", data.refreshToken);
+            }
             localStorage.setItem("user", JSON.stringify(data.user));
 
             // 跳转到主页

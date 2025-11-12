@@ -88,6 +88,30 @@
         border-bottom: 1px solid var(--border-color);
         margin-bottom: 32px;
       }
+      .filter-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: flex-end;
+        margin-bottom: 24px;
+      }
+      .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .filter-group label {
+        font-size: 13px;
+        color: var(--text-secondary);
+        font-weight: 600;
+      }
+      .filter-group select {
+        padding: 10px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--border-color);
+        background-color: #fff;
+        font-family: inherit;
+      }
       .tab-btn {
         padding: 12px 20px;
         border: none;
@@ -207,6 +231,28 @@
       <h1>Practice Center</h1>
       <p class="subtitle">Choose a topic for targeted practice.</p>
 
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label for="difficulty-filter">Difficulty</label>
+          <select id="difficulty-filter">
+            <option value="">All</option>
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="tag-filter">Tag</label>
+          <select id="tag-filter">
+            <option value="">All</option>
+          </select>
+        </div>
+        <label style="display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" id="unseen-only" />
+          Show only unseen tasks
+        </label>
+      </div>
+
       <div class="tab-nav">
         <button class="tab-btn active" data-target="#academic-content">
           Academic Discussion
@@ -261,76 +307,76 @@
         const integratedList = document.getElementById(
           "integrated-writing-list"
         );
+        const difficultyFilter = document.getElementById("difficulty-filter");
+        const tagFilter = document.getElementById("tag-filter");
+        const unseenToggle = document.getElementById("unseen-only");
         const emptyStateContainer = document.getElementById(
           "empty-state-container"
         );
         const tabNav = document.querySelector(".tab-nav");
         const tabContent = document.querySelector(".tab-content");
 
-        try {
-          // === KEY CHANGE: Add Authorization header to the request ===
-          const response = await fetch("/api/questions", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+        const createQuestionCard = (question) => {
+          const card = document.createElement("div");
+          card.className = "question-card";
 
-          if (!response.ok) {
-            // If token is invalid, redirect to login
-            if (response.status === 401 || response.status === 403) {
-              window.location.href = "/login.html";
-            }
-            throw new Error("Failed to fetch questions.");
-          }
+          const url =
+            question.task_type === "integrated_writing"
+              ? `/integrated-practice.html?id=${question.id}`
+              : `/practice-page.html?id=${question.id}`;
 
-          const allQuestions = await response.json();
+          const completedBadgeHTML = question.has_completed
+            ? `<div class="completed-badge">
+                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                 <span>Practiced</span>
+               </div>`
+            : "";
 
+          const tagsMarkup =
+            question.tags && question.tags.length
+              ? `<div class="badge-group">${question.tags
+                  .map((tag) => `<span class="topic-badge">${tag}</span>`)
+                  .join("")}</div>`
+              : "";
+
+          card.innerHTML = `
+            ${completedBadgeHTML}
+            <div class="card-content">
+              <h2>${question.title}</h2>
+              <div class="badge-group">
+                <span class="topic-badge">${question.topic}</span>
+                ${
+                  question.difficulty
+                    ? `<span class="topic-badge">${question.difficulty}</span>`
+                    : ""
+                }
+              </div>
+              ${tagsMarkup}
+            </div>
+            <a href="${url}" class="start-button">${
+            question.has_completed ? "Practice Again" : "Start Practice"
+          }</a>
+          `;
+          return card;
+        };
+
+        const renderQuestions = (academicQuestions, integratedQuestions) => {
           academicList.innerHTML = "";
           integratedList.innerHTML = "";
 
-          if (allQuestions.length === 0) {
+          if (
+            academicQuestions.length === 0 &&
+            integratedQuestions.length === 0
+          ) {
             tabNav.style.display = "none";
             tabContent.style.display = "none";
             emptyStateContainer.style.display = "block";
             return;
           }
 
-          const academicQuestions = allQuestions.filter(
-            (q) => q.task_type === "academic_discussion"
-          );
-          const integratedQuestions = allQuestions.filter(
-            (q) => q.task_type === "integrated_writing"
-          );
-
-          const createQuestionCard = (question) => {
-            const card = document.createElement("div");
-            card.className = "question-card";
-
-            const url =
-              question.task_type === "integrated_writing"
-                ? `/integrated-practice.html?id=${question.id}`
-                : `/practice-page.html?id=${question.id}`;
-
-            // === KEY CHANGE: Add the completed badge if has_completed is true ===
-            const completedBadgeHTML = question.has_completed
-              ? `<div class="completed-badge">
-                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                   <span>Practiced</span>
-                 </div>`
-              : "";
-
-            card.innerHTML = `
-              ${completedBadgeHTML}
-              <div class="card-content">
-                <h2>${question.title}</h2>
-                <div class="badge-group">
-                  <span class="topic-badge">${question.topic}</span>
-                </div>
-              </div>
-              <a href="${url}" class="start-button">${
-              question.has_completed ? "Practice Again" : "Start Practice"
-            }</a>
-            `;
-            return card;
-          };
+          tabNav.style.display = "";
+          tabContent.style.display = "";
+          emptyStateContainer.style.display = "none";
 
           if (academicQuestions.length > 0) {
             academicQuestions.forEach((q) =>
@@ -349,12 +395,67 @@
             integratedList.innerHTML =
               '<div class="empty-state">No Integrated Writing tasks available.</div>';
           }
-        } catch (error) {
-          console.error("Error fetching questions:", error);
-          academicList.innerHTML =
-            '<div class="loading-state">Error loading questions.</div>';
-          integratedList.innerHTML = "";
-        }
+        };
+
+        const loadTags = async () => {
+          try {
+            const response = await fetch("/api/questions/meta/tags", {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!response.ok) return;
+            const tags = await response.json();
+            tagFilter.innerHTML =
+              '<option value="">All</option>' +
+              tags.map((tag) => `<option value="${tag}">${tag}</option>`).join("");
+          } catch (error) {
+            console.error("Failed to load tags:", error);
+          }
+        };
+
+        const fetchQuestions = async () => {
+          const params = new URLSearchParams();
+          if (difficultyFilter.value) {
+            params.append("difficulty", difficultyFilter.value);
+          }
+          if (tagFilter.value) {
+            params.append("tag", tagFilter.value);
+          }
+          if (unseenToggle.checked) {
+            params.append("onlyUnseen", "true");
+          }
+          const query = params.toString() ? `?${params.toString()}` : "";
+          try {
+            const response = await fetch(`/api/questions${query}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!response.ok) {
+              if (response.status === 401 || response.status === 403) {
+                window.location.href = "/login.html";
+              }
+              throw new Error("Failed to fetch questions.");
+            }
+            const allQuestions = await response.json();
+            const academicQuestions = allQuestions.filter(
+              (q) => q.task_type === "academic_discussion"
+            );
+            const integratedQuestions = allQuestions.filter(
+              (q) => q.task_type === "integrated_writing"
+            );
+            renderQuestions(academicQuestions, integratedQuestions);
+          } catch (error) {
+            console.error("Error fetching questions:", error);
+            academicList.innerHTML =
+              '<div class="loading-state">Error loading questions.</div>';
+            integratedList.innerHTML = "";
+          }
+        };
+
+        difficultyFilter.addEventListener("change", fetchQuestions);
+        tagFilter.addEventListener("change", fetchQuestions);
+        unseenToggle.addEventListener("change", fetchQuestions);
+
+        loadTags();
+        fetchQuestions();
       });
     </script>
   </body>

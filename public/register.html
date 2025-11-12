@@ -115,6 +115,16 @@
           <input type="text" id="username" name="username" required />
         </div>
         <div class="form-group">
+          <label for="email">Email</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            placeholder="you@example.com"
+            required
+          />
+        </div>
+        <div class="form-group">
           <label for="password">Password</label>
           <input type="password" id="password" name="password" required />
         </div>
@@ -134,10 +144,11 @@
           const errorMessage = document.getElementById("error-message");
           errorMessage.textContent = "";
 
-          const username = e.target.username.value;
+                    const username = e.target.username.value.trim();
+          const email = e.target.email.value.trim();
           const password = e.target.password.value;
 
-          // 简单的密码长度验证
+          // �򵥵����볤����֤
           if (password.length < 6) {
             errorMessage.textContent =
               "Password must be at least 6 characters long.";
@@ -148,7 +159,8 @@
             const response = await fetch("/api/auth/register", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ username, password }),
+              credentials: "include",
+              body: JSON.stringify({ username, email, password }),
             });
 
             const data = await response.json();
@@ -157,9 +169,12 @@
               throw new Error(data.message || "Registration failed.");
             }
 
-            alert("Registration successful! Please log in.");
-            // 注册成功后，跳转到登录页面
-            window.location.href = "/login.html";
+            localStorage.setItem("token", data.token);
+            if (data.refreshToken) {
+              localStorage.setItem("refreshToken", data.refreshToken);
+            }
+            localStorage.setItem("user", JSON.stringify(data.user));
+            window.location.href = "/dashboard.html";
           } catch (error) {
             errorMessage.textContent = error.message;
           }
@@ -167,3 +182,4 @@
     </script>
   </body>
 </html>
+

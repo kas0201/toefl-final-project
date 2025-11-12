@@ -11,8 +11,16 @@ const cloudinary = require("cloudinary").v2;
 const fs = require("fs");
 const path = require("path");
 const util = require("util");
+const crypto = require("crypto");
 const englishWords = require("an-array-of-english-words");
 const { version: appVersion } = require("./package.json");
+
+const ACCESS_TOKEN_TTL = process.env.ACCESS_TOKEN_TTL || "1h";
+const REFRESH_TOKEN_DAYS = parseInt(
+  process.env.REFRESH_TOKEN_EXPIRY_DAYS || "7",
+  10
+);
+const REFRESH_COOKIE_NAME = "refreshToken";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -23,7 +31,7 @@ cloudinary.config({
 
 async function generateAudioInBackground(questionId) {
   console.log(
-    `🎤 [BACKGROUND JOB - CF] Starting audio generation for question #${questionId}...`
+    `?? [BACKGROUND JOB - CF] Starting audio generation for question #${questionId}...`
   );
 
   const MAX_RETRIES = 3;
@@ -36,7 +44,7 @@ async function generateAudioInBackground(questionId) {
 
       if (!accountId || !apiToken) {
         console.error(
-          "❌ [BACKGROUND JOB - CF] Cloudflare credentials are not set."
+          "? [BACKGROUND JOB - CF] Cloudflare credentials are not set."
         );
         return;
       }
@@ -106,7 +114,7 @@ async function generateAudioInBackground(questionId) {
           [finalAudioUrl, questionId]
         );
         console.log(
-          `✅ [BACKGROUND JOB - CF] Success on attempt ${attempt}! Audio for question #${questionId} is ready: ${finalAudioUrl}`
+          `? [BACKGROUND JOB - CF] Success on attempt ${attempt}! Audio for question #${questionId} is ready: ${finalAudioUrl}`
         );
 
         return;
@@ -121,7 +129,7 @@ async function generateAudioInBackground(questionId) {
         : error.message;
 
       console.error(
-        `❌ [BACKGROUND JOB - CF] FAILED on attempt ${attempt} for question #${questionId}:`,
+        `? [BACKGROUND JOB - CF] FAILED on attempt ${attempt} for question #${questionId}:`,
         errorMessage
       );
 
@@ -134,7 +142,7 @@ async function generateAudioInBackground(questionId) {
         await new Promise((res) => setTimeout(res, RETRY_DELAY));
       } else {
         console.error(
-          `❌ [BACKGROUND JOB - CF] All ${MAX_RETRIES} attempts failed for question #${questionId}. Giving up.`
+          `? [BACKGROUND JOB - CF] All ${MAX_RETRIES} attempts failed for question #${questionId}. Giving up.`
         );
       }
     }
@@ -143,7 +151,7 @@ async function generateAudioInBackground(questionId) {
 
 async function checkAndAwardAchievements(userId, responseId) {
   console.log(
-    `🏆 [ACHIEVEMENT] Checking for user #${userId} regarding response #${responseId}...`
+    `?? [ACHIEVEMENT] Checking for user #${userId} regarding response #${responseId}...`
   );
   try {
     const userStatsQuery = await pool.query(
@@ -178,23 +186,131 @@ async function checkAndAwardAchievements(userId, responseId) {
       );
       await Promise.all(insertPromises);
       console.log(
-        `✅ [ACHIEVEMENT] User #${userId} was awarded: ${achievementsToAward.join(
+        `? [ACHIEVEMENT] User #${userId} was awarded: ${achievementsToAward.join(
           ", "
         )}`
       );
     } else {
-      console.log(`ℹ️ [ACHIEVEMENT] No new achievements for user #${userId}.`);
+      console.log(`?? [ACHIEVEMENT] No new achievements for user #${userId}.`);
     }
   } catch (error) {
     console.error(
-      `❌ [ACHIEVEMENT] Error checking achievements for user #${userId}:`,
+      `? [ACHIEVEMENT] Error checking achievements for user #${userId}:`,
       error
     );
   }
 }
 
+const hashTokenValue = (token) =>
+  crypto.createHash("sha256").update(token).digest("hex");
+
+function generateAccessToken(user) {
+  return jwt.sign(
+    {
+      id: user.id,
+      username: user.username,
+      role: user.role || "student",
+    },
+    process.env.JWT_SECRET || "your_default_secret_key",
+    { expiresIn: ACCESS_TOKEN_TTL }
+  );
+}
+
+function setRefreshCookie(res, token) {
+  const maxAge = REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000;
+  res.cookie(REFRESH_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge,
+    path: "/",
+  });
+}
+
+async function persistRefreshToken(userId, token) {
+  const expiresAt = new Date(Date.now() + REFRESH_TOKEN_DAYS * 86400000);
+  await pool.query(
+    `INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
+     VALUES ($1, $2, $3)`,
+    [userId, hashTokenValue(token), expiresAt]
+  );
+}
+
+async function revokeRefreshToken(token) {
+  if (!token) return;
+  await pool.query(
+    `UPDATE refresh_tokens
+     SET revoked_at = NOW()
+     WHERE token_hash = $1 AND revoked_at IS NULL`,
+    [hashTokenValue(token)]
+  );
+}
+
+async function verifyRefreshToken(token) {
+  if (!token) return null;
+  const result = await pool.query(
+    `SELECT user_id FROM refresh_tokens
+     WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > NOW()`,
+    [hashTokenValue(token)]
+  );
+  return result.rows[0]?.user_id || null;
+}
+
+async function issueSessionTokens(user, res) {
+  const accessToken = generateAccessToken(user);
+  const refreshToken = crypto.randomBytes(48).toString("hex");
+  await persistRefreshToken(user.id, refreshToken);
+  setRefreshCookie(res, refreshToken);
+  return { accessToken, refreshToken };
+}
+
+async function revokeAllRefreshTokensForUser(userId) {
+  await pool.query(
+    `UPDATE refresh_tokens
+     SET revoked_at = NOW()
+     WHERE user_id = $1 AND revoked_at IS NULL`,
+    [userId]
+  );
+}
+
+async function sendPasswordResetEmail(email, token) {
+  const baseUrl = (process.env.APP_BASE_URL || "http://localhost:3000").replace(
+    /\/$/,
+    ""
+  );
+  const resetLink = `${baseUrl}/reset-password.html?token=${token}`;
+  console.log(
+    `?? [RESET] Password reset link for ${email}: ${resetLink} (share via email/SMS gateway).`
+  );
+}
+
+const parseTagArray = (tags) => {
+  if (!tags) return [];
+  if (Array.isArray(tags)) {
+    return tags.map((tag) => String(tag).trim()).filter(Boolean);
+  }
+  return String(tags)
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+};
+
+const MISTAKE_STATUSES = ["new", "reviewing", "mastered"];
+
+const cookieParserMiddleware = (req, res, next) => {
+  req.cookies = {};
+  const cookieHeader = req.headers["cookie"];
+  if (!cookieHeader) return next();
+  cookieHeader.split(";").forEach((pair) => {
+    const [name, ...rest] = pair.split("=");
+    if (!name) return;
+    const value = rest.join("=").trim();
+    req.cookies[name.trim()] = decodeURIComponent(value || "");
+  });
+  next();
+};
 async function callAIPolishAPI(responseText) {
-  console.log("🤖 [AI] Polishing started with CONSERVATIVE prompt...");
+  console.log("?? [AI] Polishing started with CONSERVATIVE prompt...");
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error("AI service is not configured.");
   const endpoint = "https://api.deepseek.com/chat/completions";
@@ -234,7 +350,7 @@ async function callAIPolishAPI(responseText) {
 
 async function callAIScoringAPI(responseText, promptText, taskType) {
   console.log(
-    `🤖 [AI] Strict scoring and forensic analysis started (Task: ${taskType})...`
+    `?? [AI] Strict scoring and forensic analysis started (Task: ${taskType})...`
   );
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error("AI service is not configured.");
@@ -343,7 +459,7 @@ Before generating the JSON, you MUST use a <thinking> block to outline your step
 }
 
 async function callAIAnalysisAPI(feedbacks) {
-  console.log("🤖 [AI] Common mistakes analysis started...");
+  console.log("?? [AI] Common mistakes analysis started...");
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error("AI service is not configured.");
   const endpoint = "https://api.deepseek.com/chat/completions";
@@ -378,7 +494,7 @@ async function callAIAnalysisAPI(feedbacks) {
 }
 
 async function callAIGenerateEssayAPI(promptText, taskType) {
-  console.log(`🤖 [AI] Model Essay generation started (Task: ${taskType})...`);
+  console.log(`?? [AI] Model Essay generation started (Task: ${taskType})...`);
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error("AI service is not configured.");
   const endpoint = "https://api.deepseek.com/chat/completions";
@@ -425,16 +541,153 @@ async function callAIGenerateEssayAPI(promptText, taskType) {
   }
 }
 
+async function processResponseWithAI(responseId) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const responseQuery = await client.query(
+      `SELECT r.id, r.content, r.task_type, r.user_id, r.question_id,
+              q.reading_passage, q.lecture_script, q.professor_prompt,
+              q.student1_author, q.student1_post, q.student2_author, q.student2_post
+       FROM responses r
+       JOIN questions q ON r.question_id = q.id
+       WHERE r.id = $1
+       FOR UPDATE`,
+      [responseId]
+    );
+    if (!responseQuery.rows.length) {
+      throw new Error(`Response ${responseId} not found for scoring.`);
+    }
+    const responseRow = responseQuery.rows[0];
+    let promptText =
+      responseRow.task_type === "integrated_writing"
+        ? `Reading: ${responseRow.reading_passage}\nLecture: ${responseRow.lecture_script}`
+        : `Professor's Prompt: ${responseRow.professor_prompt}\n${responseRow.student1_author}'s Post: ${responseRow.student1_post}\n${responseRow.student2_author}'s Post: ${responseRow.student2_post}`;
+    const aiResult = await callAIScoringAPI(
+      responseRow.content || "",
+      promptText,
+      responseRow.task_type
+    );
+    await client.query(
+      `UPDATE responses
+       SET ai_score = $1,
+           ai_feedback = $2,
+           processing_status = 'completed',
+           processing_error = NULL
+       WHERE id = $3`,
+      [aiResult.score, aiResult.feedback, responseId]
+    );
+    await client.query("DELETE FROM mistakes WHERE response_id = $1", [
+      responseId,
+    ]);
+    if (aiResult.mistakes && aiResult.mistakes.length > 0) {
+      const validTypes = [
+        "grammar",
+        "spelling",
+        "style",
+        "vocabulary",
+        "punctuation",
+      ];
+      for (const mistake of aiResult.mistakes) {
+        const mistakeType = validTypes.includes(
+          String(mistake.type).toLowerCase()
+        )
+          ? String(mistake.type).toLowerCase()
+          : "style";
+        const mistakeSubType = mistake.sub_type || "other";
+        await client.query(
+          `INSERT INTO mistakes (user_id, response_id, type, sub_type, original_text, corrected_text, explanation)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            responseRow.user_id,
+            responseId,
+            mistakeType,
+            mistakeSubType,
+            mistake.original,
+            mistake.corrected,
+            mistake.explanation,
+          ]
+        );
+      }
+      console.log(
+        `? [BACKGROUND] Saved ${aiResult.mistakes.length} mistakes for response #${responseId}`
+      );
+    }
+    await client.query("COMMIT");
+    await checkAndAwardAchievements(responseRow.user_id, responseId);
+    console.log(
+      `? [BACKGROUND] Successfully finished all AI processing for response #${responseId}.`
+    );
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error(
+      `? [BACKGROUND] AI background task failed for response #${responseId}:`,
+      error
+    );
+    await pool.query(
+      `UPDATE responses
+       SET processing_status = 'failed',
+           processing_error = $2
+       WHERE id = $1`,
+      [responseId, error.message]
+    );
+  } finally {
+    client.release();
+  }
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
-app.use(cors());
-app.use(express.json());
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+app.use(
+  cors({
+    origin: allowedOrigins.length ? allowedOrigins : true,
+    credentials: true,
+  })
+);
+app.use(express.json({ limit: "1mb" }));
+app.use(cookieParserMiddleware);
+
+const createRateLimiter = ({ windowMs, max, message }) => {
+  const store = new Map();
+  return (req, res, next) => {
+    const key = req.ip || req.headers["x-forwarded-for"] || "global";
+    const now = Date.now();
+    const timestamps = store.get(key) || [];
+    const recent = timestamps.filter((ts) => ts > now - windowMs);
+    recent.push(now);
+    store.set(key, recent);
+    if (recent.length > max) {
+      const payload =
+        typeof message === "string"
+          ? { message }
+          : message || { message: "Too many requests." };
+      return res.status(429).json(payload);
+    }
+    next();
+  };
+};
+
+const authLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: "Too many authentication attempts. Please try again later.",
+});
+
+const passwordResetLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: "Too many password reset attempts. Please try again later.",
+});
 
 const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
   console.error(
-    "❌ DATABASE_URL is not set. Please configure your database connection string."
+    "? DATABASE_URL is not set. Please configure your database connection string."
   );
   console.error(
     "  - Render: add DATABASE_URL in the Environment tab and redeploy."
@@ -455,9 +708,16 @@ const pool = new Pool(poolConfig);
 if (process.env.NODE_ENV !== "test") {
   pool
     .connect()
-    .then((client) => {
+    .then(async (client) => {
       console.log("? Successfully connected to PostgreSQL database!");
       client.release();
+      try {
+        await ensureBootstrapSchema();
+        console.log("? [BOOTSTRAP] Schema checks completed.");
+      } catch (schemaError) {
+        console.error("? [BOOTSTRAP] Schema verification failed:", schemaError);
+        setTimeout(() => process.exit(1), 1000);
+      }
     })
     .catch((err) => {
       console.error("? Database connection failed:", err);
@@ -470,78 +730,162 @@ if (process.env.NODE_ENV !== "test") {
   console.log("? Skipping PostgreSQL connection verification in test mode.");
 }
 
+async function ensureBootstrapSchema() {
+  const statements = [
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT UNIQUE",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT false",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token TEXT",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires TIMESTAMPTZ",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'student'",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ",
+    `CREATE TABLE IF NOT EXISTS refresh_tokens (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      revoked_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS writing_drafts (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      question_id INTEGER NOT NULL,
+      task_type TEXT NOT NULL,
+      content TEXT DEFAULT '',
+      word_count INTEGER DEFAULT 0,
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(user_id, question_id)
+    )`,
+    "ALTER TABLE responses ADD COLUMN IF NOT EXISTS processing_status TEXT DEFAULT 'queued'",
+    "ALTER TABLE responses ADD COLUMN IF NOT EXISTS processing_error TEXT",
+    "ALTER TABLE mistakes ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'new'",
+    "ALTER TABLE questions ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}'::text[]",
+    "ALTER TABLE questions ADD COLUMN IF NOT EXISTS difficulty TEXT",
+  ];
+
+  for (const statement of statements) {
+    try {
+      await pool.query(statement);
+    } catch (error) {
+      console.error("? [BOOTSTRAP] Statement failed:", statement, error);
+      throw error;
+    }
+  }
+
+  await pool.query(
+    "CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id)"
+  );
+  await pool.query(
+    "CREATE INDEX IF NOT EXISTS idx_writing_drafts_user_question ON writing_drafts(user_id, question_id)"
+  );
+}
+
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
-  if (token == null) return res.sendStatus(401);
+  const token =
+    (authHeader && authHeader.split(" ")[1]) ||
+    req.headers["x-access-token"];
+  if (!token) {
+    return res.status(401).json({ message: "Authentication required." });
+  }
   jwt.verify(
     token,
     process.env.JWT_SECRET || "your_default_secret_key",
     (err, user) => {
-      if (err) return res.sendStatus(403);
+      if (err) return res.status(403).json({ message: "Invalid token." });
       req.user = user;
       next();
     }
   );
 };
 
-app.post("/api/auth/register", async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
-    return res
-      .status(400)
-      .json({ message: "Username and password are required." });
+const requireAdmin = (req, res, next) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ message: "Admin access required." });
+  }
+  next();
+};
+
+app.post("/api/auth/register", authLimiter, async (req, res) => {
+  const { username, password, email } = req.body;
+  const normalizedEmail = (email || "").trim().toLowerCase();
+  if (!username || !password || !normalizedEmail) {
+    return res.status(400).json({
+      message: "Username, email, and password are required.",
+    });
+  }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(normalizedEmail)) {
+    return res.status(400).json({ message: "Please supply a valid email." });
   }
   try {
     const userCheck = await pool.query(
-      "SELECT * FROM users WHERE username = $1",
-      [username]
+      "SELECT 1 FROM users WHERE username = $1 OR email = $2",
+      [username, normalizedEmail]
     );
     if (userCheck.rows.length > 0) {
-      return res.status(409).json({ message: "Username already exists." });
+      return res
+        .status(409)
+        .json({ message: "Username or email already exists." });
     }
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-    const sql = `INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username`;
-    const newUser = await pool.query(sql, [username, hashedPassword]);
-    res
-      .status(201)
-      .json({ message: "Registration successful!", user: newUser.rows[0] });
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const sql = `INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id, username, email, role`;
+    const newUser = await pool.query(sql, [
+      username,
+      normalizedEmail,
+      hashedPassword,
+    ]);
+    const tokenBundle = await issueSessionTokens(newUser.rows[0], res);
+    res.status(201).json({
+      message: "Registration successful!",
+      token: tokenBundle.accessToken,
+      refreshToken: tokenBundle.refreshToken,
+      user: newUser.rows[0],
+    });
   } catch (err) {
     console.error("Registration failed:", err);
     res.status(500).json({ message: "Internal server error." });
   }
 });
 
-app.post("/api/auth/login", async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) {
+app.post("/api/auth/login", authLimiter, async (req, res) => {
+  const { username, email, identifier: rawIdentifier, password } = req.body;
+  const identifier =
+    (username || email || rawIdentifier || "").trim().toLowerCase();
+  if (!identifier || !password) {
     return res
       .status(400)
-      .json({ message: "Username and password are required." });
+      .json({ message: "Username/email and password are required." });
   }
   try {
-    const result = await pool.query("SELECT * FROM users WHERE username = $1", [
-      username,
-    ]);
+    const result = await pool.query(
+      "SELECT id, username, email, password_hash, role FROM users WHERE LOWER(username) = $1 OR email = $1 LIMIT 1",
+      [identifier]
+    );
     const user = result.rows[0];
     if (!user) {
-      return res.status(401).json({ message: "Invalid username or password." });
+      return res.status(401).json({ message: "Invalid credentials." });
     }
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
-      return res.status(401).json({ message: "Invalid username or password." });
+      return res.status(401).json({ message: "Invalid credentials." });
     }
-    const payload = { id: user.id, username: user.username };
-    const token = jwt.sign(
-      payload,
-      process.env.JWT_SECRET || "your_default_secret_key",
-      { expiresIn: "1d" }
-    );
+    await pool.query("UPDATE users SET last_login_at = NOW() WHERE id = $1", [
+      user.id,
+    ]);
+    const tokenBundle = await issueSessionTokens(user, res);
     res.json({
       message: "Login successful!",
-      token,
-      user: { id: user.id, username: user.username },
+      token: tokenBundle.accessToken,
+      refreshToken: tokenBundle.refreshToken,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      },
     });
   } catch (err) {
     console.error("Login failed:", err);
@@ -549,11 +893,215 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
+app.post("/api/auth/refresh", async (req, res) => {
+  const incomingToken =
+    req.cookies[REFRESH_COOKIE_NAME] || req.body.refreshToken;
+  if (!incomingToken) {
+    return res.status(400).json({ message: "Refresh token is required." });
+  }
+  try {
+    const userId = await verifyRefreshToken(incomingToken);
+    if (!userId) {
+      await revokeRefreshToken(incomingToken);
+      return res.status(401).json({ message: "Refresh token is invalid." });
+    }
+    const userQuery = await pool.query(
+      "SELECT id, username, email, role FROM users WHERE id = $1",
+      [userId]
+    );
+    const user = userQuery.rows[0];
+    if (!user) {
+      await revokeRefreshToken(incomingToken);
+      return res.status(404).json({ message: "User not found." });
+    }
+    await revokeRefreshToken(incomingToken);
+    const tokenBundle = await issueSessionTokens(user, res);
+    res.json({
+      message: "Token refreshed.",
+      token: tokenBundle.accessToken,
+      refreshToken: tokenBundle.refreshToken,
+      user,
+    });
+  } catch (err) {
+    console.error("Token refresh failed:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+app.post("/api/auth/logout", authenticateToken, async (req, res) => {
+  try {
+    const incomingToken =
+      req.cookies[REFRESH_COOKIE_NAME] || req.body.refreshToken;
+    if (incomingToken) {
+      await revokeRefreshToken(incomingToken);
+    }
+    res.clearCookie(REFRESH_COOKIE_NAME, { path: "/" });
+    res.status(204).end();
+  } catch (err) {
+    console.error("Logout failed:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+app.post(
+  "/api/auth/request-password-reset",
+  passwordResetLimiter,
+  async (req, res) => {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: "Email is required." });
+    }
+    const normalizedEmail = email.trim().toLowerCase();
+    try {
+      const userQuery = await pool.query(
+        "SELECT id, email FROM users WHERE email = $1",
+        [normalizedEmail]
+      );
+      const user = userQuery.rows[0];
+      if (user) {
+        const resetToken = crypto.randomBytes(32).toString("hex");
+        await pool.query(
+          `UPDATE users
+           SET password_reset_token = $1,
+               password_reset_expires = NOW() + INTERVAL '1 hour'
+           WHERE id = $2`,
+          [hashTokenValue(resetToken), user.id]
+        );
+        await sendPasswordResetEmail(user.email, resetToken);
+      }
+      res.json({
+        message:
+          "If that email exists in our system, a reset link has been sent.",
+      });
+    } catch (err) {
+      console.error("Password reset request failed:", err);
+      res.status(500).json({ message: "Internal server error." });
+    }
+  }
+);
+
+app.post("/api/auth/reset-password", async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) {
+    return res
+      .status(400)
+      .json({ message: "Token and new password are required." });
+  }
+  try {
+    const userQuery = await pool.query(
+      `SELECT id FROM users
+       WHERE password_reset_token = $1
+         AND password_reset_expires > NOW()`,
+      [hashTokenValue(token)]
+    );
+    const user = userQuery.rows[0];
+    if (!user) {
+      return res
+        .status(400)
+        .json({ message: "Reset link is invalid or has expired." });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await pool.query(
+      `UPDATE users
+       SET password_hash = $1,
+           password_reset_token = NULL,
+           password_reset_expires = NULL
+       WHERE id = $2`,
+      [hashedPassword, user.id]
+    );
+    await revokeAllRefreshTokensForUser(user.id);
+    res.json({ message: "Password reset successful. Please log in again." });
+  } catch (err) {
+    console.error("Password reset failed:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+app.post("/api/auth/change-password", authenticateToken, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({
+      message: "Current and new passwords are required.",
+    });
+  }
+  try {
+    const userQuery = await pool.query(
+      "SELECT password_hash FROM users WHERE id = $1",
+      [req.user.id]
+    );
+    const user = userQuery.rows[0];
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+    const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Current password is incorrect." });
+    }
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await pool.query(
+      "UPDATE users SET password_hash = $1 WHERE id = $2",
+      [hashedPassword, req.user.id]
+    );
+    await revokeAllRefreshTokensForUser(req.user.id);
+    res.json({ message: "Password updated. Please log in again." });
+  } catch (err) {
+    console.error("Change password failed:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
 app.get("/api/questions", authenticateToken, async (req, res) => {
   const userId = req.user.id;
   try {
-    const sql = `SELECT q.id, q.title, q.topic, q.task_type, CASE WHEN r.user_id IS NOT NULL THEN TRUE ELSE FALSE END AS has_completed FROM questions q LEFT JOIN (SELECT DISTINCT question_id, user_id FROM responses WHERE user_id = $1) r ON q.id = r.question_id ORDER BY q.id;`;
-    const result = await pool.query(sql, [userId]);
+    const { taskType, difficulty, tag, search, onlyUnseen } = req.query;
+    const filters = [];
+    const values = [userId];
+    let paramIndex = 2;
+
+    if (taskType) {
+      filters.push(`q.task_type = $${paramIndex}`);
+      values.push(taskType);
+      paramIndex++;
+    }
+    if (difficulty) {
+      filters.push(`q.difficulty = $${paramIndex}`);
+      values.push(difficulty);
+      paramIndex++;
+    }
+    if (tag) {
+      filters.push(`$${paramIndex} = ANY(q.tags)`);
+      values.push(tag);
+      paramIndex++;
+    }
+    if (search) {
+      filters.push(
+        `(q.title ILIKE $${paramIndex} OR q.topic ILIKE $${paramIndex})`
+      );
+      values.push(`%${search}%`);
+      paramIndex++;
+    }
+    if (String(onlyUnseen).toLowerCase() === "true") {
+      filters.push("r.user_id IS NULL");
+    }
+
+    const whereClause = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+    const sql = `
+      SELECT
+        q.id,
+        q.title,
+        q.topic,
+        q.task_type,
+        q.difficulty,
+        q.tags,
+        CASE WHEN r.user_id IS NOT NULL THEN TRUE ELSE FALSE END AS has_completed
+      FROM questions q
+      LEFT JOIN (
+        SELECT DISTINCT question_id, user_id FROM responses WHERE user_id = $1
+      ) r ON q.id = r.question_id
+      ${whereClause}
+      ORDER BY q.id;
+    `;
+    const result = await pool.query(sql, values);
     res.json(result.rows);
   } catch (err) {
     console.error("Failed to get question list:", err);
@@ -576,13 +1124,162 @@ app.get("/api/questions/:id", authenticateToken, async (req, res) => {
   }
 });
 
+app.get("/api/questions/meta/tags", authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT DISTINCT UNNEST(tags) AS tag FROM questions WHERE array_length(tags, 1) IS NOT NULL ORDER BY tag`
+    );
+    res.json(result.rows.map((row) => row.tag));
+  } catch (err) {
+    console.error("Failed to get tag list:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+app.post(
+  "/api/questions",
+  authenticateToken,
+  requireAdmin,
+  async (req, res) => {
+    const {
+      title,
+      topic,
+      task_type,
+      difficulty,
+      tags,
+      reading_passage,
+      lecture_script,
+      professor_prompt,
+      student1_author,
+      student1_post,
+      student2_author,
+      student2_post,
+    } = req.body;
+    if (!title || !topic || !task_type) {
+      return res.status(400).json({
+        message: "Title, topic, and task_type are required.",
+      });
+    }
+    if (
+      !["integrated_writing", "academic_discussion"].includes(task_type)
+    ) {
+      return res.status(400).json({ message: "Invalid task_type provided." });
+    }
+    try {
+      const insertSql = `
+        INSERT INTO questions
+          (title, topic, task_type, difficulty, tags, reading_passage, lecture_script,
+           professor_prompt, student1_author, student1_post, student2_author, student2_post)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        RETURNING *;
+      `;
+      const values = [
+        title,
+        topic,
+        task_type,
+        difficulty || null,
+        parseTagArray(tags),
+        reading_passage || null,
+        lecture_script || null,
+        professor_prompt || null,
+        student1_author || null,
+        student1_post || null,
+        student2_author || null,
+        student2_post || null,
+      ];
+      const result = await pool.query(insertSql, values);
+      res.status(201).json(result.rows[0]);
+    } catch (err) {
+      console.error("Failed to create question:", err);
+      res.status(500).json({ message: "Internal server error." });
+    }
+  }
+);
+
+app.put(
+  "/api/questions/:id",
+  authenticateToken,
+  requireAdmin,
+  async (req, res) => {
+    const { id } = req.params;
+    const allowedFields = [
+      "title",
+      "topic",
+      "task_type",
+      "difficulty",
+      "tags",
+      "reading_passage",
+      "lecture_script",
+      "professor_prompt",
+      "student1_author",
+      "student1_post",
+      "student2_author",
+      "student2_post",
+    ];
+    const sets = [];
+    const values = [];
+    let paramIndex = 1;
+    allowedFields.forEach((field) => {
+      if (field in req.body) {
+        let value = req.body[field];
+        if (field === "tags") {
+          value = parseTagArray(value);
+        }
+        sets.push(`${field} = $${paramIndex}`);
+        values.push(value);
+        paramIndex++;
+      }
+    });
+    if (!sets.length) {
+      return res
+        .status(400)
+        .json({ message: "No updatable fields were provided." });
+    }
+    values.push(id);
+    try {
+      const result = await pool.query(
+        `UPDATE questions SET ${sets.join(", ")} WHERE id = $${paramIndex} RETURNING *`,
+        values
+      );
+      if (!result.rows.length) {
+        return res.status(404).json({ message: "Question not found." });
+      }
+      res.json(result.rows[0]);
+    } catch (err) {
+      console.error(`Failed to update question #${id}:`, err);
+      res.status(500).json({ message: "Internal server error." });
+    }
+  }
+);
+
+app.delete(
+  "/api/questions/:id",
+  authenticateToken,
+  requireAdmin,
+  async (req, res) => {
+    const { id } = req.params;
+    try {
+      const result = await pool.query("DELETE FROM questions WHERE id = $1", [
+        id,
+      ]);
+      if (result.rowCount === 0) {
+        return res.status(404).json({ message: "Question not found." });
+      }
+      res.status(204).end();
+    } catch (err) {
+      console.error(`Failed to delete question #${id}:`, err);
+      res.status(500).json({ message: "Internal server error." });
+    }
+  }
+);
+
 app.post(
   "/api/questions/:id/trigger-audio-generation",
   authenticateToken,
   (req, res) => {
     const { id } = req.params;
     console.log(
-      `▶️ [HTTP] Received trigger for audio generation for question #${id}.`
+      `?? [HTTP] Received trigger for audio generation for question #${id}.`
     );
     generateAudioInBackground(id);
     res.status(202).json({ message: "Audio generation process started." });
@@ -616,7 +1313,7 @@ app.post(
   async (req, res) => {
     const { id } = req.params;
     console.log(
-      `▶️ [MODEL ESSAY API] Received request to generate essay for question #${id}.`
+      `?? [MODEL ESSAY API] Received request to generate essay for question #${id}.`
     );
 
     try {
@@ -650,19 +1347,92 @@ app.post(
       ]);
 
       console.log(
-        `✅ [MODEL ESSAY API] Successfully generated and saved new essay for question #${id}.`
+        `? [MODEL ESSAY API] Successfully generated and saved new essay for question #${id}.`
       );
 
       res.json({ modelEssay: newModelEssay });
     } catch (err) {
       console.error(
-        `❌ [MODEL ESSAY API] Failed to generate essay for question #${id}:`,
+        `? [MODEL ESSAY API] Failed to generate essay for question #${id}:`,
         err.message
       );
       res.status(500).json({ message: "Failed to generate AI model essay." });
     }
   }
 );
+
+app.get("/api/drafts/:questionId", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const questionId = parseInt(req.params.questionId, 10);
+  if (Number.isNaN(questionId)) {
+    return res.status(400).json({ message: "Invalid question id." });
+  }
+  try {
+    const result = await pool.query(
+      `SELECT content, word_count, task_type, updated_at
+       FROM writing_drafts
+       WHERE user_id = $1 AND question_id = $2`,
+      [userId, questionId]
+    );
+    if (!result.rows.length) {
+      return res.json(null);
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Failed to fetch draft:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+app.put("/api/drafts/:questionId", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const questionId = parseInt(req.params.questionId, 10);
+  if (Number.isNaN(questionId)) {
+    return res.status(400).json({ message: "Invalid question id." });
+  }
+  const { content = "", wordCount = 0, taskType } = req.body;
+  if (!taskType) {
+    return res.status(400).json({ message: "taskType is required." });
+  }
+  try {
+    const result = await pool.query(
+      `INSERT INTO writing_drafts (user_id, question_id, task_type, content, word_count, updated_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
+       ON CONFLICT (user_id, question_id)
+       DO UPDATE SET content = EXCLUDED.content,
+                     word_count = EXCLUDED.word_count,
+                     task_type = EXCLUDED.task_type,
+                     updated_at = NOW()
+       RETURNING content, word_count, updated_at`,
+      [userId, questionId, taskType, content, wordCount]
+    );
+    res.json({
+      message: "Draft saved.",
+      draft: result.rows[0],
+    });
+  } catch (err) {
+    console.error("Failed to save draft:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+app.delete("/api/drafts/:questionId", authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  const questionId = parseInt(req.params.questionId, 10);
+  if (Number.isNaN(questionId)) {
+    return res.status(400).json({ message: "Invalid question id." });
+  }
+  try {
+    await pool.query(
+      "DELETE FROM writing_drafts WHERE user_id = $1 AND question_id = $2",
+      [userId, questionId]
+    );
+    res.status(204).end();
+  } catch (err) {
+    console.error("Failed to delete draft:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
 
 app.get("/api/writing-test", authenticateToken, async (req, res) => {
   try {
@@ -690,7 +1460,7 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
     });
   }
   try {
-    const responseSql = `INSERT INTO responses (content, word_count, question_id, task_type, user_id) VALUES ($1, $2, $3, $4, $5) RETURNING id`;
+    const responseSql = `INSERT INTO responses (content, word_count, question_id, task_type, user_id, processing_status) VALUES ($1, $2, $3, $4, $5, 'processing') RETURNING id`;
     const responseResult = await pool.query(responseSql, [
       content || "",
       wordCount,
@@ -699,86 +1469,26 @@ app.post("/api/submit-response", authenticateToken, async (req, res) => {
       userId,
     ]);
     const newResponseId = responseResult.rows[0].id;
+    await pool.query(
+      "DELETE FROM writing_drafts WHERE user_id = $1 AND question_id = $2",
+      [userId, qId]
+    );
     res
       .status(201)
-      .json({ message: "Submission successful!", id: newResponseId });
+      .json({
+        message: "Submission successful!",
+        id: newResponseId,
+        status: "processing",
+      });
     console.log(
-      `▶️ [BACKGROUND] Starting AI processing for new response #${newResponseId}...`
+      `?? [BACKGROUND] Starting AI processing for new response #${newResponseId}...`
     );
-    (async () => {
-      const client = await pool.connect();
-      try {
-        await client.query("BEGIN");
-        const questionRes = await client.query(
-          "SELECT * FROM questions WHERE id = $1",
-          [qId]
-        );
-        if (questionRes.rows.length === 0)
-          throw new Error(`Question with ID ${qId} not found.`);
-        const questionData = questionRes.rows[0];
-        let promptText =
-          task_type === "integrated_writing"
-            ? `Reading: ${questionData.reading_passage}\nLecture: ${questionData.lecture_script}`
-            : `Professor's Prompt: ${questionData.professor_prompt}\n${questionData.student1_author}'s Post: ${questionData.student1_post}\n${questionData.student2_author}'s Post: ${questionData.student2_post}`;
-        const aiResult = await callAIScoringAPI(
-          content || "",
-          promptText,
-          task_type
-        );
-        await client.query(
-          `UPDATE responses SET ai_score = $1, ai_feedback = $2 WHERE id = $3`,
-          [aiResult.score, aiResult.feedback, newResponseId]
-        );
-        console.log(
-          `ℹ️ [BACKGROUND] AI scoring complete for response #${newResponseId}. Score: ${aiResult.score}`
-        );
-
-        if (aiResult.mistakes && aiResult.mistakes.length > 0) {
-          const mistakeInsertPromises = aiResult.mistakes.map((mistake) => {
-            const mistakeSql = `INSERT INTO mistakes (user_id, response_id, type, sub_type, original_text, corrected_text, explanation) VALUES ($1, $2, $3, $4, $5, $6, $7)`;
-            const validTypes = [
-              "grammar",
-              "spelling",
-              "style",
-              "vocabulary",
-              "punctuation",
-            ];
-            const mistakeType = validTypes.includes(
-              String(mistake.type).toLowerCase()
-            )
-              ? String(mistake.type).toLowerCase()
-              : "style";
-            const mistakeSubType = mistake.sub_type || "other";
-            return client.query(mistakeSql, [
-              userId,
-              newResponseId,
-              mistakeType,
-              mistakeSubType,
-              mistake.original,
-              mistake.corrected,
-              mistake.explanation,
-            ]);
-          });
-          await Promise.all(mistakeInsertPromises);
-          console.log(
-            `✅ [BACKGROUND] Saved ${aiResult.mistakes.length} granular mistakes for response #${newResponseId}`
-          );
-        }
-        await client.query("COMMIT");
-        await checkAndAwardAchievements(userId, newResponseId);
-        console.log(
-          `✅ [BACKGROUND] Successfully finished all AI processing for response #${newResponseId}.`
-        );
-      } catch (aiError) {
-        await client.query("ROLLBACK");
-        console.error(
-          `❌ [BACKGROUND] AI background task failed for response #${newResponseId}:`,
-          aiError
-        );
-      } finally {
-        client.release();
-      }
-    })();
+    processResponseWithAI(newResponseId).catch((error) => {
+      console.error(
+        `? [BACKGROUND] Async processing crashed for response #${newResponseId}:`,
+        error
+      );
+    });
   } catch (err) {
     console.error("Database insertion failed:", err);
     res.status(500).json({ message: "Internal server error." });
@@ -845,11 +1555,62 @@ app.post(
   }
 );
 
+app.get(
+  "/api/responses/:id/status",
+  authenticateToken,
+  async (req, res) => {
+    const { id } = req.params;
+    try {
+      const result = await pool.query(
+        `SELECT id, processing_status, processing_error, ai_score
+         FROM responses
+         WHERE id = $1 AND user_id = $2`,
+        [id, req.user.id]
+      );
+      if (!result.rows.length) {
+        return res.status(404).json({ message: "Response not found." });
+      }
+      res.json(result.rows[0]);
+    } catch (err) {
+      console.error(`Failed to get status for response #${id}:`, err);
+      res.status(500).json({ message: "Internal server error." });
+    }
+  }
+);
+
+app.post(
+  "/api/responses/:id/rescore",
+  authenticateToken,
+  async (req, res) => {
+    const { id } = req.params;
+    try {
+      const result = await pool.query(
+        "SELECT id FROM responses WHERE id = $1 AND user_id = $2",
+        [id, req.user.id]
+      );
+      if (!result.rows.length) {
+        return res.status(404).json({ message: "Response not found." });
+      }
+      await pool.query(
+        `UPDATE responses
+         SET processing_status = 'processing', processing_error = NULL
+         WHERE id = $1`,
+        [id]
+      );
+      processResponseWithAI(id);
+      res.json({ message: "Rescore queued.", status: "processing" });
+    } catch (err) {
+      console.error(`Failed to rescore response #${id}:`, err);
+      res.status(500).json({ message: "Internal server error." });
+    }
+  }
+);
+
 app.post("/api/responses/:id/polish", authenticateToken, async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
   console.log(
-    `▶️ [POLISH API] Starting AI polish for response #${id} by user #${userId}...`
+    `?? [POLISH API] Starting AI polish for response #${id} by user #${userId}...`
   );
   try {
     const responseQuery = await pool.query(
@@ -868,11 +1629,11 @@ app.post("/api/responses/:id/polish", authenticateToken, async (req, res) => {
     }
     const aiResult = await callAIPolishAPI(originalText);
 
-    console.log(`✅ [POLISH API] Successfully polished response #${id}.`);
+    console.log(`? [POLISH API] Successfully polished response #${id}.`);
     res.json({ polishedText: aiResult.polishedText });
   } catch (err) {
     console.error(
-      `❌ [POLISH API] AI polish failed for response #${id}:`,
+      `? [POLISH API] AI polish failed for response #${id}:`,
       err.message
     );
     res.status(500).json({ message: "Failed to get AI polish suggestion." });
@@ -893,19 +1654,165 @@ app.get("/api/review-list", authenticateToken, async (req, res) => {
 
 app.get("/api/mistakes", authenticateToken, async (req, res) => {
   const userId = req.user.id;
+  const { status, type } = req.query;
+  const filters = ["m.user_id = $1"];
+  const values = [userId];
+  let paramIndex = 2;
+  if (status && status !== "all") {
+    filters.push(`m.status = $${paramIndex}`);
+    values.push(status);
+    paramIndex++;
+  }
+  if (type && type !== "all") {
+    filters.push(`m.type = $${paramIndex}`);
+    values.push(type);
+    paramIndex++;
+  }
+  const whereClause = `WHERE ${filters.join(" AND ")}`;
   try {
     const sql = `
-      SELECT m.id, m.type, m.sub_type, m.original_text, m.corrected_text, m.explanation, m.created_at, m.response_id, q.title as question_title
+      SELECT m.id, m.type, m.sub_type, m.original_text, m.corrected_text,
+             m.explanation, m.created_at, m.response_id, m.status,
+             q.title as question_title
       FROM mistakes m
       JOIN responses r ON m.response_id = r.id
       JOIN questions q ON r.question_id = q.id
-      WHERE m.user_id = $1
+      ${whereClause}
       ORDER BY m.created_at DESC;
     `;
-    const result = await pool.query(sql, [userId]);
+    const result = await pool.query(sql, values);
     res.json(result.rows);
   } catch (err) {
     console.error("Failed to get mistakes:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+app.patch("/api/mistakes/:id", authenticateToken, async (req, res) => {
+  const { status } = req.body;
+  const { id } = req.params;
+  if (!MISTAKE_STATUSES.includes(status)) {
+    return res.status(400).json({ message: "Invalid mistake status." });
+  }
+  try {
+    const result = await pool.query(
+      `UPDATE mistakes
+       SET status = $1
+       WHERE id = $2 AND user_id = $3
+       RETURNING id, status`,
+      [status, id, req.user.id]
+    );
+    if (!result.rows.length) {
+      return res
+        .status(404)
+        .json({ message: "Mistake not found or not owned by user." });
+    }
+    res.json({
+      message: "Mistake updated.",
+      mistake: result.rows[0],
+    });
+  } catch (err) {
+    console.error("Failed to update mistake:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+app.get("/api/user/profile", authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, username, email, bio, avatar_url, email_verified, last_login_at
+       FROM users WHERE id = $1`,
+      [req.user.id]
+    );
+    if (!result.rows.length) {
+      return res.status(404).json({ message: "User not found." });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Failed to fetch profile:", err);
+    res.status(500).json({ message: "Internal server error." });
+  }
+});
+
+app.put("/api/user/profile", authenticateToken, async (req, res) => {
+  const { username, bio, avatarUrl, email } = req.body;
+  if (
+    username === undefined &&
+    bio === undefined &&
+    avatarUrl === undefined &&
+    email === undefined
+  ) {
+    return res.status(400).json({ message: "No profile fields provided." });
+  }
+  try {
+    const currentResult = await pool.query(
+      "SELECT username, email FROM users WHERE id = $1",
+      [req.user.id]
+    );
+    const currentUser = currentResult.rows[0];
+    if (!currentUser) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    const updates = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (username && username !== currentUser.username) {
+      const dupUser = await pool.query(
+        "SELECT 1 FROM users WHERE username = $1 AND id <> $2",
+        [username, req.user.id]
+      );
+      if (dupUser.rows.length) {
+        return res.status(409).json({ message: "Username already in use." });
+      }
+      updates.push(`username = $${paramIndex}`);
+      values.push(username);
+      paramIndex++;
+    }
+    if (email && email !== currentUser.email) {
+      const normalizedEmail = email.trim().toLowerCase();
+      const emailDup = await pool.query(
+        "SELECT 1 FROM users WHERE email = $1 AND id <> $2",
+        [normalizedEmail, req.user.id]
+      );
+      if (emailDup.rows.length) {
+        return res.status(409).json({ message: "Email already in use." });
+      }
+      updates.push(`email = $${paramIndex}`);
+      values.push(normalizedEmail);
+      paramIndex++;
+      updates.push(`email_verified = FALSE`);
+    }
+    if (bio !== undefined) {
+      updates.push(`bio = $${paramIndex}`);
+      values.push(bio);
+      paramIndex++;
+    }
+    if (avatarUrl !== undefined) {
+      updates.push(`avatar_url = $${paramIndex}`);
+      values.push(avatarUrl);
+      paramIndex++;
+    }
+
+    if (!updates.length) {
+      return res
+        .status(400)
+        .json({ message: "No changes detected in profile update." });
+    }
+    values.push(req.user.id);
+    const result = await pool.query(
+      `UPDATE users SET ${updates.join(", ")} WHERE id = $${
+        values.length
+      } RETURNING id, username, email, bio, avatar_url, email_verified, last_login_at`,
+      values
+    );
+    res.json({
+      message: "Profile updated successfully.",
+      profile: result.rows[0],
+    });
+  } catch (err) {
+    console.error("Failed to update profile:", err);
     res.status(500).json({ message: "Internal server error." });
   }
 });
@@ -976,14 +1883,14 @@ app.get("/api/user/writing-analysis", authenticateToken, async (req, res) => {
       res.status(404).json({ message: "No analysis found for this user." });
     }
   } catch (err) {
-    console.error("❌ Failed to get stored writing analysis:", err);
+    console.error("? Failed to get stored writing analysis:", err);
     res.status(500).json({ message: "Internal server error." });
   }
 });
 
 app.post("/api/user/writing-analysis", authenticateToken, async (req, res) => {
   const userId = req.user.id;
-  console.log(`▶️ [ANALYSIS API] Starting new analysis for user #${userId}...`);
+  console.log(`?? [ANALYSIS API] Starting new analysis for user #${userId}...`);
   try {
     const responsesQuery = await pool.query(
       "SELECT content, ai_feedback FROM responses WHERE user_id = $1 AND content IS NOT NULL AND content != '' AND ai_feedback IS NOT NULL AND ai_feedback LIKE '{%}'",
@@ -1072,12 +1979,12 @@ app.post("/api/user/writing-analysis", authenticateToken, async (req, res) => {
     );
 
     console.log(
-      `✅ [ANALYSIS API] Generated and saved new analysis for user #${userId}.`
+      `? [ANALYSIS API] Generated and saved new analysis for user #${userId}.`
     );
     res.json(responseData);
   } catch (err) {
     console.error(
-      `❌ [ANALYSIS API] Failed to generate writing analysis for user #${userId}:`,
+      `? [ANALYSIS API] Failed to generate writing analysis for user #${userId}:`,
       err.message
     );
     res
@@ -1143,3 +2050,5 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 module.exports = { app, pool };
+
+

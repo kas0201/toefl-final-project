@@ -143,6 +143,55 @@
         font-size: 14px;
         color: var(--text-secondary);
       }
+      .mistake-status-pill {
+        font-size: 12px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        text-transform: capitalize;
+        border: 1px solid var(--border-color);
+      }
+      .mistake-status-pill.reviewing {
+        border-color: var(--accent-blue);
+        color: var(--accent-blue);
+      }
+      .mistake-status-pill.mastered {
+        border-color: var(--accent-green);
+        color: var(--accent-green);
+      }
+      .mistake-status-pill.new {
+        border-color: var(--accent-red);
+        color: var(--accent-red);
+      }
+      .status-filter {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .status-filter select {
+        padding: 8px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--border-color);
+        font-family: inherit;
+      }
+      .mistake-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .mistake-actions button {
+        border: 1px solid var(--border-color);
+        background-color: transparent;
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .mistake-actions button:hover {
+        border-color: var(--accent-blue);
+        color: var(--accent-blue);
+      }
       .mistake-body {
         line-height: 1.6;
       }
@@ -214,6 +263,18 @@
         <button class="tab-btn" data-filter="style">Style</button>
       </div>
 
+      <div class="status-filter">
+        <span style="font-weight: 500; color: var(--text-secondary)"
+          >Progress:</span
+        >
+        <select id="status-filter">
+          <option value="all">All</option>
+          <option value="new">New</option>
+          <option value="reviewing">Reviewing</option>
+          <option value="mastered">Mastered</option>
+        </select>
+      </div>
+
       <div class="mistake-list" id="mistake-list">
         <div class="loading-state">Loading your mistake book...</div>
       </div>
@@ -229,23 +290,52 @@
         }
 
         const listContainer = document.getElementById("mistake-list");
-        let allMistakes = [];
-
-        // --- 【关键修改 3/3】: 更新 JavaScript 逻辑以适配标签页 ---
+        const statusFilter = document.getElementById("status-filter");
         const tabButtons = document.querySelectorAll(".tab-btn");
+        let allMistakes = [];
+        let currentTypeFilter = "all";
+        let currentStatusFilter = "all";
 
-        const renderMistakes = (filterValue) => {
+        const updateMistakeStatus = async (id, status) => {
+          try {
+            const response = await fetch(`/api/mistakes/${id}`, {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ status }),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+              throw new Error(data.message || "Failed to update mistake.");
+            }
+            const target = allMistakes.find((m) => m.id === id);
+            if (target) {
+              target.status = data.mistake.status;
+            }
+            renderMistakes();
+          } catch (error) {
+            alert(error.message);
+          }
+        };
+
+        const renderMistakes = () => {
           listContainer.innerHTML = "";
 
-          const filteredMistakes = allMistakes.filter(
-            (m) => filterValue === "all" || m.type === filterValue
-          );
+          const filteredMistakes = allMistakes.filter((m) => {
+            const typeMatch =
+              currentTypeFilter === "all" || m.type === currentTypeFilter;
+            const statusMatch =
+              currentStatusFilter === "all" || m.status === currentStatusFilter;
+            return typeMatch && statusMatch;
+          });
 
           if (filteredMistakes.length === 0) {
             const message =
               allMistakes.length === 0
                 ? "No mistakes found yet. Keep practicing and the AI will automatically log them here!"
-                : `No mistakes of type "${filterValue}" found in your records.`;
+                : "No mistakes match your current filters.";
             listContainer.innerHTML = `<div class="empty-state">${message}</div>`;
             return;
           }
@@ -269,7 +359,12 @@
                   <span class="mistake-type-badge ${mistake.type}">${
               mistake.type
             }</span>
-                  <span class="mistake-date">${date}</span>
+                  <div style="display:flex; gap:8px; align-items:center;">
+                    <span class="mistake-status-pill ${mistake.status || "new"}">${
+              mistake.status || "new"
+            }</span>
+                    <span class="mistake-date">${date}</span>
+                  </div>
               </div>
               <div class="mistake-body">
                   <span class="original">${mistake.original_text}</span>
@@ -285,25 +380,38 @@
               <a href="/history-detail.html?id=${
                 mistake.response_id
               }" class="context-link">
-                  View in original context (${
-                    mistake.question_title || "Practice Response"
-                  }) &rarr;
-              </a>`;
+                  View in original context (${mistake.question_title || "Practice Response"}) &rarr;
+              </a>
+              <div class="mistake-actions">
+                <button data-status="reviewing" data-id="${mistake.id}">Review next</button>
+                <button data-status="mastered" data-id="${mistake.id}">Mark mastered</button>
+              </div>`;
             listContainer.appendChild(card);
           });
+
+          document
+            .querySelectorAll(".mistake-actions button")
+            .forEach((button) => {
+              button.addEventListener("click", (event) => {
+                const newStatus = event.currentTarget.dataset.status;
+                const id = Number(event.currentTarget.dataset.id);
+                updateMistakeStatus(id, newStatus);
+              });
+            });
         };
 
-        // 为每个标签页按钮添加点击事件
         tabButtons.forEach((button) => {
           button.addEventListener("click", () => {
-            // 移除所有按钮的 'active' 状态
             tabButtons.forEach((btn) => btn.classList.remove("active"));
-            // 为当前点击的按钮添加 'active' 状态
             button.classList.add("active");
-            // 根据按钮的 data-filter 属性重新渲染列表
-            const filter = button.dataset.filter;
-            renderMistakes(filter);
+            currentTypeFilter = button.dataset.filter;
+            renderMistakes();
           });
+        });
+
+        statusFilter.addEventListener("change", () => {
+          currentStatusFilter = statusFilter.value;
+          renderMistakes();
         });
 
         try {
@@ -318,8 +426,7 @@
           }
 
           allMistakes = await response.json();
-          // 初始加载时，显示 "All Types"
-          renderMistakes("all");
+          renderMistakes();
         } catch (error) {
           console.error("Error loading mistake book:", error);
           listContainer.innerHTML = `<div class="empty-state">Error loading your data. Please try again later.</div>`;
