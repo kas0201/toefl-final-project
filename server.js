@@ -1,4 +1,5 @@
 ﻿// --- START OF FILE server.js (UPDATED with Strict Scoring and Forensic Error Analysis - FULLY UNABRIDGED) ---
+// 测试环境变量请参考 README.md 中的说明。
 
 const express = require("express");
 const { Pool } = require("pg");
